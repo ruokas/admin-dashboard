@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Skubios pagalbos administratoriaus prietaisų skydas</title>
+  <style>
+    :root{
+      --bg:#0b1117; --panel:#111922; --muted:#1b2530; --text:#e6edf3; --subtext:#9fb0c0;
+      --accent:#6ee7b7; --danger:#ff6b6b; --warn:#ffd166; --ok:#8ecae6; --card:#0f141a;
+      --shadow: 0 6px 20px rgba(0,0,0,.25);
+    }
+    .theme-light:root{ --bg:#f6f8fb; --panel:#ffffff; --muted:#e9eef3; --text:#0c1116; --subtext:#4a5a6a; --accent:#2563eb; --danger:#d83a3a; --ok:#0ea5e9; --card:#ffffff; --shadow: 0 10px 24px rgba(7,14,22,.08);}    
+    html,body{height:100%}
+    body{ margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji"; background:var(--bg); color:var(--text); display:flex; flex-direction:column; }
+    header{ position:sticky; top:0; z-index:3; backdrop-filter:saturate(180%) blur(10px); background:linear-gradient(180deg, rgba(0,0,0,.35), rgba(0,0,0,0)),var(--bg); padding:14px clamp(12px,2vw,24px); box-shadow: 0 1px 0 rgba(255,255,255,.05) inset; display:grid; grid-template-columns: 1fr auto; align-items:center; gap:12px; }
+    .title{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    .title h1{ margin:0; font-size: clamp(18px,3.5vw,24px); letter-spacing:.2px }
+    .title .badge{font-size:12px; padding:4px 8px; border-radius:999px; background:var(--muted); color:var(--subtext)}
+    .controls{ display:flex; flex-wrap:wrap; gap:8px; align-items:center }
+    button, .btn{ border:1px solid transparent; background:var(--panel); color:var(--text); padding:10px 12px; border-radius:12px; cursor:pointer; box-shadow:var(--shadow); font-weight:600; letter-spacing:.2px; transition:.2s ease background, .2s ease transform; display:inline-flex; align-items:center; gap:8px; text-decoration:none }
+    button:hover, .btn:hover{ transform: translateY(-1px); background:var(--muted) }
+    .btn-accent{ background:linear-gradient(180deg, var(--accent), #3dd6a6); color:#0a0f14 }
+    .btn-danger{ background: linear-gradient(180deg, var(--danger), #e24a4a); color:white }
+    .btn-outline{ background:transparent; border-color:var(--muted) }
+    .search{ position:relative; }
+    .search input{ background:var(--panel); border:1px solid transparent; color:var(--text); padding:12px 14px 12px 40px; border-radius:12px; min-width: 240px; outline:none; box-shadow:var(--shadow); }
+    .search svg{ position:absolute; left:12px; top:50%; transform:translateY(-50%); opacity:.6 }
+    main{ padding:20px clamp(10px,2.2vw,24px); max-width:1500px; width:100%; margin:0 auto; flex:1; }
+    .grid{ display:grid; grid-template-columns: repeat(auto-fill,minmax(290px,1fr)); gap:16px }
+    .group{ background:var(--panel); border:1px solid rgba(255,255,255,.06); border-radius:18px; box-shadow:var(--shadow); display:flex; flex-direction:column; min-height:120px; overflow:hidden; }
+    .group-header{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:14px; background:linear-gradient(180deg, rgba(255,255,255,.04), transparent) }
+    .group-title{ display:flex; align-items:center; gap:10px }
+    .dot{ width:12px; height:12px; border-radius:50% }
+    .group-header h2{ margin:0; font-size:16px }
+    .group-actions{ display:flex; align-items:center; gap:6px }
+    .items{ display:grid; grid-template-columns:1fr; gap:10px; padding:12px; }
+    .item{ background:var(--card); border:1px solid rgba(255,255,255,.06); border-radius:14px; padding:12px; display:flex; gap:10px; align-items:center; box-shadow:var(--shadow) }
+    .item.dragging{ opacity:.45 }
+    .item .meta{ flex:1; min-width:0 }
+    .item .meta .title{ font-weight:700; font-size:14px; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+    .item .meta .sub{ font-size:12px; color:var(--subtext); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+    .item .actions{ display:flex; gap:6px }
+    .favicon{ width:20px; height:20px; border-radius:4px; background:var(--muted); flex:0 0 20px; display:grid; place-items:center; font-size:10px; color:var(--subtext) }
+    .embed{ border-radius:12px; overflow:hidden; border:1px solid rgba(255,255,255,.08); }
+    .embed iframe{ width:100%; height:320px; border:0; background:white }
+    details summary{ cursor:pointer; list-style:none }
+    details summary::-webkit-details-marker{ display:none }
+    .empty{ border:1px dashed rgba(255,255,255,.15); border-radius:14px; padding:18px; text-align:center; color:var(--subtext); font-size:14px }
+    footer{ padding:30px; text-align:center; color:var(--subtext) }
+    .handle{ cursor:grab; opacity:.7 }
+    @media (max-width:620px){ .controls{ gap:6px } .search input{ min-width:170px } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="title">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 3l7 4v10l-7 4-7-4V7l7-4z" stroke="currentColor" stroke-width="1.5"/><path d="M12 7l3.5 2v6L12 17l-3.5-2V9L12 7z" stroke="currentColor" stroke-width="1.5"/></svg>
+      <h1>SMP administratoriaus skydas</h1>
+      <span class="badge" id="stats"></span>
+    </div>
+    <div class="controls">
+      <div class="search">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="11" cy="11" r="7.25" stroke="currentColor" stroke-width="1.5"/></svg>
+        <input id="q" placeholder="Paieška nuorodose…"/>
+      </div>
+      <button id="addGroup" type="button">➕ Pridėti grupę</button>
+      <button id="importBtn" class="btn-outline" type="button">⤒ Importuoti</button>
+      <button id="exportBtn" class="btn-outline" type="button">⤓ Eksportuoti</button>
+      <button id="themeBtn" class="btn" type="button">🌓 Tema</button>
+    </div>
+  </header>
+
+  <main>
+    <div id="groups" class="grid" aria-live="polite"></div>
+  </main>
+
+  <footer>
+    <small>Patarimas: įklijuokite Google Sheets nuorodą kuriant įrašą — ji bus automatiškai paversta į įterpiamą peržiūrą. Duomenys saugomi tik šiame įrenginyje (localStorage).</small>
+  </footer>
+
+  <input type="file" id="fileInput" accept="application/json" hidden />
+
+<script>
+(function(){
+  'use strict';
+  const T = {
+    searchPH: 'Paieška nuorodose…',
+    addGroup: 'Pridėti grupę',
+    import: 'Importuoti',
+    export: 'Eksportuoti',
+    theme: 'Tema',
+    openAll: 'Atverti visas',
+    addItem: 'Pridėti įrašą',
+    collapse: 'Sutraukti/Išskleisti',
+    editGroup: 'Redaguoti grupę',
+    deleteGroup: 'Pašalinti grupę',
+    empty: 'Nėra įrašų. Spauskite ＋, kad pridėtumėte nuorodą ar įterpimą.',
+    noMatches: 'Nėra atitikmenų šioje grupėje.',
+    itemTypes: 'Įrašo tipas: link | sheet | embed',
+    groupName: 'Grupės pavadinimas (pvz., „Kasdieniai darbai“, „Gairės“)',
+    groupColor: 'Akcento spalva',
+    renameGroup: 'Pervadinti grupę',
+    itemTitle: 'Pavadinimas',
+    itemUrl: 'URL',
+    itemNote: 'Pastaba (nebūtina)',
+    sheetTip: 'Patarimas: Google Sheets turi būti „Publish to web“ arba bendrinamas.',
+    confirmDelGroup: 'Pašalinti šią grupę ir visus jos įrašus?',
+    confirmDelItem: 'Pašalinti šį įrašą?',
+    invalidImport: 'Netinkamas failo formatas',
+  };
+
+  const STORAGE_KEY = 'ed_dashboard_lt_v1';
+  const THEME_KEY = 'ed_dash_theme';
+  const groupsEl = document.getElementById('groups');
+  const statsEl = document.getElementById('stats');
+  const searchEl = document.getElementById('q');
+
+  let state = load() || seed();
+
+  /** @typedef {{id:string, name:string, color:string, collapsed?:boolean, items: Item[]}} Group */
+  /** @typedef {{id:string, type:'link'|'sheet'|'embed', title:string, url:string, note?:string}} Item */
+
+  const uid = () => Math.random().toString(36).slice(2,10);
+  function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); render(); }
+  function load(){ try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||'');}catch(e){return null;} }
+  function seed(){
+    const demo = {
+      groups:[
+        { id:uid(), name:'Kasdieniai darbai', color:'#6ee7b7', items:[
+          {id:uid(), type:'link', title:'ESIS', url:'https://esis.example' },
+          {id:uid(), type:'link', title:'El. paštas (Outlook)', url:'https://outlook.office.com'},
+          {id:uid(), type:'link', title:'Ligoninės intranetas', url:'https://intranet.example'}
+        ]},
+        { id:uid(), name:'Rodikliai ir lapai', color:'#8ecae6', items:[
+          {id:uid(), type:'sheet', title:'SMP KPI skydas', url:'https://docs.google.com/spreadsheets/d/e/2PACX-FAKE/pubhtml?widget=true&headers=false'},
+          {id:uid(), type:'embed', title:'Looker Studio: laukimo laikai', url:'https://lookerstudio.google.com/embed/reporting/FAKE'}
+        ]},
+        { id:uid(), name:'Gairės', color:'#ffd166', items:[
+          {id:uid(), type:'link', title:'Insulto protokolas', url:'#'},
+          {id:uid(), type:'link', title:'Sepsio paketas', url:'#'}
+        ]}
+      ]
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(demo));
+    return demo;
+  }
+
+  function toFavicon(u){ try{ const url=new URL(u); return `${url.origin}/favicon.ico`; }catch{ return '' } }
+  function toSheetEmbed(url){
+    try{
+      const u = new URL(url);
+      if(!u.hostname.includes('docs.google.com')) return null;
+      const parts = u.pathname.split('/');
+      const keyIdx = parts.findIndex(p=>p==='d');
+      if(keyIdx>0 && parts[keyIdx+1]){ const id = parts[keyIdx+1]; return `https://docs.google.com/spreadsheets/d/${id}/pubhtml?widget=true&headers=false`; }
+      if(u.pathname.includes('/pub') || u.pathname.includes('/pubhtml')) return url;
+      return null;
+    }catch{ return null }
+  }
+
+  function render(){
+    const q = (searchEl.value||'').toLowerCase().trim();
+    groupsEl.innerHTML = '';
+    state.groups.forEach((g)=>{
+      const grp = document.createElement('section');
+      grp.className = 'group';
+      grp.dataset.id = g.id;
+      grp.draggable = true;
+      grp.addEventListener('dragstart', e=>{ e.dataTransfer.setData('text/group', g.id); grp.style.opacity = .5; });
+      grp.addEventListener('dragend',   ()=>{ grp.style.opacity = 1; });
+      grp.addEventListener('dragover',  e=>{ e.preventDefault(); });
+      grp.addEventListener('drop', (e)=>{
+        e.preventDefault();
+        const fromId = e.dataTransfer.getData('text/group');
+        if(fromId && fromId!==g.id){
+          const fromIdx = state.groups.findIndex(x=>x.id===fromId);
+          const toIdx   = state.groups.findIndex(x=>x.id===g.id);
+          const [moved] = state.groups.splice(fromIdx,1);
+          state.groups.splice(toIdx,0,moved);
+          save();
+        }
+      });
+
+      const h = document.createElement('div');
+      h.className = 'group-header';
+      h.innerHTML = `
+        <div class="group-title">
+          <span class="dot" style="background:${g.color||'#6ee7b7'}"></span>
+          <h2 title="Tempkite, kad perrikiuotumėte" class="handle">${escapeHtml(g.name)}</h2>
+        </div>
+        <div class="group-actions">
+          <button type="button" title="${T.openAll}" aria-label="${T.openAll}" data-act="openAll">↗</button>
+          <button type="button" title="${T.addItem}" aria-label="${T.addItem}" data-act="add">＋</button>
+          <button type="button" title="${T.collapse}" aria-label="${T.collapse}" data-act="toggle">▾</button>
+          <button type="button" title="${T.editGroup}" aria-label="${T.editGroup}" data-act="edit">✎</button>
+          <button type="button" class="btn-danger" title="${T.deleteGroup}" aria-label="${T.deleteGroup}" data-act="del">🗑</button>
+        </div>`;
+
+      h.addEventListener('click', (e)=>{
+        const btn = e.target.closest('button');
+        if(!btn) return;
+        const act = btn.dataset.act;
+        if(act==='add') return addItem(g.id);
+        if(act==='edit') return editGroup(g.id);
+        if(act==='del'){
+          if(confirm(T.confirmDelGroup)){
+            state.groups = state.groups.filter(x=>x.id!==g.id);
+            save();
+          }
+          return;
+        }
+        if(act==='toggle'){ g.collapsed = !g.collapsed; save(); return; }
+        if(act==='openAll'){ g.items.filter(i=>i.type==='link').forEach(i=> window.open(i.url, '_blank')); }
+      });
+
+      grp.appendChild(h);
+
+      const itemsWrap = document.createElement('div');
+      itemsWrap.className = 'items';
+      if(g.collapsed) itemsWrap.style.display = 'none';
+
+      const filteredItems = g.items.filter(i=>{ if(!q) return true; return [i.title, i.url, i.note].filter(Boolean).some(v=>String(v).toLowerCase().includes(q)); });
+
+      if(filteredItems.length===0){
+        const empty = document.createElement('div');
+        empty.className='empty';
+        empty.textContent = q ? T.noMatches : T.empty;
+        itemsWrap.appendChild(empty);
+      } else {
+        filteredItems.forEach((it)=>{
+          const card = document.createElement('div');
+          card.className = 'item';
+          card.dataset.gid = g.id;
+          card.dataset.iid = it.id;
+          card.draggable = true;
+          card.addEventListener('dragstart', e=>{ e.dataTransfer.setData('text/item', JSON.stringify({gid:g.id,iid:it.id})); card.classList.add('dragging'); });
+          card.addEventListener('dragend', ()=> card.classList.remove('dragging'));
+          card.addEventListener('dragover', e=> e.preventDefault());
+          card.addEventListener('drop', (e)=>{
+            e.preventDefault();
+            const data = JSON.parse(e.dataTransfer.getData('text/item')||'{}');
+            if(!data.iid) return;
+            if(data.gid===g.id){
+              const idxFrom = g.items.findIndex(x=>x.id===data.iid);
+              const idxTo   = g.items.findIndex(x=>x.id===it.id);
+              const [moved] = g.items.splice(idxFrom,1);
+              g.items.splice(idxTo,0,moved);
+              save();
+            } else {
+              const fromG = state.groups.find(x=>x.id===data.gid);
+              const idxFrom = fromG.items.findIndex(x=>x.id===data.iid);
+              const [moved] = fromG.items.splice(idxFrom,1);
+              const idxTo   = g.items.findIndex(x=>x.id===it.id);
+              g.items.splice(idxTo,0,moved);
+              save();
+            }
+          });
+
+          const favicon = it.type==='link' ? `<img class="favicon" alt="" src="${toFavicon(it.url)}" onerror="this.outerHTML='<div class=\'favicon\'>🌐</div>'">` : `<div class="favicon">${it.type==='sheet'?'📊':'🧩'}</div>`;
+
+          card.innerHTML = `
+            ${favicon}
+            <div class="meta">
+              <div class="title">${escapeHtml(it.title||'(be pavadinimo)')}</div>
+              <div class="sub">${escapeHtml(it.url)}</div>
+            </div>
+            <div class="actions">
+              ${it.type==='link'?`<a class="btn" href="${it.url}" target="_blank" rel="noopener">Atverti</a>`:''}
+              <button type="button" title="Peržiūra" aria-label="Peržiūra" data-a="preview">👁</button>
+              <button type="button" title="Redaguoti" aria-label="Redaguoti" data-a="edit">✎</button>
+              <button type="button" class="btn-danger" title="Pašalinti" aria-label="Pašalinti" data-a="del">🗑</button>
+            </div>`;
+
+          card.addEventListener('click', (e)=>{
+            const b = e.target.closest('button, a');
+            if(!b || b.tagName==='A') return; 
+            const a = b.dataset.a;
+            if(a==='edit') return editItem(g.id, it.id);
+            if(a==='del'){ if(confirm(T.confirmDelItem)){ g.items = g.items.filter(x=>x.id!==it.id); save(); } return; }
+            if(a==='preview') return previewItem(it, card);
+          });
+
+          itemsWrap.appendChild(card);
+        });
+      }
+
+      grp.appendChild(itemsWrap);
+      groupsEl.appendChild(grp);
+    });
+
+    const totalGroups = state.groups.length;
+    const totalItems = state.groups.reduce((s,g)=>s+g.items.length,0);
+    statsEl.textContent = `${totalGroups} grupės • ${totalItems} įrašai`;
+  }
+
+  function previewItem(it, mount){
+    const existing = mount.nextElementSibling;
+    if(existing && existing.classList.contains('embed')){ existing.remove(); return; }
+    const wrap = document.createElement('div');
+    wrap.className = 'embed';
+    let src = it.url;
+    if(it.type==='sheet'){ const conv = toSheetEmbed(it.url); if(conv) src = conv; }
+    wrap.innerHTML = `<details open><summary>Rodyti/slėpti peržiūrą</summary><iframe src="${src}" loading="lazy" referrerpolicy="no-referrer"></iframe></details>`;
+    mount.after(wrap);
+  }
+
+  function addGroup(){
+    const name = prompt(T.groupName); if(!name) return;
+    const color = prompt(T.groupColor, '#6ee7b7') || '#6ee7b7';
+    state.groups.push({ id:uid(), name:name.trim(), color:color.trim(), items:[] });
+    save();
+  }
+
+  function editGroup(gid){
+    const g = state.groups.find(x=>x.id===gid); if(!g) return;
+    const name = prompt(T.renameGroup, g.name); if(!name) return;
+    const color = prompt(T.groupColor, g.color) || g.color;
+    g.name = name.trim(); g.color = color.trim(); save();
+  }
+
+  function addItem(gid){
+    const g = state.groups.find(x=>x.id===gid); if(!g) return;
+    const type = (prompt(T.itemTypes, 'link')||'link').toLowerCase();
+    if(!['link','sheet','embed'].includes(type)) return alert('Nežinomas tipas.');
+    const title = prompt(T.itemTitle); if(!title) return;
+    let url = prompt(T.itemUrl); if(!url) return;
+    if(type==='sheet'){
+      const conv = toSheetEmbed(url);
+      if(conv) url = conv; else alert(T.sheetTip);
+    }
+    const note = prompt(T.itemNote) || '';
+    g.items.push({ id:uid(), type, title:title.trim(), url:url.trim(), note:note.trim() });
+    save();
+  }
+
+  function editItem(gid, iid){
+    const g = state.groups.find(x=>x.id===gid); if(!g) return;
+    const it = g.items.find(x=>x.id===iid); if(!it) return;
+    const title = prompt(T.itemTitle, it.title); if(!title) return;
+    let url = prompt(T.itemUrl, it.url); if(!url) return;
+    if(it.type==='sheet'){ const conv = toSheetEmbed(url); if(conv) url = conv; }
+    const note = prompt(T.itemNote, it.note||'') || '';
+    it.title = title.trim(); it.url = url.trim(); it.note = note.trim();
+    save();
+  }
+
+  function exportJson(){
+    const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'smp-skydas.json'; a.click(); URL.revokeObjectURL(a.href);
+  }
+
+  function importJson(file){
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const data = JSON.parse(reader.result);
+        if(!data || !Array.isArray(data.groups)) throw new Error(T.invalidImport);
+        state = data; save();
+      }catch(err){ alert('Importo klaida: '+ err.message); }
+    };
+    reader.readAsText(file);
+  }
+
+  function applyTheme(){ const theme = localStorage.getItem(THEME_KEY) || 'dark'; if(theme==='light') document.documentElement.classList.add('theme-light'); else document.documentElement.classList.remove('theme-light'); }
+  function toggleTheme(){ const now = (localStorage.getItem(THEME_KEY)||'dark')==='dark' ? 'light':'dark'; localStorage.setItem(THEME_KEY, now); applyTheme(); }
+
+  document.getElementById('addGroup').addEventListener('click', addGroup);
+  document.getElementById('exportBtn').addEventListener('click', exportJson);
+  document.getElementById('importBtn').addEventListener('click', ()=> document.getElementById('fileInput').click());
+  document.getElementById('fileInput').addEventListener('change', (e)=>{ const f = e.target.files[0]; if(f) importJson(f); e.target.value=''; });
+  document.getElementById('themeBtn').addEventListener('click', toggleTheme);
+  searchEl.placeholder = T.searchPH;
+  searchEl.addEventListener('input', render);
+
+  function escapeHtml(str){ return String(str).replace(/[&<>\"]/g, s=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[s])); }
+
+  applyTheme();
+  render();
+
+  // Papildoma diagnostika, jei vartotojas sako, kad mygtukai „neveikia“
+  window.addEventListener('error', (e)=>{ console.error('Klaida:', e.message); });
+})();
+</script>
+</body>
+</html>
