@@ -1,7 +1,0 @@
-# Bendri OS failai
-.DS_Store
-Thumbs.db
-
-# Build ar node moduliai (nors nenaudojame)
-node_modules/
-
