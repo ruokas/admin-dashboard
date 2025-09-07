@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Traumos forma – Desktop v9.6 (SVG kūno žemėlapis)</title>
+<style>
+  :root{
+    --bg:#0c1218;--card:#121a24;--ink:#e9f2fb;--muted:#a7b4c4;--line:#203040;
+    --accent:#4ea0f5;--red:#e53935;--yellow:#ffcc00;--green:#00c853;--ink2:#cfe8ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif}
+  header{position:sticky;top:0;z-index:10;background:#0d151fdd;backdrop-filter:blur(6px);border-bottom:1px solid var(--line)}
+  .wrap{max-width:1200px;margin:0 auto;padding:14px 16px}
+  h1{font-size:20px;margin:4px 0}
+  .sub{color:var(--muted);font-size:13px}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .btn{border:1px solid var(--line);background:#152231;color:var(--ink);padding:8px 12px;border-radius:10px;cursor:pointer;font-weight:600}
+  .btn.primary{background:var(--accent);color:#06223f;border-color:#2d74b8}
+  .btn.warn{background:#ffb74d;color:#271400;border-color:#bf7d19}
+  .btn.ghost{background:transparent;color:var(--muted);border-style:dashed}
+  main{max-width:1200px;margin:12px auto;padding:0 16px;display:grid;grid-template-columns:220px 1fr;gap:12px}
+  nav{position:sticky;top:68px;align-self:start}
+  nav .tab{display:block;padding:10px 12px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:#0f1822;color:var(--ink);cursor:pointer;font-weight:600;text-align:left}
+  nav .tab.active{background:#162334;border-color:#2b405c}
+  section.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+  section.card h2{font-size:16px;margin:0 0 10px}
+  section.card .grid{display:grid;gap:10px}
+  .cols-2{grid-template-columns:1fr 1fr}
+  .cols-3{grid-template-columns:repeat(3,1fr)}
+  label{display:block;color:var(--muted);font-size:13px;margin-bottom:4px}
+  input[type="text"],input[type="number"],input[type="time"],input[type="date"],textarea,select{
+    width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:#0f1620;color:#e9f2fb;font-size:14px;outline:none
+  }
+  textarea{min-height:80px;resize:vertical}
+  .row{display:flex;gap:8px;align-items:center}
+  .pill{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--line);border-radius:999px;background:#0f1822;color:#fff;font-weight:700}
+  .chip{display:inline-flex;align-items:center;justify-content:center;padding:8px 10px;border:1px solid var(--line);
+    border-radius:999px;background:#0f1822;cursor:pointer;user-select:none}
+  .chip.active{background:var(--accent);color:#051b32;border-color:#2d74b8}
+  .chip.red.active{background:var(--red);color:#fff;border-color:#a52623}
+  .chip.yellow.active{background:var(--yellow);color:#231b00;border-color:#8a7400}
+  .chip-group{display:flex;flex-wrap:wrap;gap:8px}
+  .hint{color:var(--muted);font-size:12px}
+  .badge{padding:2px 8px;border-radius:8px;font-size:12px;border:1px solid var(--line);background:#0f1822;color:#a7b4c4}
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .subtle{font-size:12px;color:var(--muted)}
+  .divider{height:1px;background:var(--line);margin:10px 0}
+  /* Alerts */
+  .alert{border-color:#e53935!important; box-shadow:0 0 0 2px rgba(229,57,53,.25); background:#1a0e10;}
+  .alert::placeholder{color:#ffbdbd}
+  /* SVG body map */
+  .map-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0}
+  .tool{padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:#0f1822;color:#e9f2fb;min-height:36px;cursor:pointer;font-weight:700}
+  .tool.active{background:var(--accent);color:#00233d;border-color:#2d74b8}
+  #svgWrap{max-width:520px}
+  #bodySvg{width:100%;height:auto;border:1px solid var(--line);border-radius:12px;background:#0b141e}
+  .silhouette{fill:#0f1822;stroke:#496a86;stroke-width:1.6}
+  .silhouette-line{fill:none;stroke:#496a86;stroke-width:1}
+  .label{fill:#a9b6c5;font:bold 14px system-ui}
+  .mark-w{stroke:#ef5350;stroke-width:2.5;fill:none}
+  .mark-b{fill:#64b5f6}
+  .mark-n{fill:#ffd54f;stroke:#6b540e;stroke-width:1.5}
+  .hidden{display:none}
+  .range{accent-color:var(--accent)}
+  .tiny{font-size:12px;color:var(--muted)}
+  @media (max-width:980px){ main{grid-template-columns:1fr} nav{position:static} .cols-3{grid-template-columns:1fr 1fr} }
+  @media print{ header,nav,.toolbar{display:none!important} body{background:#fff;color:#000} section.card{break-inside:avoid} #svgControls{display:none} }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>Traumos forma – Desktop v9.6</h1>
+    <div class="sub">Aktyvacija (EMS) · ABCDE · LT · SVG kūno žemėlapis (kompaktiškas)</div>
+    <div class="toolbar">
+      <button class="btn primary" id="btnGen">Sugeneruoti ataskaitą</button>
+      <button class="btn" id="btnCopy">Kopijuoti</button>
+      <button class="btn" id="btnSave">Išsaugoti</button>
+      <button class="btn ghost" id="btnClear">Išvalyti</button>
+      <button class="btn warn" onclick="window.print()">🖨 Spausdinti</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <nav id="tabs"></nav>
+
+  <div id="views">
+    <!-- Aktyvacija (EMS) -->
+    <section class="card view" data-tab="Aktyvacija (EMS)">
+      <h2>Traumos komandos aktyvacija <span class="badge">EMS rodikliai → auto</span></h2>
+      <div class="grid cols-3">
+        <div><label>EMS ŠSD (k./min)</label><input id="ems_hr" type="number" min="0" max="250"></div>
+        <div><label>EMS KD (k./min)</label><input id="ems_rr" type="number" min="0" max="80"></div>
+        <div><label>EMS SpO₂ (%)</label><input id="ems_spo2" type="number" min="0" max="100"></div>
+      </div>
+      <div class="grid cols-3" style="margin-top:8px">
+        <div class="row"><div style="flex:1"><label>EMS AKS s</label><input id="ems_sbp" type="number" min="0" max="300"></div><div style="flex:1"><label>EMS AKS d</label><input id="ems_dbp" type="number" min="0" max="200"></div></div>
+        <div><label>EMS GKS (A-K-M)</label><div class="row"><input id="ems_gksa" type="number" min="1" max="4" placeholder="A"><input id="ems_gksk" type="number" min="1" max="5" placeholder="K"><input id="ems_gksm" type="number" min="1" max="6" placeholder="M"></div></div>
+        <div><label>EMS Temperatūra (nebūtina)</label><input id="ems_temp" type="number" step="0.1"></div>
+      </div>
+      <div class="split" style="margin-top:12px">
+        <div>
+          <label><strong>RAUDONA</strong></label>
+          <div class="chip-group" id="chips_red">
+            <span class="chip red" data-value="GKS &lt; 9">GKS &lt; 9</span>
+            <span class="chip red" data-value="KD &lt; 8 ar &gt; 30/min">KD &lt; 8 ar &gt; 30/min</span>
+            <span class="chip red" data-value="AKS &lt; 90 mmHg">AKS &lt; 90 mmHg</span>
+            <span class="chip red" data-value="SpO₂ &lt; 90%">SpO₂ &lt; 90%</span>
+            <span class="chip red" data-value="ŠSD &gt; 120/min">ŠSD &gt; 120/min</span>
+          </div>
+        </div>
+        <div>
+          <label><strong>GELTONA</strong></label>
+          <div class="chip-group" id="chips_yellow">
+            <span class="chip yellow" data-value="Pėst./dvir./motociklo trauma">Pėst./dvir./motociklo trauma</span>
+            <span class="chip yellow" data-value="Sprogimas/susišaudymas">Sprogimas/susišaudymas</span>
+            <span class="chip yellow" data-value="Kritimas &gt; 3 m ar nardymas">Kritimas &gt; 3 m ar nardymas</span>
+            <span class="chip yellow" data-value="Reikėjo gelbėtojų pagalbos">Reikėjo gelbėtojų pagalbos</span>
+          </div>
+        </div>
+      </div>
+      <div class="hint" style="margin-top:6px">Auto-aktyvacija – tik iš EMS rodiklių; rankiniai pakeitimai išlieka.</div>
+    </section>
+
+    <!-- A -->
+    <section class="card view" data-tab="A – Kvėpavimo takai">
+      <h2>A – Kvėpavimo takai</h2>
+      <label>Takai</label>
+      <div class="chip-group" id="a_airway_group" data-single="true">
+        <span class="chip" data-value="Atviri">Atviri</span>
+        <span class="chip" data-value="Užtikrinti (intub./GMP)">Užtikrinti (intub./GMP)</span>
+        <span class="chip" data-value="Kita">Kita</span>
+      </div>
+      <div class="row" style="margin-top:8px"><label style="margin:0">Pastabos</label><input id="a_notes" type="text" placeholder="Trumpai..."></div>
+    </section>
+
+    <!-- B -->
+    <section class="card view" data-tab="B – Kvėpavimas">
+      <h2>B – Kvėpavimas</h2>
+      <div class="grid cols-3">
+        <div><label>KD (k./min)</label><input id="b_rr" type="number" min="0" max="80"></div>
+        <div><label>SpO₂ (%)</label><input id="b_spo2" type="number" min="0" max="100"></div>
+        <div>
+          <label>Alsavimas</label>
+          <div class="row">
+            <div><div class="subtle">Kairė</div><div class="chip-group" id="b_breath_left_group" data-single="true"><span class="chip" data-value="+">+</span><span class="chip" data-value="-">-</span></div></div>
+            <div><div class="subtle">Dešinė</div><div class="chip-group" id="b_breath_right_group" data-single="true"><span class="chip" data-value="+">+</span><span class="chip" data-value="-">-</span></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- C -->
+    <section class="card view" data-tab="C – Kraujotaka">
+      <h2>C – Kraujotaka</h2>
+      <div class="grid cols-3">
+        <div><label>ŠSD (k./min)</label><input id="c_hr" type="number" min="0" max="250"></div>
+        <div class="row"><div style="flex:1"><label>AKS s</label><input id="c_sbp" type="number" min="0" max="300"></div><div style="flex:1"><label>AKS d</label><input id="c_dbp" type="number" min="0" max="200"></div></div>
+        <div><label>KPL (sek.)</label><input id="c_caprefill" type="number" step="0.1" min="0" max="20"></div>
+      </div>
+    </section>
+
+    <!-- D -->
+    <section class="card view" data-tab="D – Sąmonė">
+      <h2>D – Sąmonė</h2>
+      <div class="grid cols-3">
+        <div>
+          <label>GKS (A-K-M) <span class="subtle">(15b. mygtukas užpildo 4/5/6)</span></label>
+          <div class="row">
+            <input id="d_gksa" type="number" min="1" max="4" placeholder="A">
+            <input id="d_gksk" type="number" min="1" max="5" placeholder="K">
+            <input id="d_gksm" type="number" min="1" max="6" placeholder="M">
+            <button class="btn" id="btnGCS15">15b.</button>
+          </div>
+        </div>
+        <div>
+          <label>Vyzdžiai – Kairė</label>
+          <div class="chip-group" id="d_pupil_left_group" data-single="true"><span class="chip" data-value="n.y.">n.y.</span><span class="chip" data-value="kita">kita</span></div>
+          <input id="d_pupil_left_note" type="text" placeholder="Pastabos..." style="margin-top:6px;display:none">
+        </div>
+        <div>
+          <label>Vyzdžiai – Dešinė</label>
+          <div class="chip-group" id="d_pupil_right_group" data-single="true"><span class="chip" data-value="n.y.">n.y.</span><span class="chip" data-value="kita">kita</span></div>
+          <input id="d_pupil_right_note" type="text" placeholder="Pastabos..." style="margin-top:6px;display:none">
+        </div>
+      </div>
+      <div class="row" style="margin-top:8px"><label style="margin:0">Pastabos</label><input id="d_notes" type="text" placeholder="Trumpai..."></div>
+    </section>
+
+    <!-- E -->
+    <section class="card view" data-tab="E – Kita">
+      <h2>E – Kita</h2>
+      <div class="grid cols-3">
+        <div><label>Temperatūra (°C)</label><input id="e_temp" type="number" step="0.1" min="30" max="43"></div>
+        <div><label>Nugaros apžiūra</label><div class="row"><label class="pill"><input id="e_back_ny" type="checkbox"> n.y.</label><input id="e_back_notes" type="text" placeholder="Pastabos..."></div></div>
+        <div><label>Kitos pastabos</label><input id="e_other" type="text" placeholder="..."></div>
+      </div>
+
+      <div class="divider"></div>
+      <h3 style="font-size:14px;margin:0 0 6px;color:var(--muted)">Kūno žemėlapis (SVG) – kompaktiškas siluetas su žymomis Ž/S/N</h3>
+      <div id="svgControls" class="map-toolbar">
+        <button class="tool" data-tool="Ž">Žaizda</button>
+        <button class="tool" data-tool="S">Sumušimas</button>
+        <button class="tool" data-tool="N">Nudegimas</button>
+        <span style="flex:1"></span>
+        <span class="tiny">Dydis:</span>
+        <button class="tool" data-size="S">S</button>
+        <button class="tool" data-size="M">M</button>
+        <button class="tool" data-size="L">L</button>
+        <span class="tiny">Zoom:</span>
+        <input id="zoomRange" class="range" type="range" min="0.8" max="1.4" step="0.05" value="1">
+        <button class="tool" id="btnSide">↺ Rodyti: Priekis</button>
+        <button class="tool" id="btnUndo">↩ Anuliuoti</button>
+        <button class="tool" id="btnClearMap">🧹 Išvalyti</button>
+        <button class="tool" id="btnExportSvg">⬇ Eksportuoti SVG</button>
+      </div>
+
+      <div id="svgWrap">
+        <!-- SVG BODY MAP -->
+        <svg id="bodySvg" viewBox="0 0 320 720" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <!-- marker symbols -->
+            <g id="sym-wound"><circle r="12" class="mark-w"/><path d="M-9 0 L9 0 M0 -9 L0 9" class="mark-w"/></g>
+            <g id="sym-bruise"><circle r="8" class="mark-b"/></g>
+            <g id="sym-burn"><polygon points="0,-11 11,0 0,11 -11,0" class="mark-n"/></g>
+          </defs>
+
+          <!-- FRONT -->
+          <g id="layer-front">
+            <text x="12" y="24" class="label">PRIEKIS</text>
+            <g id="front-shape" class="silhouette">
+              <path d="
+                M160,36
+                c 28,0 48,19 48,44
+                c 0,20 -9,36 -17,46
+                l 0,10
+                c 34,14 56,38 66,71
+                c 9,29 8,63 -2,90
+                c -11,30 -26,50 -44,66
+                l 0,18
+                c 12,28 19,64 24,106
+                l -45,0
+                c -4,-40 -10,-73 -18,-96
+                l -8,0
+                l 0,96
+                l -32,0
+                l 0,-96
+                l -8,0
+                c -8,23 -14,56 -18,96
+                l -45,0
+                c 5,-42 12,-78 24,-106
+                l 0,-18
+                c -18,-16 -33,-36 -44,-66
+                c -10,-27 -11,-61 -2,-90
+                c 10,-33 32,-57 66,-71
+                l 0,-10
+                c -8,-10 -17,-26 -17,-46
+                c 0,-25 20,-44 48,-44 z"/>
+              <path class="silhouette-line" d="M160,36 L160,640"/>
+            </g>
+          </g>
+
+          <!-- BACK -->
+          <g id="layer-back" class="hidden">
+            <text x="12" y="24" class="label">NUGARA</text>
+            <g id="back-shape" class="silhouette">
+              <path d="
+                M160,36
+                c 28,0 48,19 48,44
+                c 0,18 -8,33 -15,43
+                l 0,10
+                c 36,16 60,42 70,76
+                c 8,28 6,62 -2,88
+                c -11,34 -30,55 -48,72
+                l 0,14
+                c 10,28 18,64 22,108
+                l -46,0
+                c -4,-42 -10,-76 -20,-98
+                l -8,0
+                l 0,98
+                l -32,0
+                l 0,-98
+                l -8,0
+                c -10,22 -16,56 -20,98
+                l -46,0
+                c 4,-44 12,-80 22,-108
+                l 0,-14
+                c -18,-17 -37,-38 -48,-72
+                c -8,-26 -10,-60 -2,-88
+                c 10,-34 34,-60 70,-76
+                l 0,-10
+                c -7,-10 -15,-25 -15,-43
+                c 0,-25 20,-44 48,-44 z"/>
+              <path class="silhouette-line" d="M160,36 L160,640"/>
+            </g>
+          </g>
+
+          <!-- MARKS container -->
+          <g id="marks"></g>
+        </svg>
+      </div>
+      <div class="hint">Spragtelėkite ant silueto – įdedama žyma. Galite keisti dydį ir pritraukti (Zoom).</div>
+    </section>
+
+    <!-- Intervencijos -->
+    <section class="card view" data-tab="Intervencijos">
+      <h2>Intervencijos</h2>
+      <div class="split">
+        <div><h3 style="margin:0 0 6px;font-size:14px;color:var(--muted)">Medikamentai</h3><div class="grid cols-3" id="medications"></div></div>
+        <div><h3 style="margin:0 0 6px;font-size:14px;color:var(--muted)">Procedūros</h3><div class="grid cols-3" id="procedures"></div></div>
+      </div>
+      <div class="hint" style="margin-top:6px">Paspaudus ant vaisto/procedūros automatiškai užpildomas laikas (galima koreguoti).</div>
+    </section>
+
+    <!-- Vaizdai / Laboratorija / Komanda / Ataskaita -->
+    <section class="card view" data-tab="Vaizdiniai tyrimai"><h2>Vaizdiniai tyrimai</h2><div class="chip-group" id="imaging_basic"></div><h3 style="margin-top:12px;font-size:14px;color:var(--muted)">FAST</h3><div class="grid cols-3" id="fastGrid"></div></section>
+    <section class="card view" data-tab="Laboratorija"><h2>Laboratoriniai tyrimai</h2><div class="chip-group" id="labs_basic"></div></section>
+    <section class="card view" data-tab="Komanda"><h2>Komandos nariai</h2><div class="grid cols-3" id="teamGrid"></div></section>
+    <section class="card view" data-tab="Ataskaita"><h2>Sugeneruotas tekstas</h2><textarea id="output" placeholder="Spauskite „Sugeneruoti ataskaitą“..."></textarea><div class="hint">Tekstą galima įklijuoti į LIS/ESIS.</div></section>
+  </div>
+</main>
+
+<script>
+/* ===== Tabs ===== */
+const TABS=["Aktyvacija (EMS)","A – Kvėpavimo takai","B – Kvėpavimas","C – Kraujotaka","D – Sąmonė","E – Kita","Intervencijos","Vaizdiniai tyrimai","Laboratorija","Komanda","Ataskaita"];
+const nav=document.getElementById('tabs');
+TABS.forEach((t,i)=>{ const b=document.createElement('button'); b.className='tab'+(i===0?' active':''); b.textContent=t; b.onclick=()=>showTab(t); nav.appendChild(b);});
+function showTab(name){ document.querySelectorAll('nav .tab').forEach(b=>b.classList.toggle('active',b.textContent===name)); document.querySelectorAll('.view').forEach(v=>v.style.display=(v.dataset.tab===name)?'block':'none'); localStorage.setItem('v96_activeTab',name);}
+document.querySelectorAll('.view').forEach((v,i)=>v.style.display=(i===0)?'block':'none'); const savedTab=localStorage.getItem('v96_activeTab'); if(savedTab&&TABS.includes(savedTab)) showTab(savedTab);
+const $=s=>document.querySelector(s); const $$=s=>Array.from(document.querySelectorAll(s)); const nowHM=()=>{const d=new Date(),p=n=>String(n).padStart(2,'0'); return p(d.getHours())+':'+p(d.getMinutes());}
+
+/* ===== Chips (single/multi) ===== */
+document.addEventListener('click',e=>{
+  const chip=e.target.closest('.chip'); if(!chip) return;
+  const group=chip.parentElement; const single=group?.dataset?.single==='true';
+  if(single){ $$('.chip',group).forEach(c=>c.classList.remove('active')); chip.classList.add('active'); } else chip.classList.toggle('active');
+  if(group.id==='d_pupil_left_group'){ $('#d_pupil_left_note').style.display = (chip.dataset.value==='kita' && chip.classList.contains('active'))?'block':'none'; if(chip.dataset.value!=='kita') $('#d_pupil_left_note').value='';}
+  if(group.id==='d_pupil_right_group'){ $('#d_pupil_right_note').style.display = (chip.dataset.value==='kita' && chip.classList.contains('active'))?'block':'none'; if(chip.dataset.value!=='kita') $('#d_pupil_right_note').value='';}
+  saveAll();
+},true);
+
+/* ===== EMS auto-activation (only from EMS) ===== */
+function emsGKS(){const a=+($('#ems_gksa')?.value||0),k=+($('#ems_gksk')?.value||0),m=+($('#ems_gksm')?.value||0);return(a&&k&&m)?(a+k+m):0;}
+const autoMap={red:{
+  'AKS &lt; 90 mmHg':()=>{const s=+($('#ems_sbp')?.value||0);return s>0&&s<90;},
+  'SpO₂ &lt; 90%':()=>{const s=+($('#ems_spo2')?.value||0);return s>0&&s<90;},
+  'KD &lt; 8 ar &gt; 30/min':()=>{const r=+($('#ems_rr')?.value||0);return r>0&&(r<8||r>30);},
+  'ŠSD &gt; 120/min':()=>{const h=+($('#ems_hr')?.value||0);return h>120;},
+  'GKS &lt; 9':()=>{const g=emsGKS();return g>0&&g<9;}
+}};
+function autoActivateFromEMS(){const red=$('#chips_red'); Object.entries(autoMap.red).forEach(([label,fn])=>{ if(fn()){ const chip=$$('.chip',red).find(c=>c.dataset.value===label); if(chip&&!chip.classList.contains('active')) chip.classList.add('active'); }});}
+['#ems_hr','#ems_rr','#ems_spo2','#ems_sbp','#ems_dbp','#ems_gksa','#ems_gksk','#ems_gksm','#ems_temp'].forEach(sel=>{const el=$(sel); if(el) el.addEventListener('input',()=>{autoActivateFromEMS(); updateAlerts(); saveAll();});});
+
+/* ===== D: GCS 15b ===== */
+$('#btnGCS15').addEventListener('click',()=>{ $('#d_gksa').value=4; $('#d_gksk').value=5; $('#d_gksm').value=6; saveAll();});
+
+/* ===== E: nugaros apžiūra toggle ===== */
+$('#e_back_ny').addEventListener('change',e=>{ $('#e_back_notes').disabled=e.target.checked; if(e.target.checked) $('#e_back_notes').value=''; saveAll();});
+
+/* ===== Alerts (visual validation) ===== */
+function setAlert(el,on){ if(!el) return; el.classList.toggle('alert', !!on); }
+function updateAlerts(){
+  // EMS
+  const spo2EMS=+($('#ems_spo2').value||0); setAlert($('#ems_spo2'), spo2EMS>0 && spo2EMS<90);
+  const sbpEMS=+($('#ems_sbp').value||0); setAlert($('#ems_sbp'), sbpEMS>0 && sbpEMS<90);
+
+  // Section B/C parallels
+  const spo2B=+($('#b_spo2').value||0); setAlert($('#b_spo2'), spo2B>0 && spo2B<90);
+  const sbpC=+($('#c_sbp').value||0); setAlert($('#c_sbp'), sbpC>0 && sbpC<90);
+}
+['#b_spo2','#c_sbp'].forEach(sel=>{ const el=$(sel); el?.addEventListener('input',()=>{updateAlerts(); saveAll();});});
+updateAlerts();
+
+/* ===== Intervencijos ===== */
+const MEDS=["TXA","Fentanilis","Paracetamolis","Ketoprofenas","O- kraujas","Fibryga","Ca gliukonatas"];
+const PROCS=["Intubacija","Krikotirotomija","Pleuros drenažas","Adatinė dekompresija","Kūno šildymas","Turniketas","Dubens diržas","Gipsavimas","Siuvimas","Repocizija"];
+function buildActionCard(name){
+  const card=document.createElement('div'); card.className='card'; card.style.padding='10px'; card.style.borderRadius='10px';
+  card.innerHTML=`<label class="pill"><input type="checkbox" class="act_chk"> ${name}</label>
+    <div class="grid cols-3" style="margin-top:6px">
+      <div><label>Laikas</label><input type="time" class="act_time"></div>
+      <div><label>Dozė/kiekis</label><input type="text" class="act_dose"></div>
+      <div><label>Pastabos</label><input type="text" class="act_note"></div>
+    </div>`;
+  const chk=card.querySelector('.act_chk'), time=card.querySelector('.act_time');
+  chk.addEventListener('change',()=>{ if(chk.checked && !time.value) time.value=nowHM(); saveAll(); });
+  card.querySelector('label.pill').addEventListener('click',()=>{ setTimeout(()=>{ if(chk.checked&& !time.value){ time.value=nowHM(); saveAll(); }},0);});
+  return card;
+}
+const medsWrap=$('#medications'), procsWrap=$('#procedures']);
+MEDS.forEach(n=>medsWrap.appendChild(buildActionCard(n)));
+PROCS.forEach(n=>procsWrap.appendChild(buildActionCard(n)));
+
+/* ===== Imaging / Labs / Team ===== */
+const IMG=["Galvos KT","Kaklo KT","Viso kūno KT","Krūtinės Ro","Dubens Ro"];
+const LABS=["BKT","Biocheminis tyrimas","Krešumai","Fibrinogenas","ROTEM","Kraujo grupė","Kraujo dujos"];
+const TEAM_ROLES=["Komandos vadovas","Raštininkas","ED gydytojas 1","ED gydytojas 2","Slaugytoja 1","Slaugytoja 2","Anesteziologas","Chirurgas","Ortopedas","Radiologas"];
+const imgWrap=$('#imaging_basic'); IMG.forEach(n=>{const s=document.createElement('span'); s.className='chip'; s.dataset.value=n; s.textContent=n; imgWrap.appendChild(s);});
+const labsWrap=$('#labs_basic'); LABS.forEach(n=>{const s=document.createElement('span'); s.className='chip'; s.dataset.value=n; s.textContent=n; labsWrap.appendChild(s);});
+const fastAreas=["Perikardas","Dešinė pleura","Kairė pleura","RUQ","LUQ","Dubuo"]; const fastWrap=$('#fastGrid');
+fastAreas.forEach(a=>{const box=document.createElement('div'); box.innerHTML=`<label>${a}</label><div class="row"><label class="pill"><input type="radio" name="fast_${a}" value="Yra"> Yra</label><label class="pill"><input type="radio" name="fast_${a}" value="Nėra"> Nėra</label></div>`; fastWrap.appendChild(box);});
+const teamWrap=$('#teamGrid'); TEAM_ROLES.forEach(r=>{const box=document.createElement('div'); box.innerHTML=`<label>${r}</label><input type="text" data-team="${r}" placeholder="Vardas Pavardė">`; teamWrap.appendChild(box);});
+
+/* ===== SVG Body Map ===== */
+const BodySVG=(function(){
+  const wrap=$('#svgWrap'); const svg=$('#bodySvg'); const front=$('#layer-front'), back=$('#layer-back'), marks=$('#marks');
+  const btnSide=$('#btnSide'), btnUndo=$('#btnUndo'), btnClear=$('#btnClearMap'), btnExport=$('#btnExportSvg');
+  const tools=$$('.map-toolbar .tool[data-tool]'); let activeTool='Ž', side='front';
+  const sizeBtns=$$('.map-toolbar .tool[data-size]'); const zoom=$('#zoomRange');
+  function setTool(t){ activeTool=t; tools.forEach(b=>b.classList.toggle('active', b.dataset.tool===t)); }
+  tools.forEach(b=>b.addEventListener('click',()=>setTool(b.dataset.tool))); setTool('Ž');
+
+  function applySize(sz){
+    wrap.style.maxWidth = (sz==='S')?'420px' : (sz==='L')?'620px' : '520px';
+    sizeBtns.forEach(b=>b.classList.toggle('active', b.dataset.size===sz));
+    saveAll();
+  }
+  sizeBtns.forEach(b=>b.addEventListener('click',()=>applySize(b.dataset.size))); applySize('M');
+
+  zoom.addEventListener('input',()=>{ svg.style.transform=`scale(${zoom.value})`; svg.style.transformOrigin='top left'; });
+
+  btnSide.addEventListener('click',()=>{ side=(side==='front')?'back':'front'; front.classList.toggle('hidden', side!=='front'); back.classList.toggle('hidden', side!=='back'); btnSide.textContent='↺ Rodyti: '+(side==='front'?'Priekis':'Nugara'); saveAll(); });
+
+  function svgPoint(evt){
+    const pt=svg.createSVGPoint(); pt.x=evt.clientX; pt.y=evt.clientY; return pt.matrixTransform(svg.getScreenCTM().inverse());
+  }
+  function addMark(x,y,t,s){
+    let use=document.createElementNS('http://www.w3.org/2000/svg','use');
+    if(t==='Ž') use.setAttributeNS('http://www.w3.org/1999/xlink','href','#sym-wound');
+    if(t==='S') use.setAttributeNS('http://www.w3.org/1999/xlink','href','#sym-bruise');
+    if(t==='N') use.setAttributeNS('http://www.w3.org/1999/xlink','href','#sym-burn');
+    use.setAttribute('transform',`translate(${x},${y})`);
+    use.dataset.type=t; use.dataset.side=s;
+    marks.appendChild(use); saveAll();
+  }
+  ['front-shape','back-shape'].forEach(id=>{
+    $('#'+id).addEventListener('click',evt=>{ const p=svgPoint(evt); addMark(p.x,p.y,activeTool,side); });
+  });
+
+  btnUndo.addEventListener('click',()=>{ const list=[...marks.querySelectorAll('use')].filter(u=>u.dataset.side===side); const last=list.pop(); if(last){ last.remove(); saveAll(); }});
+  btnClear.addEventListener('click',()=>{ if(confirm('Išvalyti visas žymas (priekis ir nugara)?')){ marks.innerHTML=''; saveAll(); }});
+
+  btnExport.addEventListener('click',()=>{
+    const clone=svg.cloneNode(true);
+    (clone.querySelector('#layer-front')).classList.toggle('hidden', side!=='front');
+    (clone.querySelector('#layer-back')).classList.toggle('hidden', side!=='back');
+    const ser=new XMLSerializer(); const src=ser.serializeToString(clone);
+    const url='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(src);
+    const a=document.createElement('a'); a.href=url; a.download=('kuno-zemelapis-'+side+'.svg'); a.click();
+  });
+
+  function serialize(){
+    const arr=[...marks.querySelectorAll('use')].map(u=>{
+      const tr=u.getAttribute('transform'); const m=/translate\(([-\d.]+),([-\d.]+)\)/.exec(tr)||[0,0,0];
+      return {x:+m[1], y:+m[2], type:u.dataset.type, side:u.dataset.side};
+    });
+    return JSON.stringify({
+      side, tool:activeTool, marks:arr, size: wrap.style.maxWidth, zoom: zoom.value
+    });
+  }
+  function load(raw){
+    try{
+      const o=typeof raw==='string'?JSON.parse(raw):raw;
+      side=o.side||'front'; front.classList.toggle('hidden', side!=='front'); back.classList.toggle('hidden', side!=='back'); btnSide.textContent='↺ Rodyti: '+(side==='front'?'Priekis':'Nugara');
+      activeTool=o.tool||'Ž'; tools.forEach(b=>b.classList.toggle('active', b.dataset.tool===activeTool));
+      marks.innerHTML=''; (o.marks||[]).forEach(m=>addMark(m.x,m.y,m.type,m.side));
+      wrap.style.maxWidth = o.size || '520px';
+      zoom.value = o.zoom || '1'; svg.style.transform=`scale(${zoom.value})`; svg.style.transformOrigin='top left';
+    }catch(e){}
+  }
+
+  return {serialize,load};
+})();
+
+/* ===== Save / Load ===== */
+const FIELD_SELECTORS='input[type="text"],input[type="number"],input[type="time"],input[type="date"],textarea,select';
+function saveAll(){
+  const data={};
+  $$(FIELD_SELECTORS).forEach(el=>{
+    const key=el.id||el.name||el.dataset.team||el.className;
+    if(el.type==='radio'){ if(el.checked) data[key+'__'+el.value]=true; }
+    else if(el.type==='checkbox'){ data[key]=el.checked?'__checked__':(el.value||''); }
+    else{ data[key]=el.value; }
+  });
+  ['#chips_red','#chips_yellow','#imaging_basic','#labs_basic','#a_airway_group','#b_breath_left_group','#b_breath_right_group','#d_pupil_left_group','#d_pupil_right_group']
+    .forEach(sel=>{ const arr=$$('.chip.active',$(sel)).map(c=>c.dataset.value); data['chips:'+sel]=arr; });
+  function pack(container){ return Array.from(container.children).map(card=>({ name:card.querySelector('.act_chk').parentElement.textContent.trim(),
+    on:card.querySelector('.act_chk').checked, time:card.querySelector('.act_time').value, dose:card.querySelector('.act_dose').value, note:card.querySelector('.act_note').value }));}
+  data['meds']=pack($('#medications')); data['procs']=pack($('#procedures'));
+  data['bodymap_svg']=BodySVG.serialize();
+  localStorage.setItem('trauma_v96', JSON.stringify(data));
+}
+function loadAll(){
+  const raw=localStorage.getItem('trauma_v96'); if(!raw) return;
+  try{
+    const data=JSON.parse(raw);
+    $$(FIELD_SELECTORS).forEach(el=>{
+      const key=el.id||el.name||el.dataset.team||el.className;
+      if(el.type==='radio'){ if(data[key+'__'+el.value]) el.checked=true; }
+      else if(el.type==='checkbox'){ el.checked=(data[key]==='__checked__'); }
+      else{ if(data[key]!=null) el.value=data[key]; }
+    });
+    ['#chips_red','#chips_yellow','#imaging_basic','#labs_basic','#a_airway_group','#b_breath_left_group','#b_breath_right_group','#d_pupil_left_group','#d_pupil_right_group']
+      .forEach(sel=>{ const arr=data['chips:'+sel]||[]; $$('.chip',$(sel)).forEach(c=>c.classList.toggle('active',arr.includes(c.dataset.value))); });
+    function unpack(container,records){ if(!Array.isArray(records)) return; Array.from(container.children).forEach((card,i)=>{ const r=records[i]; if(!r) return;
+      card.querySelector('.act_chk').checked=!!r.on; card.querySelector('.act_time').value=r.time||''; card.querySelector('.act_dose').value=r.dose||''; card.querySelector('.act_note').value=r.note||'';});}
+    unpack($('#medications'),data['meds']); unpack($('#procedures'),data['procs']);
+    if(data['bodymap_svg']) BodySVG.load(data['bodymap_svg']);
+    $('#d_pupil_left_note').style.display = ($$('.chip.active', $('#d_pupil_left_group')).some(c=>c.dataset.value==='kita'))?'block':'none';
+    $('#d_pupil_right_note').style.display = ($$('.chip.active', $('#d_pupil_right_group')).some(c=>c.dataset.value==='kita'))?'block':'none';
+    updateAlerts();
+  }catch(e){}
+}
+document.addEventListener('input',saveAll); loadAll();
+
+/* ===== Report ===== */
+function listChips(sel){ return $$('.chip.active',$(sel)).map(c=>c.dataset.value); }
+function gksSum(a,k,m){ a=+a||0;k=+k||0;m=+m||0; return (a&&k&&m)?(a+k+m):''; }
+function getSingleValue(sel){ const a=listChips(sel); return a[0]||''; }
+function bodymapSummary(){
+  try{
+    const data=JSON.parse(localStorage.getItem('trauma_v96')||'{}'); if(!data.bodymap_svg) return '';
+    const o=JSON.parse(data.bodymap_svg); const cnt={front:{Ž:0,S:0,N:0}, back:{Ž:0,S:0,N:0}};
+    (o.marks||[]).forEach(m=>{ if(cnt[m.side] && cnt[m.side][m.type]!=null) cnt[m.side][m.type]++; });
+    const total=(cnt.front.Ž+cnt.front.S+cnt.front.N)+(cnt.back.Ž+cnt.back.S+cnt.back.N);
+    if(!total) return '';
+    const pack=side=>`(${cnt[side]['Ž']} Ž, ${cnt[side]['S']} S, ${cnt[side]['N']} N)`;
+    return `Žemėlapis: Priekis ${pack('front')}, Nugara ${pack('back')} — viso ${total} žymos.`;
+  }catch(e){ return ''; }
+}
+document.getElementById('btnGen').addEventListener('click',()=>{
+  const out=[];
+  const red=listChips('#chips_red'), yellow=listChips('#chips_yellow');
+  const ems={ hr:$('#ems_hr').value, rr:$('#ems_rr').value, spo2:$('#ems_spo2').value, sbp:$('#ems_sbp').value, dbp:$('#ems_dbp').value, gksa:$('#ems_gksa').value, gksk:$('#ems_gksk').value, gksm:$('#ems_gksm').value };
+  const gksEMS=gksSum(ems.gksa,ems.gksk,ems.gksm);
+  const emsLine=[ems.hr?`ŠSD ${ems.hr}/min`:null, ems.rr?`KD ${ems.rr}/min`:null, ems.spo2?`SpO₂ ${ems.spo2}%`:null, (ems.sbp||ems.dbp)?`AKS ${ems.sbp}/${ems.dbp}`:null, gksEMS?`GKS ${gksEMS} (A${ems.gksa}-K${ems.gksk}-M${ems.gksm})`:null].filter(Boolean).join('; ');
+  out.push('--- Aktyvacija (EMS) ---'); if(emsLine) out.push(emsLine); if(red.length) out.push('RAUDONA: '+red.join(', ')); if(yellow.length) out.push('GELTONA: '+yellow.join(', '));
+  out.push('\n--- A Kvėpavimo takai ---'); out.push(['Takai: '+(getSingleValue('#a_airway_group')||'-'), $('#a_notes').value?('Pastabos: '+$('#a_notes').value):null].filter(Boolean).join(' | '));
+  out.push('\n--- B Kvėpavimas ---'); out.push([$('#b_rr').value?('KD '+$('#b_rr').value+'/min'):null, $('#b_spo2').value?('SpO₂ '+$('#b_spo2').value+'%'):null, 'Alsavimas kairė '+(getSingleValue('#b_breath_left_group')||'–')+', dešinė '+(getSingleValue('#b_breath_right_group')||'–')].filter(Boolean).join('; '));
+  out.push('\n--- C Kraujotaka ---'); out.push([$('#c_hr').value?('ŠSD '+$('#c_hr').value+'/min'):null, ($('#c_sbp').value||$('#c_dbp').value)?('AKS '+$('#c_sbp').value+'/'+$('#c_dbp').value):null, $('#c_caprefill').value?('KPL '+$('#c_caprefill').value+' s'):null].filter(Boolean).join('; ');
+  const dgks=gksSum($('#d_gksa').value,$('#d_gksk').value,$('#d_gksm').value); const left=getSingleValue('#d_pupil_left_group'); const right=getSingleValue('#d_pupil_right_group');
+  out.push('\n--- D Sąmonė ---'); out.push([dgks?('GKS '+dgks+' (A'+$('#d_gksa').value+'-K'+$('#d_gksk').value+'-M'+$('#d_gksm').value+')'):null, left?('Vyzdžiai kairė: '+left+ (left==='kita'&&$('#d_pupil_left_note').value?(' ('+$('#d_pupil_left_note').value+')'):'') ):null, right?('Vyzdžiai dešinė: '+right+ (right==='kita'&&$('#d_pupil_right_note').value?(' ('+$('#d_pupil_right_note').value+')'):'') ):null, $('#d_notes').value?('Pastabos: '+$('#d_notes').value):null].filter(Boolean).join(' | '));
+  out.push('\n--- E Kita ---'); out.push([$('#e_temp').value?('T '+$('#e_temp').value+'°C'):null, $('#e_back_ny').checked?'Nugara: n.y.':($('#e_back_notes').value?('Nugara: '+$('#e_back_notes').value):null), $('#e_other').value?('Kita: '+$('#e_other').value):null, bodymapSummary()].filter(Boolean).join(' | '));
+  function collect(container){ return Array.from(container.children).map(card=>{ const on=card.querySelector('.act_chk').checked; if(!on) return null; const name=card.querySelector('.act_chk').parentElement.textContent.trim(); const time=card.querySelector('.act_time').value; const dose=card.querySelector('.act_dose').value; const note=card.querySelector('.act_note').value; return [name, time?('laikas '+time):null, dose?('dozė '+dose):null, note?('pastabos '+note):null].filter(Boolean).join(' | '); }).filter(Boolean);}
+  const meds=collect($('#medications')), procs=collect($('#procedures')); if(meds.length||procs.length){ out.push('\n--- Intervencijos ---'); if(meds.length) out.push('Medikamentai:\n'+meds.join('\n')); if(procs.length) out.push('Procedūros:\n'+procs.join('\n')); }
+  const imgs=listChips('#imaging_basic'); const fr=["Perikardas","Dešinė pleura","Kairė pleura","RUQ","LUQ","Dubuo"].map(a=>{ const y=document.querySelector('input[name="fast_'+a+'"][value="Yra"]')?.checked; const n=document.querySelector('input[name="fast_'+a+'"][value="Nėra"]')?.checked; return y? a+': skystis Yra' : (n? a+': skystis Nėra' : null); }).filter(Boolean);
+  if(imgs.length||fr.length){ out.push('\n--- Vaizdiniai tyrimai ---'); if(imgs.length) out.push('Užsakyta: '+imgs.join(', ')); if(fr.length) out.push('FAST: '+fr.join(' | ')); }
+  const labs=listChips('#labs_basic'); if(labs.length){ out.push('\n--- Laboratorija ---'); out.push(labs.join(', ')); }
+  const team=TEAM_ROLES.map(r=>{ const el=document.querySelector('input[data-team="'+r+'"]'); const v=el?.value?.trim(); return v? r+': '+v : null; }).filter(Boolean); if(team.length){ out.push('\n--- Komanda ---'); out.push(team.join(' | ')); }
+  $('#output').value=out.filter(Boolean).join('\n'); showTab('Ataskaita'); saveAll();
+});
+document.getElementById('btnCopy').addEventListener('click',async()=>{ try{ await navigator.clipboard.writeText($('#output').value||''); alert('Nukopijuota.'); }catch(e){ alert('Nepavyko nukopijuoti.'); }});
+document.getElementById('btnSave').addEventListener('click',()=>{ saveAll(); alert('Išsaugota naršyklėje.');});
+document.getElementById('btnClear').addEventListener('click',()=>{ if(confirm('Išvalyti viską?')){ localStorage.removeItem('trauma_v96'); location.reload(); }});
+</script>
+</body>
+</html>
