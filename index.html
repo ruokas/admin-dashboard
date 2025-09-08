@@ -247,25 +247,9 @@
   function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); render(); }
   function load(){ try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||'');}catch(e){return null;} }
   function seed(){
-    const demo = {
-      groups:[
-        { id:uid(), name:'Kasdieniai darbai', color:'#6ee7b7', items:[
-          {id:uid(), type:'link', title:'ESIS', url:'https://esis.example' },
-          {id:uid(), type:'link', title:'El. paštas (Outlook)', url:'https://outlook.office.com'},
-          {id:uid(), type:'link', title:'Ligoninės intranetas', url:'https://intranet.example'}
-        ]},
-        { id:uid(), name:'Rodikliai ir lapai', color:'#8ecae6', items:[
-          {id:uid(), type:'sheet', title:'SMP KPI skydas', url:'https://docs.google.com/spreadsheets/d/e/2PACX-FAKE/pubhtml?widget=true&headers=false'},
-          {id:uid(), type:'embed', title:'Looker Studio: laukimo laikai', url:'https://lookerstudio.google.com/embed/reporting/FAKE'}
-        ]},
-        { id:uid(), name:'Gairės', color:'#ffd166', items:[
-          {id:uid(), type:'link', title:'Insulto protokolas', url:'#'},
-          {id:uid(), type:'link', title:'Sepsio paketas', url:'#'}
-        ]}
-      ]
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(demo));
-    return demo;
+    const data = { groups: [] };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    return data;
   }
 
   function toFavicon(u){ try{ const url=new URL(u); return `${url.origin}/favicon.ico`; }catch{ return '' } }
