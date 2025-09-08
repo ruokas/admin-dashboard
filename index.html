@@ -144,9 +144,12 @@
         const w = Math.round(entry.contentRect.width / GRID) * GRID;
         const h = Math.round(entry.contentRect.height / GRID) * GRID;
         entry.target.style.width = w + 'px';
-        entry.target.style.height = h + 'px';
+        if (entry.target.dataset.resizing === '1') {
+          entry.target.style.height = h + 'px';
+          g.h = h;
+          g.resized = true;
+        }
         g.w = w;
-        g.h = h;
         persist();
       }
     }
@@ -256,7 +259,7 @@
     });
   }
 
-  /** @typedef {{id:string, name:string, color:string, collapsed?:boolean, items: Item[]}} Group */
+  /** @typedef {{id:string, name:string, color:string, items: Item[], w?:number, h?:number, resized?:boolean, collapsed?:boolean}} Group */
   /** @typedef {{id:string, type:'link'|'sheet'|'embed', title:string, url:string, note?:string}} Item */
 
   function persist(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
@@ -289,8 +292,11 @@
       const grp = document.createElement('section');
       grp.className = 'group';
       grp.dataset.id = g.id;
+      grp.dataset.resizing = '0';
       if(g.w) grp.style.width = g.w + 'px';
-      if(g.h) grp.style.height = g.h + 'px';
+      if(g.resized) grp.style.height = g.h + 'px';
+      grp.addEventListener('mousedown', ()=> grp.dataset.resizing = '1');
+      grp.addEventListener('mouseup',   ()=> grp.dataset.resizing = '0');
       grp.draggable = true;
       grp.addEventListener('dragstart', e=>{ e.dataTransfer.setData('text/group', g.id); grp.style.opacity = .5; });
       grp.addEventListener('dragend',   ()=>{ grp.style.opacity = 1; });
@@ -442,7 +448,7 @@
   async function addGroup(){
     const res = await groupFormDialog();
     if(!res) return;
-    state.groups.push({ id:uid(), name:res.name, color:res.color, items:[] });
+    state.groups.push({ id:uid(), name:res.name, color:res.color, items:[], resized:false });
     save();
   }
 
