@@ -12,6 +12,7 @@ Statinis vieno failo HTML projektas, skirtas publikuoti per **GitHub Pages**.
 - Grupių kortelių dydį galima keisti jas tempiant į šoną ir žemyn.
 - „sheet“ ir „embed“ tipo įrašai automatiškai rodo peržiūrą kortelėje.
 - Eksportas ir importas į Google Sheets per Apps Script "web app".
+- Redagavimo režimas: išjungus puslapis tampa statinis, įjungus galima keisti grupes ir įrašus.
 
 ## Smoke test
 

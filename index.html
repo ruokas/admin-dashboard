@@ -52,6 +52,7 @@
     .empty{ border:1px dashed rgba(255,255,255,.15); border-radius:14px; padding:18px; text-align:center; color:var(--subtext); font-size:14px }
     footer{ padding:30px; text-align:center; color:var(--subtext) }
     .handle{ cursor:grab; opacity:.7 }
+    body:not(.editing) .handle{ cursor:default; }
     dialog{ border:none; border-radius:12px; padding:20px; background:var(--panel); color:var(--text); box-shadow:var(--shadow); }
     dialog::backdrop{ background:rgba(0,0,0,.6); }
     dialog form{ display:grid; gap:12px; }
@@ -72,9 +73,10 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="11" cy="11" r="7.25" stroke="currentColor" stroke-width="1.5"/></svg>
         <input id="q" placeholder="Paieška nuorodose…"/>
       </div>
-      <button id="addGroup" type="button">➕ Pridėti grupę</button>
-      <button id="importBtn" class="btn-outline" type="button">⤒ Importuoti</button>
-      <button id="exportBtn" class="btn-outline" type="button">⤓ Eksportuoti</button>
+      <button id="editBtn" class="btn-outline" type="button">✏️ Redaguoti</button>
+      <button id="addGroup" type="button" style="display:none">➕ Pridėti grupę</button>
+      <button id="importBtn" class="btn-outline" type="button" style="display:none">⤒ Importuoti</button>
+      <button id="exportBtn" class="btn-outline" type="button" style="display:none">⤓ Eksportuoti</button>
       <button id="themeBtn" class="btn" type="button">🌓 Tema</button>
     </div>
   </header>
@@ -102,6 +104,8 @@
     addItem: 'Pridėti įrašą',
     collapse: 'Sutraukti/Išskleisti',
     editGroup: 'Redaguoti grupę',
+    editMode: 'Redaguoti',
+    done: 'Baigti',
     deleteGroup: 'Pašalinti grupę',
     empty: 'Nėra įrašų. Spauskite ＋, kad pridėtumėte nuorodą ar įterpimą.',
     noMatches: 'Nėra atitikmenų šioje grupėje.',
@@ -128,6 +132,18 @@
   const groupsEl = document.getElementById('groups');
   const statsEl = document.getElementById('stats');
   const searchEl = document.getElementById('q');
+  const editBtn = document.getElementById('editBtn');
+  let editing = false;
+
+  function updateEditingUI(){
+    document.body.classList.toggle('editing', editing);
+    editBtn.textContent = editing ? `✅ ${T.done}` : `✏️ ${T.editMode}`;
+    ['addGroup','importBtn','exportBtn'].forEach(id=>{
+      const el = document.getElementById(id);
+      if(el) el.style.display = editing ? 'inline-flex' : 'none';
+    });
+    render();
+  }
 
   const uid = () => Math.random().toString(36).slice(2,10);
 
@@ -344,27 +360,30 @@
       grp.dataset.resizing = '0';
       if(g.w) grp.style.width = g.w + 'px';
       if(g.resized) grp.style.height = g.h + 'px';
-      // žymime dydžio keitimą tik spaudžiant apatinį dešinį kampą
-      grp.addEventListener('mousedown', (e)=>{
-        const rect = grp.getBoundingClientRect();
-        const withinHandle = e.clientX >= rect.right - 20 && e.clientY >= rect.bottom - 20;
-        if(withinHandle) grp.dataset.resizing = '1';
-      });
-      grp.draggable = true;
-      grp.addEventListener('dragstart', e=>{ e.dataTransfer.setData('text/group', g.id); grp.style.opacity = .5; });
-      grp.addEventListener('dragend',   ()=>{ grp.style.opacity = 1; });
-      grp.addEventListener('dragover',  e=>{ e.preventDefault(); });
-      grp.addEventListener('drop', (e)=>{
-        e.preventDefault();
-        const fromId = e.dataTransfer.getData('text/group');
-        if(fromId && fromId!==g.id){
-          const fromIdx = state.groups.findIndex(x=>x.id===fromId);
-          const toIdx   = state.groups.findIndex(x=>x.id===g.id);
-          const [moved] = state.groups.splice(fromIdx,1);
-          state.groups.splice(toIdx,0,moved);
-          save();
-        }
-      });
+      grp.style.resize = editing ? 'both' : 'none';
+      if(editing){
+        // žymime dydžio keitimą tik spaudžiant apatinį dešinį kampą
+        grp.addEventListener('mousedown', (e)=>{
+          const rect = grp.getBoundingClientRect();
+          const withinHandle = e.clientX >= rect.right - 20 && e.clientY >= rect.bottom - 20;
+          if(withinHandle) grp.dataset.resizing = '1';
+        });
+        grp.draggable = true;
+        grp.addEventListener('dragstart', e=>{ e.dataTransfer.setData('text/group', g.id); grp.style.opacity = .5; });
+        grp.addEventListener('dragend',   ()=>{ grp.style.opacity = 1; });
+        grp.addEventListener('dragover',  e=>{ e.preventDefault(); });
+        grp.addEventListener('drop', (e)=>{
+          e.preventDefault();
+          const fromId = e.dataTransfer.getData('text/group');
+          if(fromId && fromId!==g.id){
+            const fromIdx = state.groups.findIndex(x=>x.id===fromId);
+            const toIdx   = state.groups.findIndex(x=>x.id===g.id);
+            const [moved] = state.groups.splice(fromIdx,1);
+            state.groups.splice(toIdx,0,moved);
+            save();
+          }
+        });
+      }
 
       const h = document.createElement('div');
       h.className = 'group-header';
@@ -373,13 +392,13 @@
           <span class="dot" style="background:${g.color||'#6ee7b7'}"></span>
           <h2 title="Tempkite, kad perrikiuotumėte" class="handle">${escapeHtml(g.name)}</h2>
         </div>
-        <div class="group-actions">
+        ${editing?`<div class="group-actions">
           <button type="button" title="${T.openAll}" aria-label="${T.openAll}" data-act="openAll">↗</button>
           <button type="button" title="${T.addItem}" aria-label="${T.addItem}" data-act="add">＋</button>
           <button type="button" title="${T.collapse}" aria-label="${T.collapse}" data-act="toggle">▾</button>
           <button type="button" title="${T.editGroup}" aria-label="${T.editGroup}" data-act="edit">✎</button>
           <button type="button" class="btn-danger" title="${T.deleteGroup}" aria-label="${T.deleteGroup}" data-act="del">🗑</button>
-        </div>`;
+        </div>`:''}`;
 
       h.addEventListener('click', (e)=>{
         const btn = e.target.closest('button');
@@ -419,57 +438,65 @@
           card.className = 'item';
           card.dataset.gid = g.id;
           card.dataset.iid = it.id;
-          card.draggable = true;
-          card.addEventListener('dragstart', e=>{ e.dataTransfer.setData('text/item', JSON.stringify({gid:g.id,iid:it.id})); card.classList.add('dragging'); });
-          card.addEventListener('dragend', ()=> card.classList.remove('dragging'));
-          card.addEventListener('dragover', e=> e.preventDefault());
-          card.addEventListener('drop', (e)=>{
-            e.preventDefault();
-            const data = JSON.parse(e.dataTransfer.getData('text/item')||'{}');
-            if(!data.iid) return;
-            if(data.gid===g.id){
-              const idxFrom = g.items.findIndex(x=>x.id===data.iid);
-              const idxTo   = g.items.findIndex(x=>x.id===it.id);
-              const [moved] = g.items.splice(idxFrom,1);
-              g.items.splice(idxTo,0,moved);
-              save();
-            } else {
-              const fromG = state.groups.find(x=>x.id===data.gid);
-              const idxFrom = fromG.items.findIndex(x=>x.id===data.iid);
-              const [moved] = fromG.items.splice(idxFrom,1);
-              const idxTo   = g.items.findIndex(x=>x.id===it.id);
-              g.items.splice(idxTo,0,moved);
-              save();
-            }
-          });
+          card.draggable = editing;
+          if(editing){
+            card.addEventListener('dragstart', e=>{ e.dataTransfer.setData('text/item', JSON.stringify({gid:g.id,iid:it.id})); card.classList.add('dragging'); });
+            card.addEventListener('dragend', ()=> card.classList.remove('dragging'));
+            card.addEventListener('dragover', e=> e.preventDefault());
+            card.addEventListener('drop', (e)=>{
+              e.preventDefault();
+              const data = JSON.parse(e.dataTransfer.getData('text/item')||'{}');
+              if(!data.iid) return;
+              if(data.gid===g.id){
+                const idxFrom = g.items.findIndex(x=>x.id===data.iid);
+                const idxTo   = g.items.findIndex(x=>x.id===it.id);
+                const [moved] = g.items.splice(idxFrom,1);
+                g.items.splice(idxTo,0,moved);
+                save();
+              } else {
+                const fromG = state.groups.find(x=>x.id===data.gid);
+                const idxFrom = fromG.items.findIndex(x=>x.id===data.iid);
+                const [moved] = fromG.items.splice(idxFrom,1);
+                const idxTo   = g.items.findIndex(x=>x.id===it.id);
+                g.items.splice(idxTo,0,moved);
+                save();
+              }
+            });
+          }
 
           const favicon = it.type==='link' ? `<img class="favicon" alt="" src="${toFavicon(it.url)}" onerror="this.outerHTML='<div class=\'favicon\'>🌐</div>'">` : `<div class="favicon">${it.type==='sheet'?'📊':'🧩'}</div>`;
 
+          const actionsHtml = editing ? `<div class="actions">
+              ${it.type==='link'?`<a class="btn" href="${it.url}" target="_blank" rel="noopener">Atverti</a>`:''}
+              <button type="button" title="Peržiūra" aria-label="Peržiūra" data-a="preview">👁</button>
+              <button type="button" title="Redaguoti" aria-label="Redaguoti" data-a="edit">✎</button>
+              <button type="button" class="btn-danger" title="Pašalinti" aria-label="Pašalinti" data-a="del">🗑</button>
+            </div>` : '';
           card.innerHTML = `
             ${favicon}
             <div class="meta">
               <div class="title">${escapeHtml(it.title||'(be pavadinimo)')}</div>
               <div class="sub">${escapeHtml(it.url)}</div>
             </div>
-            <div class="actions">
-              ${it.type==='link'?`<a class="btn" href="${it.url}" target="_blank" rel="noopener">Atverti</a>`:''}
-              <button type="button" title="Peržiūra" aria-label="Peržiūra" data-a="preview">👁</button>
-              <button type="button" title="Redaguoti" aria-label="Redaguoti" data-a="edit">✎</button>
-              <button type="button" class="btn-danger" title="Pašalinti" aria-label="Pašalinti" data-a="del">🗑</button>
-            </div>`;
+            ${actionsHtml}`;
 
           card.addEventListener('click', (e)=>{
-            const b = e.target.closest('button, a');
-            if(!b || b.tagName==='A') return; 
-            const a = b.dataset.a;
-            if(a==='edit') return editItem(g.id, it.id);
-            if(a==='del'){
-              confirmDialog(T.confirmDelItem).then(ok=>{
-                if(ok){ g.items = g.items.filter(x=>x.id!==it.id); save(); }
-              });
-              return;
+            if(editing){
+              const b = e.target.closest('button, a');
+              if(!b || b.tagName==='A') return;
+              const a = b.dataset.a;
+              if(a==='edit') return editItem(g.id, it.id);
+              if(a==='del'){
+                confirmDialog(T.confirmDelItem).then(ok=>{
+                  if(ok){ g.items = g.items.filter(x=>x.id!==it.id); save(); }
+                });
+                return;
+              }
+              if(a==='preview') return previewItem(it, card);
+            }else{
+              if(it.type==='link') window.open(it.url, '_blank');
+              else previewItem(it, card);
             }
-            if(a==='preview') return previewItem(it, card);
           });
 
           itemsWrap.appendChild(card);
@@ -479,7 +506,7 @@
 
       grp.appendChild(itemsWrap);
       groupsEl.appendChild(grp);
-      ro.observe(grp);
+      if(editing) ro.observe(grp);
     });
 
     const totalGroups = state.groups.length;
@@ -569,13 +596,14 @@
   });
   document.getElementById('fileInput').addEventListener('change', (e)=>{ const f = e.target.files[0]; if(f) importJson(f); e.target.value=''; });
   document.getElementById('themeBtn').addEventListener('click', toggleTheme);
+  editBtn.addEventListener('click', ()=>{ editing = !editing; updateEditingUI(); });
   searchEl.placeholder = T.searchPH;
   searchEl.addEventListener('input', render);
 
   function escapeHtml(str){ return String(str).replace(/[&<>\"]/g, s=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[s])); }
 
   applyTheme();
-  render();
+  updateEditingUI();
 
   // Papildoma diagnostika, jei vartotojas sako, kad mygtukai „neveikia“
   window.addEventListener('error', (e)=>{ console.error('Klaida:', e.message); });
