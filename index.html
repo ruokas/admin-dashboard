@@ -136,6 +136,45 @@
 
   let state = load() || seed();
 
+  // Google Sheets
+  const sheetsSync = (()=>{
+    const SCRIPT_URL = 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec'; // Pakeiskite į savo "web app" URL
+    async function send(action, payload){
+      const res = await fetch(SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, data: payload })
+      });
+      if(!res.ok) throw new Error('HTTP '+ res.status);
+      return res.json();
+    }
+    return {
+      async export(){
+        try{
+          await send('export', state);
+          console.log('Sheets eksportas pavyko');
+        }catch(err){
+          console.error('Sheets eksportas nepavyko', err);
+          alert('Sheets eksportas nepavyko');
+        }
+      },
+      async import(){
+        try{
+          const res = await send('import');
+          if(res && res.data){
+            state = res.data;
+            save();
+            render();
+            console.log('Sheets importas pavyko');
+          }
+        }catch(err){
+          console.error('Sheets importas nepavyko', err);
+          alert('Sheets importas nepavyko');
+        }
+      }
+    };
+  })();
+
   const ro = new ResizeObserver(entries => {
     for (const entry of entries) {
       const id = entry.target.dataset.id;
@@ -520,8 +559,14 @@
   function applyTheme(){ const theme = localStorage.getItem(THEME_KEY) || 'dark'; if(theme==='light') document.documentElement.classList.add('theme-light'); else document.documentElement.classList.remove('theme-light'); }
   function toggleTheme(){ const now = (localStorage.getItem(THEME_KEY)||'dark')==='dark' ? 'light':'dark'; localStorage.setItem(THEME_KEY, now); applyTheme(); }
   document.getElementById('addGroup').addEventListener('click', addGroup);
-  document.getElementById('exportBtn').addEventListener('click', exportJson);
-  document.getElementById('importBtn').addEventListener('click', ()=> document.getElementById('fileInput').click());
+  document.getElementById('exportBtn').addEventListener('click', ()=>{
+    exportJson();
+    sheetsSync.export();
+  });
+  document.getElementById('importBtn').addEventListener('click', ()=>{
+    sheetsSync.import();
+    document.getElementById('fileInput').click();
+  });
   document.getElementById('fileInput').addEventListener('change', (e)=>{ const f = e.target.files[0]; if(f) importJson(f); e.target.value=''; });
   document.getElementById('themeBtn').addEventListener('click', toggleTheme);
   searchEl.placeholder = T.searchPH;
