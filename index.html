@@ -301,7 +301,12 @@
       grp.dataset.resizing = '0';
       if(g.w) grp.style.width = g.w + 'px';
       if(g.resized) grp.style.height = g.h + 'px';
-      grp.addEventListener('mousedown', ()=> grp.dataset.resizing = '1');
+      // žymime dydžio keitimą tik spaudžiant apatinį dešinį kampą
+      grp.addEventListener('mousedown', (e)=>{
+        const rect = grp.getBoundingClientRect();
+        const withinHandle = e.clientX >= rect.right - 20 && e.clientY >= rect.bottom - 20;
+        if(withinHandle) grp.dataset.resizing = '1';
+      });
       grp.addEventListener('mouseup',   ()=> grp.dataset.resizing = '0');
       grp.draggable = true;
       grp.addEventListener('dragstart', e=>{ e.dataTransfer.setData('text/group', g.id); grp.style.opacity = .5; });
