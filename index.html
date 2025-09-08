@@ -9,6 +9,7 @@
       --bg:#0b1117; --panel:#111922; --muted:#1b2530; --text:#e6edf3; --subtext:#9fb0c0;
       --accent:#6ee7b7; --danger:#ff6b6b; --warn:#ffd166; --ok:#8ecae6; --card:#0f141a;
       --shadow: 0 6px 20px rgba(0,0,0,.25);
+      --group-width:360px;
     }
     .theme-light:root{ --bg:#f6f8fb; --panel:#ffffff; --muted:#e9eef3; --text:#0c1116; --subtext:#4a5a6a; --accent:#2563eb; --danger:#d83a3a; --ok:#0ea5e9; --card:#ffffff; --shadow: 0 10px 24px rgba(7,14,22,.08);}    
     html,body{height:100%}
@@ -27,7 +28,7 @@
     .search input{ background:var(--panel); border:1px solid transparent; color:var(--text); padding:12px 14px 12px 40px; border-radius:12px; min-width: 240px; outline:none; box-shadow:var(--shadow); }
     .search svg{ position:absolute; left:12px; top:50%; transform:translateY(-50%); opacity:.6 }
     main{ padding:20px clamp(10px,2.2vw,24px); max-width:1500px; width:100%; margin:0 auto; flex:1; }
-    .grid{ display:grid; grid-template-columns: repeat(auto-fill,minmax(290px,1fr)); gap:16px }
+    .grid{ display:grid; grid-template-columns: repeat(auto-fill,minmax(var(--group-width),1fr)); gap:16px }
     .group{ background:var(--panel); border:1px solid rgba(255,255,255,.06); border-radius:18px; box-shadow:var(--shadow); display:flex; flex-direction:column; min-height:120px; overflow:hidden; }
     .group-header{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:14px; background:linear-gradient(180deg, rgba(255,255,255,.04), transparent) }
     .group-title{ display:flex; align-items:center; gap:10px }
@@ -43,7 +44,7 @@
     .item .actions{ display:flex; gap:6px }
     .favicon{ width:20px; height:20px; border-radius:4px; background:var(--muted); flex:0 0 20px; display:grid; place-items:center; font-size:10px; color:var(--subtext) }
     .embed{ border-radius:12px; overflow:hidden; border:1px solid rgba(255,255,255,.08); }
-    .embed iframe{ width:100%; height:320px; border:0; background:white }
+    .embed iframe{ width:100%; height:400px; border:0; background:white }
     details summary{ cursor:pointer; list-style:none }
     details summary::-webkit-details-marker{ display:none }
     .empty{ border:1px dashed rgba(255,255,255,.15); border-radius:14px; padding:18px; text-align:center; color:var(--subtext); font-size:14px }
@@ -72,6 +73,7 @@
       <button id="addGroup" type="button">➕ Pridėti grupę</button>
       <button id="importBtn" class="btn-outline" type="button">⤒ Importuoti</button>
       <button id="exportBtn" class="btn-outline" type="button">⤓ Eksportuoti</button>
+      <button id="sizeBtn" class="btn" type="button">📏 Kortelės</button>
       <button id="themeBtn" class="btn" type="button">🌓 Tema</button>
     </div>
   </header>
@@ -95,6 +97,10 @@
     import: 'Importuoti',
     export: 'Eksportuoti',
     theme: 'Tema',
+    size: 'Kortelės',
+    sizeSmall: 'Mažos',
+    sizeMedium: 'Vidutinės',
+    sizeLarge: 'Didelės',
     openAll: 'Atverti visas',
     addItem: 'Pridėti įrašą',
     collapse: 'Sutraukti/Išskleisti',
@@ -122,9 +128,11 @@
 
   const STORAGE_KEY = 'ed_dashboard_lt_v1';
   const THEME_KEY = 'ed_dash_theme';
+  const SIZE_KEY = 'ed_dash_size';
   const groupsEl = document.getElementById('groups');
   const statsEl = document.getElementById('stats');
   const searchEl = document.getElementById('q');
+  const sizeBtn = document.getElementById('sizeBtn');
 
   const uid = () => Math.random().toString(36).slice(2,10);
 
@@ -403,6 +411,7 @@
           });
 
           itemsWrap.appendChild(card);
+          if(it.type === 'embed' || it.type === 'sheet') previewItem(it, card);
         });
       }
 
@@ -486,18 +495,32 @@
 
   function applyTheme(){ const theme = localStorage.getItem(THEME_KEY) || 'dark'; if(theme==='light') document.documentElement.classList.add('theme-light'); else document.documentElement.classList.remove('theme-light'); }
   function toggleTheme(){ const now = (localStorage.getItem(THEME_KEY)||'dark')==='dark' ? 'light':'dark'; localStorage.setItem(THEME_KEY, now); applyTheme(); }
+  function applySize(){
+    const size = localStorage.getItem(SIZE_KEY) || 'm';
+    const map = {s:'300px', m:'360px', l:'460px'};
+    document.documentElement.style.setProperty('--group-width', map[size]);
+    sizeBtn.textContent = `📏 ${T.size}: ${size==='s'?T.sizeSmall:size==='l'?T.sizeLarge:T.sizeMedium}`;
+  }
+  function toggleSize(){
+    const now = localStorage.getItem(SIZE_KEY) || 'm';
+    const next = now==='s'?'m':now==='m'?'l':'s';
+    localStorage.setItem(SIZE_KEY, next);
+    applySize();
+  }
 
   document.getElementById('addGroup').addEventListener('click', addGroup);
   document.getElementById('exportBtn').addEventListener('click', exportJson);
   document.getElementById('importBtn').addEventListener('click', ()=> document.getElementById('fileInput').click());
   document.getElementById('fileInput').addEventListener('change', (e)=>{ const f = e.target.files[0]; if(f) importJson(f); e.target.value=''; });
   document.getElementById('themeBtn').addEventListener('click', toggleTheme);
+  sizeBtn.addEventListener('click', toggleSize);
   searchEl.placeholder = T.searchPH;
   searchEl.addEventListener('input', render);
 
   function escapeHtml(str){ return String(str).replace(/[&<>\"]/g, s=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[s])); }
 
   applyTheme();
+  applySize();
   render();
 
   // Papildoma diagnostika, jei vartotojas sako, kad mygtukai „neveikia“
