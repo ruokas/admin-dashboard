@@ -276,12 +276,18 @@
     try{
       const u = new URL(url);
       if(!u.hostname.includes('docs.google.com')) return null;
-      const parts = u.pathname.split('/');
-      const keyIdx = parts.findIndex(p=>p==='d');
-      if(keyIdx>0 && parts[keyIdx+1]){ const id = parts[keyIdx+1]; return `https://docs.google.com/spreadsheets/d/${id}/pubhtml?widget=true&headers=false`; }
-      if(u.pathname.includes('/pub') || u.pathname.includes('/pubhtml')) return url;
-      return null;
-    }catch{ return null }
+      if(/\/(pub|pubhtml|htmlview|htmlembed)/.test(u.pathname)) return url;
+      const parts = u.pathname.split('/').filter(Boolean);
+      const dIdx = parts.indexOf('d');
+      if(dIdx === -1) return null;
+      let id = parts[dIdx + 1];
+      if(id === 'e') id = parts[dIdx + 2];
+      if(!id) return null;
+      const gid = u.searchParams.get('gid') || u.hash.match(/gid=([^&]+)/)?.[1];
+      const params = new URLSearchParams({widget:'true', headers:'false'});
+      if(gid) params.set('gid', gid);
+      return `https://docs.google.com/spreadsheets/d/${id}/htmlembed?${params.toString()}`;
+    }catch{ return null; }
   }
 
   function render(){
