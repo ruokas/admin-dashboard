@@ -49,6 +49,11 @@
     .empty{ border:1px dashed rgba(255,255,255,.15); border-radius:14px; padding:18px; text-align:center; color:var(--subtext); font-size:14px }
     footer{ padding:30px; text-align:center; color:var(--subtext) }
     .handle{ cursor:grab; opacity:.7 }
+    dialog{ border:none; border-radius:12px; padding:20px; background:var(--panel); color:var(--text); box-shadow:var(--shadow); }
+    dialog::backdrop{ background:rgba(0,0,0,.6); }
+    dialog form{ display:grid; gap:12px; }
+    dialog menu{ display:flex; justify-content:flex-end; gap:8px; padding:0; }
+    dialog .error{ color:var(--danger); font-size:13px; }
     @media (max-width:620px){ .controls{ gap:6px } .search input{ min-width:170px } }
   </style>
 </head>
@@ -97,7 +102,7 @@
     deleteGroup: 'Pašalinti grupę',
     empty: 'Nėra įrašų. Spauskite ＋, kad pridėtumėte nuorodą ar įterpimą.',
     noMatches: 'Nėra atitikmenų šioje grupėje.',
-    itemTypes: 'Įrašo tipas: link | sheet | embed',
+    itemType: 'Įrašo tipas',
     groupName: 'Grupės pavadinimas (pvz., „Kasdieniai darbai“, „Gairės“)',
     groupColor: 'Akcento spalva',
     renameGroup: 'Pervadinti grupę',
@@ -108,6 +113,11 @@
     confirmDelGroup: 'Pašalinti šią grupę ir visus jos įrašus?',
     confirmDelItem: 'Pašalinti šį įrašą?',
     invalidImport: 'Netinkamas failo formatas',
+    save: 'Išsaugoti',
+    cancel: 'Atšaukti',
+    required: 'Užpildykite visus laukus.',
+    invalidUrl: 'Neteisingas URL.',
+    remove: 'Pašalinti',
   };
 
   const STORAGE_KEY = 'ed_dashboard_lt_v1';
@@ -117,6 +127,109 @@
   const searchEl = document.getElementById('q');
 
   let state = load() || seed();
+
+  // Dialogai
+  const groupDlg = document.createElement('dialog');
+  groupDlg.innerHTML = `<form method="dialog" id="groupForm">
+      <label>${T.groupName}<br><input name="name" required></label>
+      <label>${T.groupColor}<br><input name="color" type="color" value="#6ee7b7"></label>
+      <p class="error" id="groupErr"></p>
+      <menu>
+        <button type="button" data-act="cancel">${T.cancel}</button>
+        <button type="submit" class="btn-accent">${T.save}</button>
+      </menu>
+    </form>`;
+  document.body.appendChild(groupDlg);
+  const groupForm = groupDlg.querySelector('#groupForm');
+  const groupErr = groupDlg.querySelector('#groupErr');
+  const groupCancel = groupForm.querySelector('[data-act="cancel"]');
+
+  const itemDlg = document.createElement('dialog');
+  itemDlg.innerHTML = `<form method="dialog" id="itemForm">
+      <label>${T.itemType}<br>
+        <select name="type">
+          <option value="link">link</option>
+          <option value="sheet">sheet</option>
+          <option value="embed">embed</option>
+        </select>
+      </label>
+      <label>${T.itemTitle}<br><input name="title" required></label>
+      <label>${T.itemUrl}<br><input name="url" type="url" required></label>
+      <label>${T.itemNote}<br><textarea name="note" rows="2"></textarea></label>
+      <p class="error" id="itemErr"></p>
+      <menu>
+        <button type="button" data-act="cancel">${T.cancel}</button>
+        <button type="submit" class="btn-accent">${T.save}</button>
+      </menu>
+    </form>`;
+  document.body.appendChild(itemDlg);
+  const itemForm = itemDlg.querySelector('#itemForm');
+  const itemErr = itemDlg.querySelector('#itemErr');
+  const itemCancel = itemForm.querySelector('[data-act="cancel"]');
+
+  function groupFormDialog(data={}){
+    groupForm.name.value = data.name || '';
+    groupForm.color.value = data.color || '#6ee7b7';
+    groupErr.textContent = '';
+    return new Promise(resolve=>{
+      function submit(e){
+        e.preventDefault();
+        const name = groupForm.name.value.trim();
+        if(!name){ groupErr.textContent = T.required; return; }
+        resolve({name, color: groupForm.color.value});
+        cleanup();
+      }
+      function cancel(){ resolve(null); cleanup(); }
+      function cleanup(){
+        groupForm.removeEventListener('submit', submit);
+        groupCancel.removeEventListener('click', cancel);
+        groupDlg.close();
+      }
+      groupForm.addEventListener('submit', submit);
+      groupCancel.addEventListener('click', cancel);
+      groupDlg.showModal();
+    });
+  }
+
+  function itemFormDialog(data={}){
+    itemForm.type.value = data.type || 'link';
+    itemForm.title.value = data.title || '';
+    itemForm.url.value = data.url || '';
+    itemForm.note.value = data.note || '';
+    itemErr.textContent = '';
+    return new Promise(resolve=>{
+      function submit(e){
+        e.preventDefault();
+        const formData = Object.fromEntries(new FormData(itemForm));
+        formData.title = formData.title.trim();
+        formData.url = formData.url.trim();
+        formData.note = formData.note.trim();
+        if(!formData.title || !formData.url){ itemErr.textContent = T.required; return; }
+        try{ new URL(formData.url); }catch{ itemErr.textContent = T.invalidUrl; return; }
+        resolve(formData);
+        cleanup();
+      }
+      function cancel(){ resolve(null); cleanup(); }
+      function cleanup(){
+        itemForm.removeEventListener('submit', submit);
+        itemCancel.removeEventListener('click', cancel);
+        itemDlg.close();
+      }
+      itemForm.addEventListener('submit', submit);
+      itemCancel.addEventListener('click', cancel);
+      itemDlg.showModal();
+    });
+  }
+
+  function confirmDialog(msg){
+    return new Promise(resolve=>{
+      const dlg = document.createElement('dialog');
+      dlg.innerHTML = `<form method="dialog"><p>${msg}</p><menu><button value="cancel">${T.cancel}</button><button value="ok" class="btn-danger">${T.remove}</button></menu></form>`;
+      document.body.appendChild(dlg);
+      dlg.addEventListener('close', ()=>{ resolve(dlg.returnValue==='ok'); dlg.remove(); });
+      dlg.showModal();
+    });
+  }
 
   /** @typedef {{id:string, name:string, color:string, collapsed?:boolean, items: Item[]}} Group */
   /** @typedef {{id:string, type:'link'|'sheet'|'embed', title:string, url:string, note?:string}} Item */
@@ -204,10 +317,12 @@
         if(act==='add') return addItem(g.id);
         if(act==='edit') return editGroup(g.id);
         if(act==='del'){
-          if(confirm(T.confirmDelGroup)){
-            state.groups = state.groups.filter(x=>x.id!==g.id);
-            save();
-          }
+          confirmDialog(T.confirmDelGroup).then(ok=>{
+            if(ok){
+              state.groups = state.groups.filter(x=>x.id!==g.id);
+              save();
+            }
+          });
           return;
         }
         if(act==='toggle'){ g.collapsed = !g.collapsed; save(); return; }
@@ -277,7 +392,12 @@
             if(!b || b.tagName==='A') return; 
             const a = b.dataset.a;
             if(a==='edit') return editItem(g.id, it.id);
-            if(a==='del'){ if(confirm(T.confirmDelItem)){ g.items = g.items.filter(x=>x.id!==it.id); save(); } return; }
+            if(a==='del'){
+              confirmDialog(T.confirmDelItem).then(ok=>{
+                if(ok){ g.items = g.items.filter(x=>x.id!==it.id); save(); }
+              });
+              return;
+            }
             if(a==='preview') return previewItem(it, card);
           });
 
@@ -305,43 +425,44 @@
     mount.after(wrap);
   }
 
-  function addGroup(){
-    const name = prompt(T.groupName); if(!name) return;
-    const color = prompt(T.groupColor, '#6ee7b7') || '#6ee7b7';
-    state.groups.push({ id:uid(), name:name.trim(), color:color.trim(), items:[] });
+  async function addGroup(){
+    const res = await groupFormDialog();
+    if(!res) return;
+    state.groups.push({ id:uid(), name:res.name, color:res.color, items:[] });
     save();
   }
 
-  function editGroup(gid){
+  async function editGroup(gid){
     const g = state.groups.find(x=>x.id===gid); if(!g) return;
-    const name = prompt(T.renameGroup, g.name); if(!name) return;
-    const color = prompt(T.groupColor, g.color) || g.color;
-    g.name = name.trim(); g.color = color.trim(); save();
+    const res = await groupFormDialog({name:g.name, color:g.color});
+    if(!res) return;
+    g.name = res.name;
+    g.color = res.color;
+    save();
   }
 
-  function addItem(gid){
+  async function addItem(gid){
     const g = state.groups.find(x=>x.id===gid); if(!g) return;
-    const type = (prompt(T.itemTypes, 'link')||'link').toLowerCase();
-    if(!['link','sheet','embed'].includes(type)) return alert('Nežinomas tipas.');
-    const title = prompt(T.itemTitle); if(!title) return;
-    let url = prompt(T.itemUrl); if(!url) return;
-    if(type==='sheet'){
-      const conv = toSheetEmbed(url);
-      if(conv) url = conv; else alert(T.sheetTip);
+    const data = await itemFormDialog({type:'link'});
+    if(!data) return;
+    if(data.type==='sheet'){
+      const conv = toSheetEmbed(data.url);
+      if(conv) data.url = conv; else alert(T.sheetTip);
     }
-    const note = prompt(T.itemNote) || '';
-    g.items.push({ id:uid(), type, title:title.trim(), url:url.trim(), note:note.trim() });
+    g.items.push({ id:uid(), type:data.type, title:data.title, url:data.url, note:data.note });
     save();
   }
 
-  function editItem(gid, iid){
+  async function editItem(gid, iid){
     const g = state.groups.find(x=>x.id===gid); if(!g) return;
     const it = g.items.find(x=>x.id===iid); if(!it) return;
-    const title = prompt(T.itemTitle, it.title); if(!title) return;
-    let url = prompt(T.itemUrl, it.url); if(!url) return;
-    if(it.type==='sheet'){ const conv = toSheetEmbed(url); if(conv) url = conv; }
-    const note = prompt(T.itemNote, it.note||'') || '';
-    it.title = title.trim(); it.url = url.trim(); it.note = note.trim();
+    const data = await itemFormDialog(it);
+    if(!data) return;
+    if(data.type==='sheet'){ const conv = toSheetEmbed(data.url); if(conv) data.url = conv; }
+    it.type = data.type;
+    it.title = data.title;
+    it.url = data.url;
+    it.note = data.note;
     save();
   }
 
