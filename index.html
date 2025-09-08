@@ -143,14 +143,14 @@
       if (g) {
         const w = Math.round(entry.contentRect.width / GRID) * GRID;
         const h = Math.round(entry.contentRect.height / GRID) * GRID;
-        entry.target.style.width = w + 'px';
         if (entry.target.dataset.resizing === '1') {
+          entry.target.style.width = w + 'px';
           entry.target.style.height = h + 'px';
+          g.w = w;
           g.h = h;
           g.resized = true;
+          persist();
         }
-        g.w = w;
-        persist();
       }
     }
   });
