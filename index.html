@@ -129,6 +129,9 @@
 
   const uid = () => Math.random().toString(36).slice(2,10);
 
+  // Tinklelio dydis grupių dydžių reguliavimui (px)
+  const GRID = 20;
+
   let state = load() || seed();
 
   const ro = new ResizeObserver(entries => {
@@ -136,8 +139,12 @@
       const id = entry.target.dataset.id;
       const g = state.groups.find(x => x.id === id);
       if (g) {
-        g.w = Math.round(entry.contentRect.width);
-        g.h = Math.round(entry.contentRect.height);
+        const w = Math.round(entry.contentRect.width / GRID) * GRID;
+        const h = Math.round(entry.contentRect.height / GRID) * GRID;
+        entry.target.style.width = w + 'px';
+        entry.target.style.height = h + 'px';
+        g.w = w;
+        g.h = h;
         persist();
       }
     }
