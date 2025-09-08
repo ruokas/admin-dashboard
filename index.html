@@ -126,6 +126,8 @@
   const statsEl = document.getElementById('stats');
   const searchEl = document.getElementById('q');
 
+  const uid = () => Math.random().toString(36).slice(2,10);
+
   let state = load() || seed();
 
   // Dialogai
@@ -234,7 +236,6 @@
   /** @typedef {{id:string, name:string, color:string, collapsed?:boolean, items: Item[]}} Group */
   /** @typedef {{id:string, type:'link'|'sheet'|'embed', title:string, url:string, note?:string}} Item */
 
-  const uid = () => Math.random().toString(36).slice(2,10);
   function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); render(); }
   function load(){ try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||'');}catch(e){return null;} }
   function seed(){
