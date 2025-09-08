@@ -9,7 +9,7 @@ Statinis vieno failo HTML projektas, skirtas publikuoti per **GitHub Pages**.
 
 ## Funkcijos
 
-- Grupių kortelių dydį galima keisti mygtuku „📏 Kortelės“.
+- Grupių kortelių dydį galima keisti jas tempiant į šoną ir žemyn.
 - „sheet“ ir „embed“ tipo įrašai automatiškai rodo peržiūrą kortelėje.
 
 ## Licencija
