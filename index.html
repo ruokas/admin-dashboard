@@ -34,9 +34,9 @@
     .group-title{ display:flex; align-items:center; gap:10px }
     .dot{ width:12px; height:12px; border-radius:50% }
     .group-header h2{ margin:0; font-size:16px }
-    .group-actions{ display:flex; align-items:center; gap:6px }
-    /* didesnės piktogramos grupės kortelės veiksmams */
-    .group-actions button{ font-size:20px }
+    .group-actions{ display:flex; align-items:center; gap:4px }
+    /* kompaktiškesni mygtukai grupės kortelėse */
+    .group-actions button{ font-size:18px; padding:6px }
     .items{ display:grid; grid-template-columns:1fr; gap:10px; padding:12px; }
     .item{ background:var(--card); border:1px solid rgba(255,255,255,.06); border-radius:14px; padding:12px; display:flex; gap:10px; align-items:center; box-shadow:var(--shadow) }
     .item.dragging{ opacity:.45 }
@@ -45,11 +45,8 @@
     .item .meta .sub{ font-size:12px; color:var(--subtext); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
     .item .actions{ display:flex; gap:6px }
     .favicon{ width:20px; height:20px; border-radius:4px; background:var(--muted); flex:0 0 20px; display:grid; place-items:center; font-size:10px; color:var(--subtext) }
-    .embed{ border-radius:12px; overflow:hidden; border:1px solid rgba(255,255,255,.08); }
-    /* Iframe aukštis koreguojamas pagal grupės plotį (16:9 santykis) */
-    .embed iframe{ width:100%; border:0; background:white; height:auto; aspect-ratio:16/9 }
-    details summary{ cursor:pointer; list-style:none }
-    details summary::-webkit-details-marker{ display:none }
+    .embed{ border-radius:12px; overflow:hidden; border:1px solid rgba(255,255,255,.08); resize:vertical; min-height:120px; }
+    .embed iframe{ width:100%; border:0; background:white; height:100%; }
     .empty{ border:1px dashed rgba(255,255,255,.15); border-radius:14px; padding:18px; text-align:center; color:var(--subtext); font-size:14px }
     footer{ padding:30px; text-align:center; color:var(--subtext) }
     .handle{ cursor:grab; opacity:.7 }
@@ -103,7 +100,6 @@
     theme: 'Tema',
     openAll: 'Atverti visas',
     addItem: 'Pridėti įrašą',
-    collapse: 'Sutraukti/Išskleisti',
     editGroup: 'Redaguoti grupę',
     editMode: 'Redaguoti',
     done: 'Baigti',
@@ -320,8 +316,8 @@
     });
   }
 
-  /** @typedef {{id:string, name:string, color:string, items: Item[], w?:number, h?:number, resized?:boolean, collapsed?:boolean}} Group */
-  /** @typedef {{id:string, type:'link'|'sheet'|'embed', title:string, url:string, note?:string}} Item */
+  /** @typedef {{id:string, name:string, color:string, items: Item[], w?:number, h?:number, resized?:boolean}} Group */
+  /** @typedef {{id:string, type:'link'|'sheet'|'embed', title:string, url:string, note?:string, h?:number}} Item */
 
   function persist(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
   function save(){ persist(); render(); }
@@ -397,7 +393,6 @@
         ${editing?`<div class="group-actions">
           <button type="button" title="${T.openAll}" aria-label="${T.openAll}" data-act="openAll">↗</button>
           <button type="button" title="${T.addItem}" aria-label="${T.addItem}" data-act="add">＋</button>
-          <button type="button" title="${T.collapse}" aria-label="${T.collapse}" data-act="toggle">▾</button>
           <button type="button" title="${T.editGroup}" aria-label="${T.editGroup}" data-act="edit">✎</button>
           <button type="button" class="btn-danger" title="${T.deleteGroup}" aria-label="${T.deleteGroup}" data-act="del">🗑</button>
         </div>`:''}`;
@@ -417,7 +412,6 @@
           });
           return;
         }
-        if(act==='toggle'){ g.collapsed = !g.collapsed; save(); return; }
         if(act==='openAll'){ g.items.filter(i=>i.type==='link').forEach(i=> window.open(i.url, '_blank')); }
       });
 
@@ -425,7 +419,6 @@
 
       const itemsWrap = document.createElement('div');
       itemsWrap.className = 'items';
-      if(g.collapsed) itemsWrap.style.display = 'none';
 
       const filteredItems = g.items.filter(i=>{ if(!q) return true; return [i.title, i.url, i.note].filter(Boolean).some(v=>String(v).toLowerCase().includes(q)); });
 
@@ -517,14 +510,16 @@
   }
 
   /**
-   * Pritaiko iframe aukštį pagal tėvinio elemento plotį (16:9 santykis)
+   * Nustato numatytą embed aukštį pagal tėvinio elemento plotį (16:9),
+   * jei vartotojas nėra pakeitęs dydžio.
    * @param {HTMLElement} root Grupės elementas
    */
   function resizeEmbeds(root){
     if(!root) return;
-    root.querySelectorAll('.embed iframe').forEach(frame => {
-      const w = frame.parentElement.clientWidth;
-      frame.style.height = Math.round(w * 0.5625) + 'px';
+    root.querySelectorAll('.embed').forEach(box => {
+      if(box.dataset.custom==='1') return;
+      const w = box.clientWidth;
+      box.style.height = Math.round(w * 0.5625) + 'px';
     });
   }
 
@@ -533,9 +528,17 @@
     if(existing && existing.classList.contains('embed')){ existing.remove(); return; }
     const wrap = document.createElement('div');
     wrap.className = 'embed';
+    wrap.style.overflow = 'hidden';
+    wrap.dataset.custom = it.h ? '1' : '0';
+    if(it.h) wrap.style.height = it.h + 'px';
     let src = it.url;
     if(it.type==='sheet'){ const conv = toSheetEmbed(it.url); if(conv) src = conv; }
-    wrap.innerHTML = `<details open><summary>Rodyti/slėpti peržiūrą</summary><iframe src="${src}" loading="lazy" referrerpolicy="no-referrer"></iframe></details>`;
+    wrap.innerHTML = `<iframe src="${src}" loading="lazy" referrerpolicy="no-referrer"></iframe>`;
+    wrap.addEventListener('mouseup', ()=>{
+      it.h = Math.round(wrap.getBoundingClientRect().height);
+      wrap.dataset.custom = '1';
+      save();
+    });
     mount.after(wrap);
     resizeEmbeds(mount.closest('.group'));
   }
