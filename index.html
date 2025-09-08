@@ -155,6 +155,10 @@
     }
   });
 
+  document.addEventListener('mouseup', ()=>{
+    document.querySelectorAll('.group').forEach(g=>g.dataset.resizing='0');
+  });
+
   // Dialogai
   const groupDlg = document.createElement('dialog');
   groupDlg.innerHTML = `<form method="dialog" id="groupForm">
@@ -307,7 +311,6 @@
         const withinHandle = e.clientX >= rect.right - 20 && e.clientY >= rect.bottom - 20;
         if(withinHandle) grp.dataset.resizing = '1';
       });
-      grp.addEventListener('mouseup',   ()=> grp.dataset.resizing = '0');
       grp.draggable = true;
       grp.addEventListener('dragstart', e=>{ e.dataTransfer.setData('text/group', g.id); grp.style.opacity = .5; });
       grp.addEventListener('dragend',   ()=>{ grp.style.opacity = 1; });
