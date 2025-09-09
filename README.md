@@ -12,6 +12,7 @@ Statinis vieno failo HTML projektas, skirtas publikuoti per **GitHub Pages**.
 ## Funkcijos
 
 - Grupių kortelių dydį galima keisti jas tempiant į šoną ir žemyn.
+- Įrašų eiliškumą galima keisti rodyklėmis arba tempiant (drag-and-drop) redagavimo režime.
 - „sheet“ ir „embed“ tipo įrašai automatiškai rodo peržiūrą kortelėje.
 - Embed peržiūros kortelę galima vertikaliai padidinti arba sumažinti.
 - Eksportas ir importas į Google Sheets per Apps Script "web app" (laikinai išjungta).
