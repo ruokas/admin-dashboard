@@ -43,6 +43,8 @@ const T = {
   required: 'Užpildykite visus laukus.',
   invalidUrl: 'Neteisingas URL.',
   remove: 'Pašalinti',
+  moveUp: 'Perkelti aukštyn',
+  moveDown: 'Perkelti žemyn',
 };
 
 const I = {
@@ -54,6 +56,10 @@ const I = {
   eye: '<svg class="icon" viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>',
   arrowUpRight:
     '<svg class="icon" viewBox="0 0 24 24"><polyline points="7 17 17 7"/><polyline points="7 7 17 7 17 17"/></svg>',
+  arrowUp:
+    '<svg class="icon" viewBox="0 0 24 24"><polyline points="6 15 12 9 18 15"/></svg>',
+  arrowDown:
+    '<svg class="icon" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>',
   check:
     '<svg class="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>',
   globe:

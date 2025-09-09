@@ -280,6 +280,8 @@ export function render(state, editing, T, I, handlers, saveFn) {
 
         const actionsHtml = editing
           ? `<div class="actions">
+              <button type="button" title="${T.moveUp}" aria-label="${T.moveUp}" data-a="up">${I.arrowUp}</button>
+              <button type="button" title="${T.moveDown}" aria-label="${T.moveDown}" data-a="down">${I.arrowDown}</button>
               <button type="button" title="Peržiūra" aria-label="Peržiūra" data-a="preview">${I.eye}</button>
               <button type="button" title="Redaguoti" aria-label="Redaguoti" data-a="edit">${I.pencil}</button>
               <button type="button" class="btn-danger" title="Pašalinti" aria-label="Pašalinti" data-a="del">${I.trash}</button>
@@ -309,6 +311,20 @@ export function render(state, editing, T, I, handlers, saveFn) {
               return;
             }
             if (a === 'preview') return previewItem(it, card);
+            if (a === 'up' || a === 'down') {
+              const idx = g.items.findIndex((x) => x.id === it.id);
+              if (a === 'up' && idx > 0) {
+                const [moved] = g.items.splice(idx, 1);
+                g.items.splice(idx - 1, 0, moved);
+              }
+              if (a === 'down' && idx < g.items.length - 1) {
+                const [moved] = g.items.splice(idx, 1);
+                g.items.splice(idx + 1, 0, moved);
+              }
+              persist();
+              render(state, editing, T, I, handlers, saveFn);
+              return;
+            }
           } else {
             if (it.type === 'link') window.open(it.url, '_blank');
             else previewItem(it, card);
