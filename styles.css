@@ -31,14 +31,17 @@ main{ padding:20px clamp(10px,2.2vw,24px); max-width:1500px; width:100%; margin:
 .group-header h2{ margin:0; font-size:16px }
 .group-actions{ display:flex; align-items:center; gap:4px }
 .group-actions button{ padding:4px }
-.item .actions button{ padding:4px; min-width:32px; }
 .items{ display:grid; grid-template-columns:1fr; gap:6px; padding:8px; }
 .item{ background:var(--card); border:1px solid rgba(255,255,255,.06); border-radius:10px; padding:8px; display:flex; gap:8px; align-items:center; box-shadow:var(--shadow) }
 .item.dragging{ opacity:.45 }
 .item .meta{ flex:1; min-width:0; text-decoration:none; color:inherit; display:block }
 .item .meta .title{ font-weight:700; font-size:13px; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 .item .meta .sub{ font-size:11px; color:var(--subtext); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
-.item .actions{ display:flex; gap:4px }
+.item .actions{ margin-left:auto; position:relative; }
+.item .actions>button{ padding:4px; }
+.item .actions .menu{ position:absolute; right:0; top:100%; margin-top:4px; display:flex; flex-direction:column; gap:4px; background:var(--panel); border:1px solid rgba(255,255,255,.06); border-radius:8px; padding:4px; box-shadow:var(--shadow); }
+.item .actions .menu button{ width:100%; justify-content:flex-start; padding:6px 8px; box-shadow:none; }
+.item .actions .menu[hidden]{ display:none; }
 .favicon{ width:16px; height:16px; border-radius:4px; background:var(--muted); flex:0 0 16px; display:grid; place-items:center; color:var(--subtext) }
 .favicon svg{ width:100%; height:100%; }
 .embed{ border-radius:12px; overflow:hidden; border:1px solid rgba(255,255,255,.08); resize:vertical; min-height:120px; }
