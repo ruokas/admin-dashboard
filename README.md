@@ -13,6 +13,7 @@ Statinis vieno failo HTML projektas, skirtas publikuoti per **GitHub Pages**.
 - „sheet“ ir „embed“ tipo įrašai automatiškai rodo peržiūrą kortelėje.
 - Embed peržiūros kortelę galima vertikaliai padidinti arba sumažinti.
 - Eksportas ir importas į Google Sheets per Apps Script "web app".
+- Sinchronizacijos būsena rodoma antraštėje.
 - Redagavimo režimas: išjungus puslapis tampa statinis, įjungus galima keisti grupes ir įrašus.
 
 ## Smoke test
