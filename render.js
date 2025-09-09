@@ -78,7 +78,7 @@ export function toSheetEmbed(url) {
 
 function escapeHtml(str) {
   return String(str).replace(
-    /[&<>\"]/g,
+    /[&<>"]/g,
     (s) =>
       ({
         '&': '&amp;',
