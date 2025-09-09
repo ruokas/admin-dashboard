@@ -19,7 +19,7 @@ export function seed() {
 }
 
 export function sheetsSync(state, syncStatus, saveFn, renderFn) {
-  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx87mix5Ch6eaLgS0MVR2ooQGzktFJVrVw1aG0iVzRgHPyjlcOjeqNgx4fCrGjX9Dqo/exec'; // Pakeiskite į savo "web app" URL
+  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxGrClqMHfkKqCUK8zZSix35s26oFW2Oyje-LsIcSH-6DTftkNtEVWcALfbD__rEfy_/exec'; // Pakeiskite į savo "web app" URL
 
   async function send(action, payload) {
     const res = await fetch(SCRIPT_URL, {
