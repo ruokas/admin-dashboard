@@ -8,9 +8,13 @@ const ro = new ResizeObserver((entries) => {
     const id = entry.target.dataset.id;
     const g = currentState.groups.find((x) => x.id === id);
     if (g) {
-      const w = Math.round(entry.contentRect.width / GRID) * GRID;
-      const h = Math.round(entry.contentRect.height / GRID) * GRID;
+      let w = Math.round(entry.contentRect.width / GRID) * GRID;
+      let h = Math.round(entry.contentRect.height / GRID) * GRID;
       if (entry.target.dataset.resizing === '1') {
+        const minW = entry.target.scrollWidth;
+        const minH = entry.target.scrollHeight;
+        if (w < minW) w = minW;
+        if (h < minH) h = minH;
         entry.target.style.width = w + 'px';
         entry.target.style.height = h + 'px';
         g.w = w;
@@ -27,6 +31,14 @@ document.addEventListener('mouseup', () => {
   document
     .querySelectorAll('.group')
     .forEach((g) => (g.dataset.resizing = '0'));
+});
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.actions')) {
+    document
+      .querySelectorAll('.actions .menu')
+      .forEach((m) => (m.hidden = true));
+  }
 });
 
 const embedObserver = new ResizeObserver((entries) => {
@@ -176,6 +188,8 @@ export function render(state, editing, T, I, handlers, saveFn) {
         ${
           editing
             ? `<div class="group-actions">
+          <button type="button" title="${T.moveUp}" aria-label="${T.moveUp}" data-act="up">${I.arrowUp}</button>
+          <button type="button" title="${T.moveDown}" aria-label="${T.moveDown}" data-act="down">${I.arrowDown}</button>
           <button type="button" title="${T.openAll}" aria-label="${T.openAll}" data-act="openAll">${I.arrowUpRight}</button>
           <button type="button" title="${T.addItem}" aria-label="${T.addItem}" data-act="add">${I.plus}</button>
           <button type="button" title="${T.editGroup}" aria-label="${T.editGroup}" data-act="edit">${I.pencil}</button>
@@ -198,6 +212,20 @@ export function render(state, editing, T, I, handlers, saveFn) {
             render(state, editing, T, I, handlers, saveFn);
           }
         });
+        return;
+      }
+      if (act === 'up' || act === 'down') {
+        const idx = state.groups.findIndex((x) => x.id === g.id);
+        if (act === 'up' && idx > 0) {
+          const [moved] = state.groups.splice(idx, 1);
+          state.groups.splice(idx - 1, 0, moved);
+        }
+        if (act === 'down' && idx < state.groups.length - 1) {
+          const [moved] = state.groups.splice(idx, 1);
+          state.groups.splice(idx + 1, 0, moved);
+        }
+        persist();
+        render(state, editing, T, I, handlers, saveFn);
         return;
       }
       if (act === 'openAll') {
@@ -280,11 +308,14 @@ export function render(state, editing, T, I, handlers, saveFn) {
 
         const actionsHtml = editing
           ? `<div class="actions">
-              <button type="button" title="${T.moveUp}" aria-label="${T.moveUp}" data-a="up">${I.arrowUp}</button>
-              <button type="button" title="${T.moveDown}" aria-label="${T.moveDown}" data-a="down">${I.arrowDown}</button>
-              <button type="button" title="Peržiūra" aria-label="Peržiūra" data-a="preview">${I.eye}</button>
-              <button type="button" title="Redaguoti" aria-label="Redaguoti" data-a="edit">${I.pencil}</button>
-              <button type="button" class="btn-danger" title="Pašalinti" aria-label="Pašalinti" data-a="del">${I.trash}</button>
+              <button type="button" title="${T.actions}" aria-label="${T.actions}" data-a="menu">${I.more}</button>
+              <div class="menu" hidden>
+                <button type="button" data-a="up">${I.arrowUp} ${T.moveUp}</button>
+                <button type="button" data-a="down">${I.arrowDown} ${T.moveDown}</button>
+                <button type="button" data-a="preview">${I.eye} ${T.preview}</button>
+                <button type="button" data-a="edit">${I.pencil} ${T.edit}</button>
+                <button type="button" class="btn-danger" data-a="del">${I.trash} ${T.remove}</button>
+              </div>
             </div>`
           : '';
         card.innerHTML = `${favicon}${metaHtml}${actionsHtml}`;
@@ -299,6 +330,12 @@ export function render(state, editing, T, I, handlers, saveFn) {
             const b = e.target.closest('button');
             if (!b) return;
             const a = b.dataset.a;
+            const menuEl = card.querySelector('.menu');
+            if (menuEl && a !== 'menu') menuEl.hidden = true;
+            if (a === 'menu') {
+              if (menuEl) menuEl.hidden = !menuEl.hidden;
+              return;
+            }
             if (a === 'edit') return handlers.editItem(g.id, it.id);
             if (a === 'del') {
               handlers.confirmDialog(T.confirmDelItem).then((ok) => {
