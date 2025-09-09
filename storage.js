@@ -34,6 +34,11 @@ export function sheetsSync(state, syncStatus, saveFn, renderFn) {
   return {
     async export() {
       syncStatus.textContent = 'Sinchronizuojama…';
+      if (!navigator.onLine) {
+        syncStatus.textContent = 'Nėra ryšio';
+        alert('Nėra interneto ryšio');
+        return;
+      }
       try {
         await send('export', state);
         syncStatus.textContent = 'Baigta';
@@ -41,7 +46,7 @@ export function sheetsSync(state, syncStatus, saveFn, renderFn) {
       } catch (err) {
         syncStatus.textContent = 'Nepavyko';
         console.error('Sheets eksportas nepavyko', err);
-        alert('Sheets eksportas nepavyko');
+        alert('Eksportas nepavyko: ' + err.message);
       } finally {
         setTimeout(() => {
           syncStatus.textContent = '';
@@ -50,6 +55,11 @@ export function sheetsSync(state, syncStatus, saveFn, renderFn) {
     },
     async import() {
       syncStatus.textContent = 'Sinchronizuojama…';
+      if (!navigator.onLine) {
+        syncStatus.textContent = 'Nėra ryšio';
+        alert('Nėra interneto ryšio');
+        return;
+      }
       try {
         const res = await send('import');
         if (res && res.data) {
