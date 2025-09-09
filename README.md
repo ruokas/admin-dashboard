@@ -18,8 +18,15 @@ Statinis vieno failo HTML projektas, skirtas publikuoti per **GitHub Pages**.
 
 ## Smoke test
 
-1. Apps Script faile sukurkite funkcijas `doPost(e)` su veiksmu `export`/`import` ir publikuokite kaip "web app". Nukopijuokite gautą URL.
-2. `index.html` faile `SCRIPT_URL` konstanta pakeiskite į savo "web app" adresą.
+1. Apps Script faile sukurkite funkcijas `doPost(e)` su veiksmu `export`/`import` ir publikuokite kaip "web app". URL galite gauti paleidę žemiau esantį pavyzdį ir pasižiūrėję **Execution log** skiltį.
+
+   ```javascript
+   function showUrl() {
+     Logger.log(ScriptApp.getService().getUrl());
+   }
+   ```
+
+2. `storage.js` faile `SCRIPT_URL` konstanta pakeiskite į savo "web app" adresą.
 3. Atidarykite puslapį ir paspauskite **Eksportuoti** – duomenys nusiųsami į Sheets.
 4. Perkraukite puslapį (išvalykite `localStorage`, jei reikia).
 5. Paspauskite **Importuoti** – duomenys parsiunčiami iš Sheets.
