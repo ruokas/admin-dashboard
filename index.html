@@ -77,6 +77,7 @@
       <button id="importBtn" class="btn-outline" type="button" style="display:none"><svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Importuoti</span></button>
       <button id="exportBtn" class="btn-outline" type="button" style="display:none"><svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><span>Eksportuoti</span></button>
       <button id="themeBtn" class="btn" type="button"><svg class="icon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg><span>Tema</span></button>
+      <span id="syncStatus" aria-live="polite"></span>
     </div>
   </header>
 
@@ -139,6 +140,7 @@
   const statsEl = document.getElementById('stats');
   const searchEl = document.getElementById('q');
   const editBtn = document.getElementById('editBtn');
+  const syncStatus = document.getElementById('syncStatus');
   let editing = false;
 
   function updateEditingUI(){
@@ -172,15 +174,21 @@
     }
     return {
       async export(){
+        syncStatus.textContent = 'Sinchronizuojama…';
         try{
           await send('export', state);
+          syncStatus.textContent = 'Baigta';
           console.log('Sheets eksportas pavyko');
         }catch(err){
+          syncStatus.textContent = 'Nepavyko';
           console.error('Sheets eksportas nepavyko', err);
           alert('Sheets eksportas nepavyko');
+        }finally{
+          setTimeout(()=>{ syncStatus.textContent = ''; }, 3000);
         }
       },
       async import(){
+        syncStatus.textContent = 'Sinchronizuojama…';
         try{
           const res = await send('import');
           if(res && res.data){
@@ -189,9 +197,13 @@
             render();
             console.log('Sheets importas pavyko');
           }
+          syncStatus.textContent = 'Baigta';
         }catch(err){
+          syncStatus.textContent = 'Nepavyko';
           console.error('Sheets importas nepavyko', err);
           alert('Sheets importas nepavyko');
+        }finally{
+          setTimeout(()=>{ syncStatus.textContent = ''; }, 3000);
         }
       }
     };
