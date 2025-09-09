@@ -24,7 +24,7 @@ export function sheetsSync(state, syncStatus, saveFn, renderFn) {
   async function send(action, payload) {
     const res = await fetch(SCRIPT_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      // Jokios "Content-Type" antraštės – taip išvengiama CORS preflight
       body: JSON.stringify({ action, data: payload }),
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
