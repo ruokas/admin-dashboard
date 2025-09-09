@@ -1,4 +1,4 @@
-import { load, save, seed, sheetsSync } from './storage.js';
+import { load, save, seed } from './storage.js';
 import {
   render,
   updateEditingUI,
@@ -65,7 +65,7 @@ const I = {
 };
 
 const editBtn = document.getElementById('editBtn');
-const syncStatus = document.getElementById('syncStatus');
+// const syncStatus = document.getElementById('syncStatus'); // Sheets sync indikatorius (išjungta)
 const searchEl = document.getElementById('q');
 
 let state = load() || seed();
@@ -186,15 +186,14 @@ function importJson(file) {
   reader.readAsText(file);
 }
 
-const sheets = sheetsSync(state, syncStatus, () => save(state), renderAll);
+// Google Sheets sinchronizavimas laikinai išjungtas
+// const sheets = sheetsSync(state, syncStatus, () => save(state), renderAll);
 
 document.getElementById('addGroup').addEventListener('click', addGroup);
 document.getElementById('exportBtn').addEventListener('click', () => {
   exportJson();
-  sheets.export();
 });
 document.getElementById('importBtn').addEventListener('click', () => {
-  sheets.import();
   document.getElementById('fileInput').click();
 });
 document.getElementById('fileInput').addEventListener('change', (e) => {
