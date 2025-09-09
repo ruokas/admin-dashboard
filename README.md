@@ -2,6 +2,8 @@
 
 Statinis vieno failo HTML projektas, skirtas publikuoti per **GitHub Pages**.
 
+> **Pastaba:** sinchronizavimas su Google Sheets šiuo metu išjungtas.
+
 ## Naudojimas
 
 1. Atidarykite [projekto puslapį](https://<user>.github.io/admin-dashboard/) GitHub Pages (pakeiskite `<user>` savo GitHub naudotojo vardu).
@@ -12,11 +14,12 @@ Statinis vieno failo HTML projektas, skirtas publikuoti per **GitHub Pages**.
 - Grupių kortelių dydį galima keisti jas tempiant į šoną ir žemyn.
 - „sheet“ ir „embed“ tipo įrašai automatiškai rodo peržiūrą kortelėje.
 - Embed peržiūros kortelę galima vertikaliai padidinti arba sumažinti.
-- Eksportas ir importas į Google Sheets per Apps Script "web app".
-- Sinchronizacijos būsena rodoma antraštėje.
+- Eksportas ir importas į Google Sheets per Apps Script "web app" (laikinai išjungta).
 - Redagavimo režimas: išjungus puslapis tampa statinis, įjungus galima keisti grupes ir įrašus.
 
 ## Smoke test
+
+Šie žingsniai aktualūs tik atnaujinus ir vėl įjungus Google Sheets sinchronizavimą.
 
 1. Apps Script faile sukurkite funkcijas `doPost(e)` su veiksmu `export`/`import` ir publikuokite kaip "web app". URL galite gauti paleidę žemiau esantį pavyzdį ir pasižiūrėję **Execution log** skiltį.
 
@@ -34,4 +37,3 @@ Statinis vieno failo HTML projektas, skirtas publikuoti per **GitHub Pages**.
 ## Licencija
 
 Projektas platinamas pagal [MIT licenciją](LICENSE).
-
