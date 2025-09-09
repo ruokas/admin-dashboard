@@ -19,36 +19,37 @@
     .title h1{ margin:0; font-size: clamp(18px,3.5vw,24px); letter-spacing:.2px }
     .title .badge{font-size:12px; padding:4px 8px; border-radius:999px; background:var(--muted); color:var(--subtext)}
     .controls{ display:flex; flex-wrap:wrap; gap:8px; align-items:center }
-    button, .btn{ border:1px solid transparent; background:var(--panel); color:var(--text); padding:10px 12px; border-radius:12px; cursor:pointer; box-shadow:var(--shadow); font-weight:600; letter-spacing:.2px; transition:.2s ease background, .2s ease transform; display:inline-flex; align-items:center; gap:8px; text-decoration:none }
+    button, .btn{ border:1px solid transparent; background:var(--panel); color:var(--text); padding:10px 12px; border-radius:12px; cursor:pointer; box-shadow:var(--shadow); font-weight:600; letter-spacing:.2px; transition:.2s ease background, .2s ease transform; display:inline-flex; align-items:center; gap:6px; text-decoration:none }
     button:hover, .btn:hover{ transform: translateY(-1px); background:var(--muted) }
     .btn-accent{ background:linear-gradient(180deg, var(--accent), #3dd6a6); color:#0a0f14 }
     .btn-danger{ background: linear-gradient(180deg, var(--danger), #e24a4a); color:white }
     .btn-outline{ background:transparent; border-color:var(--muted) }
+    .icon{ width:16px; height:16px; stroke:currentColor; stroke-width:1.5; fill:none; stroke-linecap:round; stroke-linejoin:round; }
+    .btn .icon{ margin-right:4px; }
     .search{ position:relative; }
     .search input{ background:var(--panel); border:1px solid transparent; color:var(--text); padding:12px 14px 12px 40px; border-radius:12px; min-width: 240px; outline:none; box-shadow:var(--shadow); }
     .search svg{ position:absolute; left:12px; top:50%; transform:translateY(-50%); opacity:.6 }
     main{ padding:20px clamp(10px,2.2vw,24px); max-width:1500px; width:100%; margin:0 auto; flex:1; }
     .grid{ display:flex; flex-wrap:wrap; gap:16px; }
-    .group{ background:var(--panel); border:1px solid rgba(255,255,255,.06); border-radius:18px; box-shadow:var(--shadow); display:flex; flex-direction:column; min-height:120px; overflow:auto; resize:both; width:var(--group-width); }
-    .group-header{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:14px; background:linear-gradient(180deg, rgba(255,255,255,.04), transparent) }
-    .group-title{ display:flex; align-items:center; gap:10px }
+    .group{ background:var(--panel); border:1px solid rgba(255,255,255,.06); border-radius:16px; box-shadow:var(--shadow); display:flex; flex-direction:column; min-height:100px; overflow:auto; resize:both; width:var(--group-width); }
+    .group-header{ display:flex; align-items:center; justify-content:space-between; gap:6px; padding:10px; background:linear-gradient(180deg, rgba(255,255,255,.04), transparent) }
+    .group-title{ display:flex; align-items:center; gap:8px }
     .dot{ width:12px; height:12px; border-radius:50% }
     .group-header h2{ margin:0; font-size:16px }
     .group-actions{ display:flex; align-items:center; gap:4px }
-    /* kompaktiškesni mygtukai grupės kortelėse */
-    .group-actions button{ font-size:18px; padding:6px }
-    .items{ display:grid; grid-template-columns:1fr; gap:10px; padding:12px; }
-    .item{ background:var(--card); border:1px solid rgba(255,255,255,.06); border-radius:14px; padding:12px; display:flex; gap:10px; align-items:center; box-shadow:var(--shadow) }
+    .group-actions button{ padding:4px }
+    .items{ display:grid; grid-template-columns:1fr; gap:6px; padding:8px; }
+    .item{ background:var(--card); border:1px solid rgba(255,255,255,.06); border-radius:10px; padding:8px; display:flex; gap:8px; align-items:center; box-shadow:var(--shadow) }
     .item.dragging{ opacity:.45 }
-    .item .meta{ flex:1; min-width:0 }
-    .item .meta .title{ font-weight:700; font-size:14px; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
-    .item .meta .sub{ font-size:12px; color:var(--subtext); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
-    .item .actions{ display:flex; gap:6px }
-    .favicon{ width:20px; height:20px; border-radius:4px; background:var(--muted); flex:0 0 20px; display:grid; place-items:center; font-size:10px; color:var(--subtext) }
+    .item .meta{ flex:1; min-width:0; text-decoration:none; color:inherit; display:block }
+    .item .meta .title{ font-weight:700; font-size:13px; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+    .item .meta .sub{ font-size:11px; color:var(--subtext); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+    .item .actions{ display:flex; gap:4px }
+    .favicon{ width:16px; height:16px; border-radius:4px; background:var(--muted); flex:0 0 16px; display:grid; place-items:center; color:var(--subtext) }
+    .favicon svg{ width:100%; height:100%; }
     .embed{ border-radius:12px; overflow:hidden; border:1px solid rgba(255,255,255,.08); resize:vertical; min-height:120px; }
     .embed iframe{ width:100%; border:0; background:white; height:100%; }
     .empty{ border:1px dashed rgba(255,255,255,.15); border-radius:14px; padding:18px; text-align:center; color:var(--subtext); font-size:14px }
-    footer{ padding:30px; text-align:center; color:var(--subtext) }
     .handle{ cursor:grab; opacity:.7 }
     body:not(.editing) .handle{ cursor:default; }
     dialog{ border:none; border-radius:12px; padding:20px; background:var(--panel); color:var(--text); box-shadow:var(--shadow); }
@@ -71,21 +72,17 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="11" cy="11" r="7.25" stroke="currentColor" stroke-width="1.5"/></svg>
         <input id="q" placeholder="Paieška nuorodose…"/>
       </div>
-      <button id="editBtn" class="btn-outline" type="button">✏️ Redaguoti</button>
-      <button id="addGroup" type="button" style="display:none">➕ Pridėti grupę</button>
-      <button id="importBtn" class="btn-outline" type="button" style="display:none">⤒ Importuoti</button>
-      <button id="exportBtn" class="btn-outline" type="button" style="display:none">⤓ Eksportuoti</button>
-      <button id="themeBtn" class="btn" type="button">🌓 Tema</button>
+      <button id="editBtn" class="btn-outline" type="button"></button>
+      <button id="addGroup" type="button" style="display:none"><svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg><span>Pridėti grupę</span></button>
+      <button id="importBtn" class="btn-outline" type="button" style="display:none"><svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Importuoti</span></button>
+      <button id="exportBtn" class="btn-outline" type="button" style="display:none"><svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><span>Eksportuoti</span></button>
+      <button id="themeBtn" class="btn" type="button"><svg class="icon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg><span>Tema</span></button>
     </div>
   </header>
 
   <main>
     <div id="groups" class="grid" aria-live="polite"></div>
   </main>
-
-  <footer>
-    <small>Patarimas: įklijuokite Google Sheets nuorodą kuriant įrašą — ji bus automatiškai paversta į įterpiamą peržiūrą. Duomenys saugomi tik šiame įrenginyje (localStorage).</small>
-  </footer>
 
   <input type="file" id="fileInput" accept="application/json" hidden />
 
@@ -124,6 +121,18 @@
     remove: 'Pašalinti',
   };
 
+  const I = {
+    plus: '<svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
+    pencil: '<svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5l4 4L7 21H3v-4L16.5 3.5z"/></svg>',
+    trash: '<svg class="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14H7L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>',
+    eye: '<svg class="icon" viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>',
+    arrowUpRight: '<svg class="icon" viewBox="0 0 24 24"><polyline points="7 17 17 7"/><polyline points="7 7 17 7 17 17"/></svg>',
+    check: '<svg class="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>',
+    globe: '<svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>',
+    table: '<svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="10" y1="4" x2="10" y2="20"/></svg>',
+    puzzle: '<svg class="icon" viewBox="0 0 24 24"><path d="M13 2a3 3 0 013 3h3v4h-3a3 3 0 1 1-6 0H7v4h3a3 3 0 1 1 6 0h3v4h-3a3 3 0 0 1-6 0H7v3H3v-3a3 3 0 0 1 3-3v-4a3 3 0 0 1-3-3V5h4a3 3 0 0 1 3-3h3z"/></svg>'
+  };
+
   const STORAGE_KEY = 'ed_dashboard_lt_v1';
   const THEME_KEY = 'ed_dash_theme';
   const groupsEl = document.getElementById('groups');
@@ -134,7 +143,7 @@
 
   function updateEditingUI(){
     document.body.classList.toggle('editing', editing);
-    editBtn.textContent = editing ? `✅ ${T.done}` : `✏️ ${T.editMode}`;
+    editBtn.innerHTML = editing ? `${I.check} <span>${T.done}</span>` : `${I.pencil} <span>${T.editMode}</span>`;
     ['addGroup','importBtn','exportBtn'].forEach(id=>{
       const el = document.getElementById(id);
       if(el) el.style.display = editing ? 'inline-flex' : 'none';
@@ -391,10 +400,10 @@
           <h2 title="Tempkite, kad perrikiuotumėte" class="handle">${escapeHtml(g.name)}</h2>
         </div>
         ${editing?`<div class="group-actions">
-          <button type="button" title="${T.openAll}" aria-label="${T.openAll}" data-act="openAll">↗</button>
-          <button type="button" title="${T.addItem}" aria-label="${T.addItem}" data-act="add">＋</button>
-          <button type="button" title="${T.editGroup}" aria-label="${T.editGroup}" data-act="edit">✎</button>
-          <button type="button" class="btn-danger" title="${T.deleteGroup}" aria-label="${T.deleteGroup}" data-act="del">🗑</button>
+          <button type="button" title="${T.openAll}" aria-label="${T.openAll}" data-act="openAll">${I.arrowUpRight}</button>
+          <button type="button" title="${T.addItem}" aria-label="${T.addItem}" data-act="add">${I.plus}</button>
+          <button type="button" title="${T.editGroup}" aria-label="${T.editGroup}" data-act="edit">${I.pencil}</button>
+          <button type="button" class="btn-danger" title="${T.deleteGroup}" aria-label="${T.deleteGroup}" data-act="del">${I.trash}</button>
         </div>`:''}`;
 
       h.addEventListener('click', (e)=>{
@@ -459,26 +468,25 @@
             });
           }
 
-          const favicon = it.type==='link' ? `<img class="favicon" alt="" src="${toFavicon(it.url)}" onerror="this.outerHTML='<div class=\'favicon\'>🌐</div>'">` : `<div class="favicon">${it.type==='sheet'?'📊':'🧩'}</div>`;
+          const favicon = it.type==='link' ? `<img class="favicon" alt="" src="${toFavicon(it.url)}">` : `<div class="favicon">${it.type==='sheet'?I.table:I.puzzle}</div>`;
+
+          const metaHtml = it.type==='link'
+            ? `<a class="meta" href="${it.url}" target="_blank" rel="noopener"><div class="title">${escapeHtml(it.title||'(be pavadinimo)')}</div><div class="sub">${escapeHtml(it.note||'')}</div></a>`
+            : `<div class="meta"><div class="title">${escapeHtml(it.title||'(be pavadinimo)')}</div><div class="sub">${escapeHtml(it.note||'')}</div></div>`;
 
           const actionsHtml = editing ? `<div class="actions">
-              ${it.type==='link'?`<a class="btn" href="${it.url}" target="_blank" rel="noopener">Atverti</a>`:''}
-              <button type="button" title="Peržiūra" aria-label="Peržiūra" data-a="preview">👁</button>
-              <button type="button" title="Redaguoti" aria-label="Redaguoti" data-a="edit">✎</button>
-              <button type="button" class="btn-danger" title="Pašalinti" aria-label="Pašalinti" data-a="del">🗑</button>
+              <button type="button" title="Peržiūra" aria-label="Peržiūra" data-a="preview">${I.eye}</button>
+              <button type="button" title="Redaguoti" aria-label="Redaguoti" data-a="edit">${I.pencil}</button>
+              <button type="button" class="btn-danger" title="Pašalinti" aria-label="Pašalinti" data-a="del">${I.trash}</button>
             </div>` : '';
-          card.innerHTML = `
-            ${favicon}
-            <div class="meta">
-              <div class="title">${escapeHtml(it.title||'(be pavadinimo)')}</div>
-              <div class="sub">${escapeHtml(it.note||'')}</div>
-            </div>
-            ${actionsHtml}`;
+          card.innerHTML = `${favicon}${metaHtml}${actionsHtml}`;
+          if(it.type==='link') card.querySelector('img.favicon')?.addEventListener('error',e=>{e.target.outerHTML=`<div class="favicon">${I.globe}</div>`;});
 
           card.addEventListener('click', (e)=>{
+            if(e.target.closest('a')) return;
             if(editing){
-              const b = e.target.closest('button, a');
-              if(!b || b.tagName==='A') return;
+              const b = e.target.closest('button');
+              if(!b) return;
               const a = b.dataset.a;
               if(a==='edit') return editItem(g.id, it.id);
               if(a==='del'){
@@ -514,9 +522,18 @@
    * jei vartotojas nėra pakeitęs dydžio.
    * @param {HTMLElement} root Grupės elementas
    */
+  const embedObserver = new ResizeObserver(entries => {
+    for(const entry of entries){
+      if(entry.target.dataset.custom==='1') continue;
+      const w = entry.contentRect.width;
+      entry.target.style.height = Math.round(w * 0.5625) + 'px';
+    }
+  });
+
   function resizeEmbeds(root){
     if(!root) return;
     root.querySelectorAll('.embed').forEach(box => {
+      embedObserver.observe(box);
       if(box.dataset.custom==='1') return;
       const w = box.clientWidth;
       box.style.height = Math.round(w * 0.5625) + 'px';
