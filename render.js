@@ -49,7 +49,11 @@ document.addEventListener('mouseup', () => {
 });
 
 document.addEventListener('click', (e) => {
-  if (floatingMenu && !e.target.closest('.floating-menu') && !e.target.closest('[data-a="menu"]')) {
+  if (
+    floatingMenu &&
+    !e.target.closest('.floating-menu') &&
+    !e.target.closest('[data-a="menu"]')
+  ) {
     floatingMenu.remove();
     floatingMenu = null;
   }
@@ -277,6 +281,20 @@ export function render(state, editing, T, I, handlers, saveFn) {
     itemsWrap.className = 'items';
     const itemsScroll = document.createElement('div');
     itemsScroll.className = 'items-scroll';
+    if (editing) {
+      itemsScroll.addEventListener('dragover', (e) => e.preventDefault());
+      itemsScroll.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const data = JSON.parse(e.dataTransfer.getData('text/item') || '{}');
+        if (!data.iid) return;
+        const fromG = state.groups.find((x) => x.id === data.gid);
+        const idxFrom = fromG.items.findIndex((x) => x.id === data.iid);
+        const [moved] = fromG.items.splice(idxFrom, 1);
+        g.items.push(moved);
+        persist();
+        render(state, editing, T, I, handlers, saveFn);
+      });
+    }
 
     const filteredItems = g.items.filter((i) => {
       if (!q) return true;
@@ -311,6 +329,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
           card.addEventListener('dragover', (e) => e.preventDefault());
           card.addEventListener('drop', (e) => {
             e.preventDefault();
+            e.stopPropagation();
             const data = JSON.parse(
               e.dataTransfer.getData('text/item') || '{}',
             );
@@ -334,17 +353,19 @@ export function render(state, editing, T, I, handlers, saveFn) {
           });
         }
 
-        const favicon = it.iconUrl
-          ? `<img class="favicon" alt="" src="${it.iconUrl}">`
-          : it.type === 'link'
-            ? `<img class="favicon" alt="" src="${toFavicon(it.url)}">`
-    : `<div class="favicon">${
-        it.type === 'sheet'
-          ? I.table
-          : it.type === 'chart'
-          ? I.chart
-          : I.puzzle
-      }</div>`;
+        const favicon = it.icon
+          ? `<div class="favicon">${I[it.icon] || ''}</div>`
+          : it.iconUrl
+            ? `<img class="favicon" alt="" src="${it.iconUrl}">`
+            : it.type === 'link'
+              ? `<img class="favicon" alt="" src="${toFavicon(it.url)}">`
+              : `<div class="favicon">${
+                  it.type === 'sheet'
+                    ? I.table
+                    : it.type === 'chart'
+                      ? I.chart
+                      : I.puzzle
+                }</div>`;
 
         const metaHtml =
           it.type === 'link'
@@ -360,14 +381,14 @@ export function render(state, editing, T, I, handlers, saveFn) {
         const imgFav = card.querySelector('img.favicon');
         if (imgFav)
           imgFav.addEventListener('error', (e) => {
-              const fallback =
-                it.type === 'sheet'
-                  ? I.table
-                  : it.type === 'chart'
+            const fallback =
+              it.type === 'sheet'
+                ? I.table
+                : it.type === 'chart'
                   ? I.chart
                   : it.type === 'embed'
-                  ? I.puzzle
-                  : I.globe;
+                    ? I.puzzle
+                    : I.globe;
             e.target.outerHTML = `<div class="favicon">${fallback}</div>`;
           });
 
@@ -400,7 +421,8 @@ export function render(state, editing, T, I, handlers, saveFn) {
               const rect = b.getBoundingClientRect();
               floatingMenu.style.position = 'fixed';
               floatingMenu.style.top = rect.bottom + 4 + 'px';
-              floatingMenu.style.left = rect.right - floatingMenu.offsetWidth + 'px';
+              floatingMenu.style.left =
+                rect.right - floatingMenu.offsetWidth + 'px';
               floatingMenu.addEventListener('click', (ev) => {
                 const btn = ev.target.closest('button');
                 if (!btn) return;
