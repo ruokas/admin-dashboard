@@ -239,6 +239,8 @@ export function render(state, editing, T, I, handlers, saveFn) {
 
     const itemsWrap = document.createElement('div');
     itemsWrap.className = 'items';
+    const itemsScroll = document.createElement('div');
+    itemsScroll.className = 'items-scroll';
 
     const filteredItems = g.items.filter((i) => {
       if (!q) return true;
@@ -251,7 +253,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
       const empty = document.createElement('div');
       empty.className = 'empty';
       empty.textContent = q ? T.noMatches : T.empty;
-      itemsWrap.appendChild(empty);
+      itemsScroll.appendChild(empty);
     } else {
       filteredItems.forEach((it) => {
         const card = document.createElement('div');
@@ -376,10 +378,11 @@ export function render(state, editing, T, I, handlers, saveFn) {
           }
         });
 
-        itemsWrap.appendChild(card);
+        itemsScroll.appendChild(card);
       });
     }
 
+    itemsWrap.appendChild(itemsScroll);
     grp.appendChild(itemsWrap);
     groupsEl.appendChild(grp);
     ro.observe(grp);
