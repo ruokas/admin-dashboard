@@ -54,6 +54,7 @@ export function itemFormDialog(T, data = {}) {
         <select name="type">
           <option value="link">link</option>
           <option value="sheet">sheet</option>
+          <option value="chart">chart</option>
           <option value="embed">embed</option>
         </select>
       </label>
