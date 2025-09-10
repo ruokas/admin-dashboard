@@ -67,6 +67,18 @@ export function itemFormDialog(T, data = {}) {
           <option value="table">📄</option>
           <option value="chart">📊</option>
           <option value="puzzle">🧩</option>
+          <option value="book">📘</option>
+          <option value="file">📁</option>
+          <option value="folder">🗂️</option>
+          <option value="mail">✉️</option>
+          <option value="phone">📞</option>
+          <option value="star">⭐</option>
+          <option value="home">🏠</option>
+          <option value="link">🔗</option>
+          <option value="camera">📷</option>
+          <option value="calendar">📅</option>
+          <option value="clock">⏰</option>
+          <option value="user">👤</option>
         </select>
       </label>
       <label>${T.itemNote}<br><textarea name="note" rows="2"></textarea></label>
