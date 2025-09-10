@@ -22,7 +22,8 @@ button:hover, .btn:hover{ transform: translateY(-1px); background:var(--muted) }
 .search{ position:relative; }
 .search input{ background:var(--panel); border:1px solid transparent; color:var(--text); padding:12px 14px 12px 40px; border-radius:12px; min-width: 240px; outline:none; box-shadow:var(--shadow); }
 .search svg{ position:absolute; left:12px; top:50%; transform:translateY(-50%); opacity:.6 }
-main{ padding:20px clamp(10px,2.2vw,24px); max-width:1500px; width:100%; margin:0 auto; flex:1; }
+/* Expand layout to use full screen width */
+main{ padding:20px clamp(10px,2.2vw,24px); width:100%; margin:0 auto; flex:1; }
 .grid{ display:flex; flex-wrap:wrap; gap:16px; }
   .group{ background:var(--panel); border:1px solid rgba(255,255,255,.06); border-radius:16px; box-shadow:var(--shadow); display:flex; flex-direction:column; min-height:100px; overflow:auto; resize:both; width:var(--group-width); }
 .group-header{ display:flex; align-items:center; justify-content:space-between; gap:6px; padding:10px; background:linear-gradient(180deg, rgba(255,255,255,.04), transparent) }
