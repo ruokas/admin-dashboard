@@ -165,6 +165,124 @@ export function render(state, editing, T, I, handlers, saveFn) {
   const q = (searchEl.value || '').toLowerCase().trim();
   groupsEl.innerHTML = '';
   state.groups.forEach((g) => {
+    if (g.type === 'chart') {
+      const grp = document.createElement('section');
+      grp.className = 'group';
+      grp.dataset.id = g.id;
+      grp.dataset.resizing = '0';
+      if (g.w) grp.style.width = g.w + 'px';
+      if (g.h) {
+        grp.style.height = g.h + 'px';
+        g.resized = true;
+      }
+      grp.style.resize = editing ? 'both' : 'none';
+      if (editing) {
+        grp.addEventListener('mousedown', (e) => {
+          const rect = grp.getBoundingClientRect();
+          const withinHandle =
+            e.clientX >= rect.right - 20 && e.clientY >= rect.bottom - 20;
+          if (withinHandle) grp.dataset.resizing = '1';
+        });
+        grp.draggable = true;
+        grp.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData('text/group', g.id);
+          grp.style.opacity = 0.5;
+        });
+        grp.addEventListener('dragend', () => {
+          grp.style.opacity = 1;
+        });
+        grp.addEventListener('dragover', (e) => {
+          e.preventDefault();
+        });
+        grp.addEventListener('drop', (e) => {
+          e.preventDefault();
+          const fromId = e.dataTransfer.getData('text/group');
+          if (fromId && fromId !== g.id) {
+            const fromIdx = state.groups.findIndex((x) => x.id === fromId);
+            const toIdx = state.groups.findIndex((x) => x.id === g.id);
+            const [moved] = state.groups.splice(fromIdx, 1);
+            state.groups.splice(toIdx, 0, moved);
+            persist();
+            render(state, editing, T, I, handlers, saveFn);
+          }
+        });
+      }
+
+      grp.addEventListener('click', (e) => {
+        if (!e.shiftKey) return;
+        if (e.target.closest('button')) return;
+        e.preventDefault();
+        const idx = selectedGroups.indexOf(grp);
+        if (idx === -1) {
+          selectedGroups.push(grp);
+          grp.classList.add('selected');
+        } else {
+          selectedGroups.splice(idx, 1);
+          grp.classList.remove('selected');
+        }
+      });
+
+      const h = document.createElement('div');
+      h.className = 'group-header';
+      h.innerHTML = `
+        <div class="group-title">
+          <span class="dot" style="background:${g.color || '#6ee7b7'}"></span>
+          <h2 title="Tempkite, kad perrikiuotumėte" class="handle">${escapeHtml(g.name || '')}</h2>
+        </div>
+        ${
+          editing
+            ? `<div class="group-actions">
+          <button type="button" title="${T.moveUp}" aria-label="${T.moveUp}" data-act="up">${I.arrowUp}</button>
+          <button type="button" title="${T.moveDown}" aria-label="${T.moveDown}" data-act="down">${I.arrowDown}</button>
+          <button type="button" title="${T.editChart}" aria-label="${T.editChart}" data-act="edit">${I.pencil}</button>
+          <button type="button" class="btn-danger" title="${T.deleteGroup}" aria-label="${T.deleteGroup}" data-act="del">${I.trash}</button>
+        </div>`
+            : ''
+        }`;
+
+      h.addEventListener('click', (e) => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        const act = btn.dataset.act;
+        if (act === 'edit') return handlers.editChart(g.id);
+        if (act === 'del') {
+          handlers.confirmDialog(T.confirmDelChart).then((ok) => {
+            if (ok) {
+              state.groups = state.groups.filter((x) => x.id !== g.id);
+              persist();
+              render(state, editing, T, I, handlers, saveFn);
+            }
+          });
+          return;
+        }
+        if (act === 'up' || act === 'down') {
+          const idx = state.groups.findIndex((x) => x.id === g.id);
+          if (act === 'up' && idx > 0) {
+            const [moved] = state.groups.splice(idx, 1);
+            state.groups.splice(idx - 1, 0, moved);
+          }
+          if (act === 'down' && idx < state.groups.length - 1) {
+            const [moved] = state.groups.splice(idx, 1);
+            state.groups.splice(idx + 1, 0, moved);
+          }
+          persist();
+          render(state, editing, T, I, handlers, saveFn);
+        }
+      });
+
+      grp.appendChild(h);
+      const emb = document.createElement('div');
+      emb.className = 'embed';
+      emb.dataset.custom = '1';
+      emb.style.flex = '1';
+      emb.style.resize = 'none';
+      emb.innerHTML = `<iframe src="${g.url}" loading="lazy" referrerpolicy="no-referrer"></iframe>`;
+      grp.appendChild(emb);
+      groupsEl.appendChild(grp);
+      ro.observe(grp);
+      resizeEmbeds(grp);
+      return;
+    }
     const grp = document.createElement('section');
     grp.className = 'group';
     grp.dataset.id = g.id;
@@ -485,10 +603,16 @@ export function updateEditingUI(editing, T, I, renderFn) {
   editBtn.innerHTML = editing
     ? `${I.check} <span>${T.done}</span>`
     : `${I.pencil} <span>${T.editMode}</span>`;
-  ['addGroup', 'importBtn', 'exportBtn'].forEach((id) => {
+  ['addMenu', 'importBtn', 'exportBtn'].forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.style.display = editing ? 'inline-flex' : 'none';
   });
+  const addBtn = document.getElementById('addBtn');
+  const addGroup = document.getElementById('addGroup');
+  const addChart = document.getElementById('addChart');
+  if (addBtn) addBtn.innerHTML = `${I.plus} <span>${T.add}</span>`;
+  if (addGroup) addGroup.innerHTML = `${I.plus} ${T.addGroup}`;
+  if (addChart) addChart.innerHTML = `${I.chart} ${T.addChart}`;
   renderFn();
 }
 
