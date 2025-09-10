@@ -59,6 +59,7 @@ export function itemFormDialog(T, data = {}) {
       </label>
       <label>${T.itemTitle}<br><input name="title" required></label>
       <label>${T.itemUrl}<br><input name="url" type="url" required></label>
+      <label>${T.itemIcon}<br><input name="iconUrl" type="url" placeholder="https://example.com/icon.png"></label>
       <label>${T.itemNote}<br><textarea name="note" rows="2"></textarea></label>
       <p class="error" id="itemErr"></p>
       <menu>
@@ -73,6 +74,7 @@ export function itemFormDialog(T, data = {}) {
     form.type.value = data.type || 'link';
     form.title.value = data.title || '';
     form.url.value = data.url || '';
+    form.iconUrl.value = data.iconUrl || '';
     form.note.value = data.note || '';
 
     function cleanup() {
@@ -86,6 +88,7 @@ export function itemFormDialog(T, data = {}) {
       const formData = Object.fromEntries(new FormData(form));
       formData.title = formData.title.trim();
       formData.url = formData.url.trim();
+      formData.iconUrl = formData.iconUrl.trim();
       formData.note = formData.note.trim();
       if (!formData.title || !formData.url) {
         err.textContent = T.required;
@@ -96,6 +99,14 @@ export function itemFormDialog(T, data = {}) {
       } catch {
         err.textContent = T.invalidUrl;
         return;
+      }
+      if (formData.iconUrl) {
+        try {
+          new URL(formData.iconUrl);
+        } catch {
+          err.textContent = T.invalidUrl;
+          return;
+        }
       }
       resolve(formData);
       cleanup();

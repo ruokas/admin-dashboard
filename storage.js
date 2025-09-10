@@ -2,7 +2,15 @@ const STORAGE_KEY = 'ed_dashboard_lt_v1';
 
 export function load() {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '');
+    const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '');
+    if (data && Array.isArray(data.groups)) {
+      data.groups.forEach((g) =>
+        g.items?.forEach((it) => {
+          if (!('iconUrl' in it)) it.iconUrl = '';
+        }),
+      );
+    }
+    return data;
   } catch (e) {
     return null;
   }
