@@ -2,6 +2,9 @@ let currentState;
 let persist;
 let floatingMenu;
 
+// Holds references to currently shift-selected groups
+let selectedGroups = [];
+
 const GRID = 20;
 
 const ro = new ResizeObserver((entries) => {
@@ -16,13 +19,24 @@ const ro = new ResizeObserver((entries) => {
         const minH = entry.target.scrollHeight;
         if (w < minW) w = minW;
         if (h < minH) h = minH;
-        entry.target.style.width = w + 'px';
-        entry.target.style.height = h + 'px';
-        g.w = w;
-        g.h = h;
-        g.resized = true;
+
+        const targets = selectedGroups.includes(entry.target)
+          ? selectedGroups
+          : [entry.target];
+
+        targets.forEach((el) => {
+          el.style.width = w + 'px';
+          el.style.height = h + 'px';
+          const sg = currentState.groups.find((x) => x.id === el.dataset.id);
+          if (sg) {
+            sg.w = w;
+            sg.h = h;
+            sg.resized = true;
+            resizeEmbeds(el);
+          }
+        });
+
         persist();
-        resizeEmbeds(entry.target);
       }
     }
   }
@@ -142,6 +156,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
   const searchEl = document.getElementById('q');
 
   ro.disconnect();
+  selectedGroups = [];
 
   const q = (searchEl.value || '').toLowerCase().trim();
   groupsEl.innerHTML = '';
@@ -184,6 +199,20 @@ export function render(state, editing, T, I, handlers, saveFn) {
         }
       });
     }
+
+    grp.addEventListener('click', (e) => {
+      if (!e.shiftKey) return;
+      if (e.target.closest('button')) return;
+      e.preventDefault();
+      const idx = selectedGroups.indexOf(grp);
+      if (idx === -1) {
+        selectedGroups.push(grp);
+        grp.classList.add('selected');
+      } else {
+        selectedGroups.splice(idx, 1);
+        grp.classList.remove('selected');
+      }
+    });
 
     const h = document.createElement('div');
     h.className = 'group-header';

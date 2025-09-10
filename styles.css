@@ -182,6 +182,10 @@ main {
   width: var(--group-width);
   max-width: 100%;
 }
+
+.group.selected {
+  outline: 2px solid var(--accent);
+}
 .group-header {
   display: flex;
   align-items: center;
