@@ -1,3 +1,5 @@
+import { I } from './icons.js';
+
 export function groupFormDialog(T, data = {}) {
   return new Promise((resolve) => {
     const dlg = document.createElement('dialog');
@@ -48,6 +50,30 @@ export function groupFormDialog(T, data = {}) {
 
 export function itemFormDialog(T, data = {}) {
   return new Promise((resolve) => {
+    const iconKeys = [
+      'globe',
+      'table',
+      'chart',
+      'puzzle',
+      'book',
+      'file',
+      'folder',
+      'mail',
+      'phone',
+      'star',
+      'home',
+      'link',
+      'camera',
+      'calendar',
+      'clock',
+      'user',
+    ];
+    const iconButtons = iconKeys
+      .map(
+        (k) =>
+          `<button type="button" data-val="${k}" title="${k}">${I[k]}</button>`,
+      )
+      .join('');
     const dlg = document.createElement('dialog');
     dlg.innerHTML = `<form method="dialog" id="itemForm">
       <label>${T.itemType}<br>
@@ -61,25 +87,10 @@ export function itemFormDialog(T, data = {}) {
       <label>${T.itemTitle}<br><input name="title" required></label>
       <label>${T.itemUrl}<br><input name="url" type="url" required></label>
       <label>${T.itemIcon}<br>
-        <select name="icon">
-          <option value="">–</option>
-          <option value="globe">🌐</option>
-          <option value="table">📄</option>
-          <option value="chart">📊</option>
-          <option value="puzzle">🧩</option>
-          <option value="book">📘</option>
-          <option value="file">📁</option>
-          <option value="folder">🗂️</option>
-          <option value="mail">✉️</option>
-          <option value="phone">📞</option>
-          <option value="star">⭐</option>
-          <option value="home">🏠</option>
-          <option value="link">🔗</option>
-          <option value="camera">📷</option>
-          <option value="calendar">📅</option>
-          <option value="clock">⏰</option>
-          <option value="user">👤</option>
-        </select>
+        <div class="icon-picker">
+          <button type="button" data-val="">–</button>${iconButtons}
+          <input type="hidden" name="icon">
+        </div>
       </label>
       <label>${T.itemNote}<br><textarea name="note" rows="2"></textarea></label>
       <p class="error" id="itemErr"></p>
@@ -92,11 +103,27 @@ export function itemFormDialog(T, data = {}) {
     const form = dlg.querySelector('form');
     const err = dlg.querySelector('#itemErr');
     const cancel = form.querySelector('[data-act="cancel"]');
+    const picker = form.querySelector('.icon-picker');
+    const iconInput = form.icon;
     form.type.value = data.type || 'link';
     form.title.value = data.title || '';
     form.url.value = data.url || '';
-    form.icon.value = data.icon || '';
+    iconInput.value = data.icon || '';
     form.note.value = data.note || '';
+
+    const initBtn = picker.querySelector(
+      `button[data-val="${iconInput.value}"]`,
+    );
+    if (initBtn) initBtn.classList.add('selected');
+
+    picker.addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      iconInput.value = btn.dataset.val;
+      picker
+        .querySelectorAll('button')
+        .forEach((b) => b.classList.toggle('selected', b === btn));
+    });
 
     function cleanup() {
       form.removeEventListener('submit', submit);
