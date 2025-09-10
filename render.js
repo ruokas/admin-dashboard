@@ -5,7 +5,7 @@ let floatingMenu;
 // Holds references to currently shift-selected groups
 let selectedGroups = [];
 
-const GRID = 20;
+const GRID = 40;
 
 const ro = new ResizeObserver((entries) => {
   for (const entry of entries) {
