@@ -19,7 +19,13 @@
         <input id="q" placeholder="Paieška nuorodose…"/>
       </div>
       <button id="editBtn" class="btn-outline" type="button"></button>
-      <button id="addGroup" type="button" style="display:none"><svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg><span>Pridėti grupę</span></button>
+      <div id="addMenu" class="dropdown" style="display:none">
+        <button id="addBtn" type="button"></button>
+        <div id="addMenuList" class="dropdown-list">
+          <button id="addGroup" type="button"></button>
+          <button id="addChart" type="button"></button>
+        </div>
+      </div>
       <button id="importBtn" class="btn-outline" type="button" style="display:none"><svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Importuoti</span></button>
       <button id="exportBtn" class="btn-outline" type="button" style="display:none"><svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><span>Eksportuoti</span></button>
       <button id="themeBtn" class="btn" type="button"><svg class="icon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg><span>Tema</span></button>

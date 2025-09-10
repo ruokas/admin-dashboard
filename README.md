@@ -15,6 +15,7 @@ Statinis vieno failo HTML projektas, skirtas publikuoti per **GitHub Pages**.
 - Įrašų eiliškumą galima keisti rodyklėmis arba tempiant (drag-and-drop) redagavimo režime.
 - „sheet“ ir „embed“ tipo įrašai automatiškai rodo peržiūrą kortelėje.
 - „chart“ tipo įrašai leidžia įterpti Google Sheets diagramas.
+- Galima pridėti grafikus kaip atskiras korteles.
 - Embed peržiūros kortelę galima vertikaliai padidinti arba sumažinti.
 - Eksportas ir importas į Google Sheets per Apps Script "web app" (laikinai išjungta).
 - Redagavimo režimas: išjungus puslapis tampa statinis, įjungus galima keisti grupes ir įrašus.

@@ -9,18 +9,22 @@ import {
 import {
   groupFormDialog,
   itemFormDialog,
+  chartFormDialog,
   confirmDialog as confirmDlg,
 } from './forms.js';
 
 const T = {
   searchPH: 'Paieška nuorodose…',
+  add: 'Pridėti',
   addGroup: 'Pridėti grupę',
+  addChart: 'Pridėti grafiką',
   import: 'Importuoti',
   export: 'Eksportuoti',
   theme: 'Tema',
   openAll: 'Atverti visas',
   addItem: 'Pridėti įrašą',
   editGroup: 'Redaguoti grupę',
+  editChart: 'Redaguoti grafiką',
   editMode: 'Redaguoti',
   done: 'Baigti',
   deleteGroup: 'Pašalinti grupę',
@@ -37,6 +41,7 @@ const T = {
   sheetTip:
     'Patarimas: Google Sheets turi būti „Publish to web“ arba bendrinamas.',
   confirmDelGroup: 'Pašalinti šią grupę ir visus jos įrašus?',
+  confirmDelChart: 'Pašalinti šį grafiką?',
   confirmDelItem: 'Pašalinti šį įrašą?',
   invalidImport: 'Netinkamas failo formatas',
   save: 'Išsaugoti',
@@ -121,6 +126,7 @@ function renderAll() {
       addItem,
       editGroup,
       editItem,
+      editChart,
       confirmDialog: (msg) => confirmDlg(T, msg),
     },
     () => save(state),
@@ -152,6 +158,38 @@ async function editGroup(gid) {
   if (!res) return;
   g.name = res.name;
   g.color = res.color;
+  save(state);
+  renderAll();
+}
+
+async function addChart() {
+  const res = await chartFormDialog(T);
+  if (!res) return;
+  const parsed = parseIframe(res.url);
+  state.groups.push({
+    id: uid(),
+    type: 'chart',
+    name: res.title,
+    url: parsed.src,
+    h: parsed.h ? parsed.h + 56 : undefined,
+    resized: !!parsed.h,
+  });
+  save(state);
+  renderAll();
+}
+
+async function editChart(gid) {
+  const g = state.groups.find((x) => x.id === gid && x.type === 'chart');
+  if (!g) return;
+  const res = await chartFormDialog(T, { title: g.name, url: g.url });
+  if (!res) return;
+  const parsed = parseIframe(res.url);
+  g.name = res.title;
+  g.url = parsed.src;
+  if (parsed.h) {
+    g.h = parsed.h + 56;
+    g.resized = true;
+  }
   save(state);
   renderAll();
 }
@@ -243,7 +281,25 @@ function importJson(file) {
 // Google Sheets sinchronizavimas laikinai išjungtas
 // const sheets = sheetsSync(state, syncStatus, () => save(state), renderAll);
 
-document.getElementById('addGroup').addEventListener('click', addGroup);
+const addMenuList = document.getElementById('addMenuList');
+const addBtn = document.getElementById('addBtn');
+function hideAddMenu() {
+  addMenuList.style.display = 'none';
+}
+addBtn.addEventListener('click', () => {
+  addMenuList.style.display = addMenuList.style.display === 'flex' ? 'none' : 'flex';
+});
+document.addEventListener('click', (e) => {
+  if (!document.getElementById('addMenu').contains(e.target)) hideAddMenu();
+});
+document.getElementById('addGroup').addEventListener('click', () => {
+  hideAddMenu();
+  addGroup();
+});
+document.getElementById('addChart').addEventListener('click', () => {
+  hideAddMenu();
+  addChart();
+});
 document.getElementById('exportBtn').addEventListener('click', () => {
   exportJson();
 });

@@ -138,6 +138,56 @@ export function itemFormDialog(T, data = {}) {
   });
 }
 
+export function chartFormDialog(T, data = {}) {
+  return new Promise((resolve) => {
+    const dlg = document.createElement('dialog');
+    dlg.innerHTML = `<form method="dialog" id="chartForm">
+      <label>${T.itemTitle}<br><input name="title" required></label>
+      <label>${T.itemUrl}<br><input name="url" required></label>
+      <p class="error" id="chartErr"></p>
+      <menu>
+        <button type="button" data-act="cancel">${T.cancel}</button>
+        <button type="submit" class="btn-accent">${T.save}</button>
+      </menu>
+    </form>`;
+    document.body.appendChild(dlg);
+    const form = dlg.querySelector('form');
+    const err = dlg.querySelector('#chartErr');
+    const cancel = form.querySelector('[data-act="cancel"]');
+    form.title.value = data.title || '';
+    form.url.value = data.url || '';
+
+    function cleanup() {
+      form.removeEventListener('submit', submit);
+      cancel.removeEventListener('click', close);
+      dlg.remove();
+    }
+
+    function submit(e) {
+      e.preventDefault();
+      const title = form.title.value.trim();
+      const url = form.url.value.trim();
+      if (!title || !url) {
+        err.textContent = T.required;
+        return;
+      }
+      resolve({ title, url });
+      cleanup();
+    }
+
+    function close() {
+      resolve(null);
+      cleanup();
+    }
+
+    form.addEventListener('submit', submit);
+    cancel.addEventListener('click', close);
+    dlg.addEventListener('cancel', close);
+    dlg.showModal();
+    form.title.focus();
+  });
+}
+
 export function confirmDialog(T, msg) {
   return new Promise((resolve) => {
     const dlg = document.createElement('dialog');
