@@ -1,5 +1,6 @@
 let currentState;
 let persist;
+let floatingMenu;
 
 const GRID = 20;
 
@@ -34,10 +35,16 @@ document.addEventListener('mouseup', () => {
 });
 
 document.addEventListener('click', (e) => {
-  if (!e.target.closest('.actions')) {
-    document
-      .querySelectorAll('.actions .menu')
-      .forEach((m) => (m.hidden = true));
+  if (floatingMenu && !e.target.closest('.floating-menu') && !e.target.closest('[data-a="menu"]')) {
+    floatingMenu.remove();
+    floatingMenu = null;
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && floatingMenu) {
+    floatingMenu.remove();
+    floatingMenu = null;
   }
 });
 
@@ -312,13 +319,6 @@ export function render(state, editing, T, I, handlers, saveFn) {
         const actionsHtml = editing
           ? `<div class="actions">
               <button type="button" title="${T.actions}" aria-label="${T.actions}" data-a="menu">${I.more}</button>
-              <div class="menu" hidden>
-                <button type="button" data-a="up">${I.arrowUp} ${T.moveUp}</button>
-                <button type="button" data-a="down">${I.arrowDown} ${T.moveDown}</button>
-                <button type="button" data-a="preview">${I.eye} ${T.preview}</button>
-                <button type="button" data-a="edit">${I.pencil} ${T.edit}</button>
-                <button type="button" class="btn-danger" data-a="del">${I.trash} ${T.remove}</button>
-              </div>
             </div>`
           : '';
         card.innerHTML = `${favicon}${metaHtml}${actionsHtml}`;
@@ -340,36 +340,62 @@ export function render(state, editing, T, I, handlers, saveFn) {
             const b = e.target.closest('button');
             if (!b) return;
             const a = b.dataset.a;
-            const menuEl = card.querySelector('.menu');
-            if (menuEl && a !== 'menu') menuEl.hidden = true;
             if (a === 'menu') {
-              if (menuEl) menuEl.hidden = !menuEl.hidden;
-              return;
-            }
-            if (a === 'edit') return handlers.editItem(g.id, it.id);
-            if (a === 'del') {
-              handlers.confirmDialog(T.confirmDelItem).then((ok) => {
-                if (ok) {
-                  g.items = g.items.filter((x) => x.id !== it.id);
+              if (floatingMenu) {
+                if (floatingMenu.dataset.item === it.id) {
+                  floatingMenu.remove();
+                  floatingMenu = null;
+                  return;
+                }
+                floatingMenu.remove();
+              }
+              floatingMenu = document.createElement('div');
+              floatingMenu.className = 'floating-menu';
+              floatingMenu.dataset.item = it.id;
+              floatingMenu.innerHTML = `
+                <button type="button" data-a="up">${I.arrowUp} ${T.moveUp}</button>
+                <button type="button" data-a="down">${I.arrowDown} ${T.moveDown}</button>
+                <button type="button" data-a="preview">${I.eye} ${T.preview}</button>
+                <button type="button" data-a="edit">${I.pencil} ${T.edit}</button>
+                <button type="button" class="btn-danger" data-a="del">${I.trash} ${T.remove}</button>
+              `;
+              document.body.appendChild(floatingMenu);
+              const rect = b.getBoundingClientRect();
+              floatingMenu.style.position = 'fixed';
+              floatingMenu.style.top = rect.bottom + 4 + 'px';
+              floatingMenu.style.left = rect.right - floatingMenu.offsetWidth + 'px';
+              floatingMenu.addEventListener('click', (ev) => {
+                const btn = ev.target.closest('button');
+                if (!btn) return;
+                const action = btn.dataset.a;
+                floatingMenu.remove();
+                floatingMenu = null;
+                if (action === 'edit') return handlers.editItem(g.id, it.id);
+                if (action === 'del') {
+                  handlers.confirmDialog(T.confirmDelItem).then((ok) => {
+                    if (ok) {
+                      g.items = g.items.filter((x) => x.id !== it.id);
+                      persist();
+                      render(state, editing, T, I, handlers, saveFn);
+                    }
+                  });
+                  return;
+                }
+                if (action === 'preview') return previewItem(it, card);
+                if (action === 'up' || action === 'down') {
+                  const idx = g.items.findIndex((x) => x.id === it.id);
+                  if (action === 'up' && idx > 0) {
+                    const [moved] = g.items.splice(idx, 1);
+                    g.items.splice(idx - 1, 0, moved);
+                  }
+                  if (action === 'down' && idx < g.items.length - 1) {
+                    const [moved] = g.items.splice(idx, 1);
+                    g.items.splice(idx + 1, 0, moved);
+                  }
                   persist();
                   render(state, editing, T, I, handlers, saveFn);
                 }
               });
-              return;
-            }
-            if (a === 'preview') return previewItem(it, card);
-            if (a === 'up' || a === 'down') {
-              const idx = g.items.findIndex((x) => x.id === it.id);
-              if (a === 'up' && idx > 0) {
-                const [moved] = g.items.splice(idx, 1);
-                g.items.splice(idx - 1, 0, moved);
-              }
-              if (a === 'down' && idx < g.items.length - 1) {
-                const [moved] = g.items.splice(idx, 1);
-                g.items.splice(idx + 1, 0, moved);
-              }
-              persist();
-              render(state, editing, T, I, handlers, saveFn);
               return;
             }
           } else {

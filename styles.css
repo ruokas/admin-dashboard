@@ -43,6 +43,8 @@ main{ padding:20px clamp(10px,2.2vw,24px); max-width:1500px; width:100%; margin:
   .item .actions .menu{ position:absolute; right:0; top:100%; margin-top:4px; display:flex; flex-direction:column; gap:4px; background:var(--panel); border:1px solid rgba(255,255,255,.06); border-radius:8px; padding:4px; box-shadow:var(--shadow); z-index:10; }
 .item .actions .menu button{ width:100%; justify-content:flex-start; padding:6px 8px; box-shadow:none; }
 .item .actions .menu[hidden]{ display:none; }
+.floating-menu{ display:flex; flex-direction:column; gap:4px; background:var(--panel); border:1px solid rgba(255,255,255,.06); border-radius:8px; padding:4px; box-shadow:var(--shadow); position:fixed; z-index:1000; }
+.floating-menu button{ width:100%; justify-content:flex-start; padding:6px 8px; box-shadow:none; }
 .favicon{ width:16px; height:16px; border-radius:4px; background:var(--muted); flex:0 0 16px; display:grid; place-items:center; color:var(--subtext) }
 .favicon svg{ width:100%; height:100%; }
 .embed{ border-radius:12px; overflow:hidden; border:1px solid rgba(255,255,255,.08); resize:vertical; min-height:120px; }
