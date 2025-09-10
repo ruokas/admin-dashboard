@@ -74,6 +74,8 @@ const I = {
     '<svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="10" y1="4" x2="10" y2="20"/></svg>',
   puzzle:
     '<svg class="icon" viewBox="0 0 24 24"><path d="M13 2a3 3 0 013 3h3v4h-3a3 3 0 1 1-6 0H7v4h3a3 3 0 1 1 6 0h3v4h-3a3 3 0 0 1-6 0H7v3H3v-3a3 3 0 0 1 3-3v-4a3 3 0 0 1-3-3V5h4a3 3 0 0 1 3-3h3z"/></svg>',
+  chart:
+    '<svg class="icon" viewBox="0 0 24 24"><line x1="4" y1="19" x2="20" y2="19"/><line x1="8" y1="19" x2="8" y2="11"/><line x1="12" y1="19" x2="12" y2="7"/><line x1="16" y1="19" x2="16" y2="13"/></svg>',
 };
 
 const editBtn = document.getElementById('editBtn');
@@ -84,6 +86,14 @@ let state = load() || seed();
 let editing = false;
 
 const uid = () => Math.random().toString(36).slice(2, 10);
+
+function parseIframe(html) {
+  const match = html.match(/<iframe[^>]*src="([^"]+)"[^>]*>/i);
+  if (!match) return { src: html };
+  const src = match[1];
+  const hMatch = html.match(/height="(\d+)"/i);
+  return { src, h: hMatch ? parseInt(hMatch[1], 10) : undefined };
+}
 
 function renderAll() {
   render(
@@ -140,6 +150,11 @@ async function addItem(gid) {
     if (conv) data.url = conv;
     else alert(T.sheetTip);
   }
+  if (data.type === 'embed' || data.type === 'chart') {
+    const parsed = parseIframe(data.url);
+    data.url = parsed.src;
+    if (parsed.h) data.h = parsed.h;
+  }
   g.items.push({
     id: uid(),
     type: data.type,
@@ -147,6 +162,7 @@ async function addItem(gid) {
     url: data.url,
     note: data.note,
     iconUrl: data.iconUrl,
+    ...(data.h ? { h: data.h } : {}),
   });
   save(state);
   renderAll();
@@ -163,11 +179,19 @@ async function editItem(gid, iid) {
     const conv = toSheetEmbed(data.url);
     if (conv) data.url = conv;
   }
+  if (data.type === 'embed' || data.type === 'chart') {
+    const parsed = parseIframe(data.url);
+    data.url = parsed.src;
+    if (parsed.h) data.h = parsed.h;
+    else delete data.h;
+  }
   it.type = data.type;
   it.title = data.title;
   it.url = data.url;
   it.note = data.note;
   it.iconUrl = data.iconUrl;
+  if (data.h) it.h = data.h;
+  else delete it.h;
   save(state);
   renderAll();
 }

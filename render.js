@@ -309,7 +309,13 @@ export function render(state, editing, T, I, handlers, saveFn) {
           ? `<img class="favicon" alt="" src="${it.iconUrl}">`
           : it.type === 'link'
             ? `<img class="favicon" alt="" src="${toFavicon(it.url)}">`
-            : `<div class="favicon">${it.type === 'sheet' ? I.table : I.puzzle}</div>`;
+    : `<div class="favicon">${
+        it.type === 'sheet'
+          ? I.table
+          : it.type === 'chart'
+          ? I.chart
+          : I.puzzle
+      }</div>`;
 
         const metaHtml =
           it.type === 'link'
@@ -325,12 +331,14 @@ export function render(state, editing, T, I, handlers, saveFn) {
         const imgFav = card.querySelector('img.favicon');
         if (imgFav)
           imgFav.addEventListener('error', (e) => {
-            const fallback =
-              it.type === 'sheet'
-                ? I.table
-                : it.type === 'embed'
-                ? I.puzzle
-                : I.globe;
+              const fallback =
+                it.type === 'sheet'
+                  ? I.table
+                  : it.type === 'chart'
+                  ? I.chart
+                  : it.type === 'embed'
+                  ? I.puzzle
+                  : I.globe;
             e.target.outerHTML = `<div class="favicon">${fallback}</div>`;
           });
 
