@@ -32,7 +32,7 @@ const T = {
   renameGroup: 'Pervadinti grupę',
   itemTitle: 'Pavadinimas',
   itemUrl: 'URL',
-  itemIcon: 'Piktogramos URL (nebūtina)',
+  itemIcon: 'Pasirinkite piktogramą (nebūtina)',
   itemNote: 'Pastaba (nebūtina)',
   sheetTip:
     'Patarimas: Google Sheets turi būti „Publish to web“ arba bendrinamas.',
@@ -66,8 +66,7 @@ const I = {
     '<svg class="icon" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>',
   check:
     '<svg class="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>',
-  more:
-    '<svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>',
+  more: '<svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>',
   globe:
     '<svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>',
   table:
@@ -161,7 +160,7 @@ async function addItem(gid) {
     title: data.title,
     url: data.url,
     note: data.note,
-    iconUrl: data.iconUrl,
+    icon: data.icon,
     ...(data.h ? { h: data.h } : {}),
   });
   save(state);
@@ -189,7 +188,7 @@ async function editItem(gid, iid) {
   it.title = data.title;
   it.url = data.url;
   it.note = data.note;
-  it.iconUrl = data.iconUrl;
+  it.icon = data.icon;
   if (data.h) it.h = data.h;
   else delete it.h;
   save(state);

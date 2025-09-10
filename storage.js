@@ -7,6 +7,7 @@ export function load() {
       data.groups.forEach((g) =>
         g.items?.forEach((it) => {
           if (!('iconUrl' in it)) it.iconUrl = '';
+          if (!('icon' in it)) it.icon = '';
         }),
       );
     }
@@ -27,7 +28,8 @@ export function seed() {
 }
 
 export function sheetsSync(state, syncStatus, saveFn, renderFn) {
-  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxGrClqMHfkKqCUK8zZSix35s26oFW2Oyje-LsIcSH-6DTftkNtEVWcALfbD__rEfy_/exec'; // Pakeiskite į savo "web app" URL
+  const SCRIPT_URL =
+    'https://script.google.com/macros/s/AKfycbxGrClqMHfkKqCUK8zZSix35s26oFW2Oyje-LsIcSH-6DTftkNtEVWcALfbD__rEfy_/exec'; // Pakeiskite į savo "web app" URL
 
   async function send(action, payload) {
     const res = await fetch(SCRIPT_URL, {
