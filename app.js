@@ -32,6 +32,7 @@ const T = {
   renameGroup: 'Pervadinti grupę',
   itemTitle: 'Pavadinimas',
   itemUrl: 'URL',
+  itemIcon: 'Piktogramos URL (nebūtina)',
   itemNote: 'Pastaba (nebūtina)',
   sheetTip:
     'Patarimas: Google Sheets turi būti „Publish to web“ arba bendrinamas.',
@@ -145,6 +146,7 @@ async function addItem(gid) {
     title: data.title,
     url: data.url,
     note: data.note,
+    iconUrl: data.iconUrl,
   });
   save(state);
   renderAll();
@@ -165,6 +167,7 @@ async function editItem(gid, iid) {
   it.title = data.title;
   it.url = data.url;
   it.note = data.note;
+  it.iconUrl = data.iconUrl;
   save(state);
   renderAll();
 }

@@ -296,8 +296,9 @@ export function render(state, editing, T, I, handlers, saveFn) {
           });
         }
 
-        const favicon =
-          it.type === 'link'
+        const favicon = it.iconUrl
+          ? `<img class="favicon" alt="" src="${it.iconUrl}">`
+          : it.type === 'link'
             ? `<img class="favicon" alt="" src="${toFavicon(it.url)}">`
             : `<div class="favicon">${it.type === 'sheet' ? I.table : I.puzzle}</div>`;
 
@@ -319,9 +320,16 @@ export function render(state, editing, T, I, handlers, saveFn) {
             </div>`
           : '';
         card.innerHTML = `${favicon}${metaHtml}${actionsHtml}`;
-        if (it.type === 'link')
-          card.querySelector('img.favicon')?.addEventListener('error', (e) => {
-            e.target.outerHTML = `<div class="favicon">${I.globe}</div>`;
+        const imgFav = card.querySelector('img.favicon');
+        if (imgFav)
+          imgFav.addEventListener('error', (e) => {
+            const fallback =
+              it.type === 'sheet'
+                ? I.table
+                : it.type === 'embed'
+                ? I.puzzle
+                : I.globe;
+            e.target.outerHTML = `<div class="favicon">${fallback}</div>`;
           });
 
         card.addEventListener('click', (e) => {
