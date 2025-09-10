@@ -280,14 +280,14 @@ main {
 }
 .item .meta .title {
   font-weight: 700;
-  font-size: 13px;
+  font-size: 1rem; /* keep size consistent after leaving edit mode */
   color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .item .meta .sub {
-  font-size: 11px;
+  font-size: 0.875rem; /* match default input size */
   color: var(--subtext);
   overflow: hidden;
   text-overflow: ellipsis;
