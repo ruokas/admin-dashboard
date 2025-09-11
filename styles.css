@@ -76,6 +76,17 @@ header {
   font-size: clamp(18px, 3.5vw, 24px);
   letter-spacing: 0.2px;
 }
+
+/* Placeholder and focus style for editable page title */
+.title h1[contenteditable='true']:empty::before {
+  content: 'Įveskite pavadinimą';
+  color: var(--subtext);
+}
+
+.title h1[contenteditable='true']:focus {
+  outline: 1px dashed var(--muted);
+  padding: 2px 4px;
+}
 .page-icon {
   width: 28px;
   height: 28px;
