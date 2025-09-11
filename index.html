@@ -56,13 +56,14 @@
           </svg>
           <input id="q" placeholder="Paieška nuorodose…" />
         </div>
-        <button id="editBtn" class="btn-outline" type="button"></button>
+        <!-- Fallback labels so buttons are visible before JS initializes -->
+        <button id="editBtn" class="btn-outline" type="button">Redaguoti</button>
         <div id="addMenu" class="dropdown" style="display: none">
-          <button id="addBtn" type="button"></button>
+          <button id="addBtn" type="button">＋ Pridėti</button>
           <div id="addMenuList" class="dropdown-list">
-            <button id="addGroup" type="button"></button>
-            <button id="addChart" type="button"></button>
-            <button id="addNote" type="button"></button>
+            <button id="addGroup" type="button">＋ Pridėti grupę</button>
+            <button id="addChart" type="button">📈 Pridėti grafiką</button>
+            <button id="addNote" type="button">＋ Pridėti pastabas</button>
           </div>
         </div>
         <button
