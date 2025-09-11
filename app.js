@@ -1,14 +1,11 @@
 import { load, save, seed } from './storage.js';
-import {
-  render,
-  updateEditingUI,
-  toSheetEmbed,
-} from './render.js';
+import { render, updateEditingUI, toSheetEmbed } from './render.js';
 import {
   groupFormDialog,
   itemFormDialog,
   chartFormDialog,
   confirmDialog as confirmDlg,
+  notesDialog,
 } from './forms.js';
 import { I } from './icons.js';
 
@@ -20,6 +17,7 @@ const T = {
   import: 'Importuoti',
   export: 'Eksportuoti',
   theme: 'Tema',
+  notes: 'Pastabos',
   toDark: 'Perjungti į tamsią temą',
   toLight: 'Perjungti į šviesią temą',
   openAll: 'Atverti visas',
@@ -63,6 +61,7 @@ const editBtn = document.getElementById('editBtn');
 // const syncStatus = document.getElementById('syncStatus'); // Sheets sync indikatorius (išjungta)
 const searchEl = document.getElementById('q');
 const themeBtn = document.getElementById('themeBtn');
+const notesBtn = document.getElementById('notesBtn');
 
 let state = load() || seed();
 let editing = false;
@@ -308,6 +307,12 @@ themeBtn.addEventListener('click', toggleTheme);
 editBtn.addEventListener('click', () => {
   editing = !editing;
   updateUI();
+});
+notesBtn.setAttribute('aria-label', T.notes);
+notesBtn.addEventListener('click', async () => {
+  const current = localStorage.getItem('notes') || '';
+  const res = await notesDialog(T, current);
+  if (res !== null) localStorage.setItem('notes', res);
 });
 searchEl.placeholder = T.searchPH;
 searchEl.addEventListener('input', renderAll);

@@ -219,6 +219,46 @@ export function chartFormDialog(T, data = {}) {
   });
 }
 
+export function notesDialog(T, text = '') {
+  return new Promise((resolve) => {
+    const dlg = document.createElement('dialog');
+    dlg.innerHTML = `<form method="dialog" id="notesForm">
+      <label>${T.notes}<br><textarea name="note" rows="8"></textarea></label>
+      <menu>
+        <button type="button" data-act="cancel">${T.cancel}</button>
+        <button type="submit" class="btn-accent">${T.save}</button>
+      </menu>
+    </form>`;
+    document.body.appendChild(dlg);
+    const form = dlg.querySelector('form');
+    const cancel = form.querySelector('[data-act="cancel"]');
+    form.note.value = text || '';
+
+    function cleanup() {
+      form.removeEventListener('submit', submit);
+      cancel.removeEventListener('click', close);
+      dlg.remove();
+    }
+
+    function submit(e) {
+      e.preventDefault();
+      resolve(form.note.value.trim());
+      cleanup();
+    }
+
+    function close() {
+      resolve(null);
+      cleanup();
+    }
+
+    form.addEventListener('submit', submit);
+    cancel.addEventListener('click', close);
+    dlg.addEventListener('cancel', close);
+    dlg.showModal();
+    form.note.focus();
+  });
+}
+
 export function confirmDialog(T, msg) {
   return new Promise((resolve) => {
     const dlg = document.createElement('dialog');
