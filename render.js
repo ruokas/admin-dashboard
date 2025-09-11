@@ -226,6 +226,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
       h.className = 'group-header';
       h.innerHTML = `
         <div class="group-title">
+          <button type="button" class="toggle" data-collapse title="${g.collapsed ? T.expand : T.collapse}" aria-label="${g.collapsed ? T.expand : T.collapse}">${g.collapsed ? I.arrowDown : I.arrowUp}</button>
           <span class="dot" style="background:${g.color || '#6ee7b7'}"></span>
           <h2 title="Tempkite, kad perrikiuotumėte" class="handle">${escapeHtml(g.name || '')}</h2>
         </div>
@@ -243,6 +244,10 @@ export function render(state, editing, T, I, handlers, saveFn) {
       h.addEventListener('click', (e) => {
         const btn = e.target.closest('button');
         if (!btn) return;
+        if (btn.dataset.collapse !== undefined) {
+          handlers.toggleCollapse(g.id);
+          return;
+        }
         const act = btn.dataset.act;
         if (act === 'edit') return handlers.editChart(g.id);
         if (act === 'del') {
@@ -278,6 +283,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
       emb.style.resize = 'none';
       emb.innerHTML = `<iframe src="${g.url}" loading="lazy" referrerpolicy="no-referrer"></iframe>`;
       grp.appendChild(emb);
+      if (g.collapsed) grp.classList.add('collapsed');
       groupsEl.appendChild(grp);
       ro.observe(grp);
       resizeEmbeds(grp);
@@ -340,6 +346,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
     h.className = 'group-header';
     h.innerHTML = `
         <div class="group-title">
+          <button type="button" class="toggle" data-collapse title="${g.collapsed ? T.expand : T.collapse}" aria-label="${g.collapsed ? T.expand : T.collapse}">${g.collapsed ? I.arrowDown : I.arrowUp}</button>
           <span class="dot" style="background:${g.color || '#6ee7b7'}"></span>
           <h2 title="Tempkite, kad perrikiuotumėte" class="handle">${escapeHtml(g.name)}</h2>
         </div>
@@ -359,6 +366,10 @@ export function render(state, editing, T, I, handlers, saveFn) {
     h.addEventListener('click', (e) => {
       const btn = e.target.closest('button');
       if (!btn) return;
+      if (btn.dataset.collapse !== undefined) {
+        handlers.toggleCollapse(g.id);
+        return;
+      }
       const act = btn.dataset.act;
       if (act === 'add') return handlers.addItem(g.id);
       if (act === 'edit') return handlers.editGroup(g.id);
@@ -587,6 +598,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
 
     itemsWrap.appendChild(itemsScroll);
     grp.appendChild(itemsWrap);
+    if (g.collapsed) grp.classList.add('collapsed');
     groupsEl.appendChild(grp);
     ro.observe(grp);
     resizeEmbeds(grp);
