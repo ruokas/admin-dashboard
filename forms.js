@@ -221,11 +221,12 @@ export function chartFormDialog(T, data = {}) {
 
 export function notesDialog(
   T,
-  data = { text: '', size: 16, padding: 8 },
+  data = { title: '', text: '', size: 16, padding: 8 },
 ) {
   return new Promise((resolve) => {
     const dlg = document.createElement('dialog');
     dlg.innerHTML = `<form method="dialog" id="notesForm">
+      <label>${T.noteTitle}<br><input name="title" type="text"></label>
       <label>${T.notes}<br><textarea name="note" rows="8"></textarea></label>
       <label>${T.noteSize}<br><input name="size" type="number" min="10" max="48"></label>
       <label>${T.notePadding}<br><input name="padding" type="number" min="0" max="100"></label>
@@ -237,6 +238,7 @@ export function notesDialog(
     document.body.appendChild(dlg);
     const form = dlg.querySelector('form');
     const cancel = form.querySelector('[data-act="cancel"]');
+    form.title.value = data.title || '';
     form.note.value = data.text || '';
     form.size.value = data.size || 16;
     form.padding.value = data.padding || 8;
@@ -250,6 +252,7 @@ export function notesDialog(
     function submit(e) {
       e.preventDefault();
       resolve({
+        title: form.title.value.trim(),
         text: form.note.value.trim(),
         size: parseInt(form.size.value, 10) || 16,
         padding: parseInt(form.padding.value, 10) || 8,

@@ -9,24 +9,24 @@ const GRID = 40;
 
 const ro = new ResizeObserver((entries) => {
   for (const entry of entries) {
-    const id = entry.target.dataset.id;
-    const g = currentState.groups.find((x) => x.id === id);
-    if (g) {
+    if (entry.target.dataset.resizing === '1') {
       let w = Math.round(entry.contentRect.width / GRID) * GRID;
       let h = Math.round(entry.contentRect.height / GRID) * GRID;
-      if (entry.target.dataset.resizing === '1') {
-        const minW = entry.target.scrollWidth;
-        const minH = entry.target.scrollHeight;
-        if (w < minW) w = minW;
-        if (h < minH) h = minH;
+      const minW = entry.target.scrollWidth;
+      const minH = entry.target.scrollHeight;
+      if (w < minW) w = minW;
+      if (h < minH) h = minH;
 
-        const targets = selectedGroups.includes(entry.target)
-          ? selectedGroups
-          : [entry.target];
+      const targets = selectedGroups.includes(entry.target)
+        ? selectedGroups
+        : [entry.target];
 
-        targets.forEach((el) => {
-          el.style.width = w + 'px';
-          el.style.height = h + 'px';
+      targets.forEach((el) => {
+        el.style.width = w + 'px';
+        el.style.height = h + 'px';
+        if (el.dataset.id === 'notes') {
+          currentState.notesBox = { w, h };
+        } else {
           const sg = currentState.groups.find((x) => x.id === el.dataset.id);
           if (sg) {
             sg.w = w;
@@ -34,10 +34,10 @@ const ro = new ResizeObserver((entries) => {
             sg.resized = true;
             resizeEmbeds(el);
           }
-        });
+        }
+      });
 
-        persist();
-      }
+      persist();
     }
   }
 });
@@ -169,13 +169,36 @@ export function render(state, editing, T, I, handlers, saveFn) {
     noteGrp.className = 'group';
     noteGrp.dataset.id = 'notes';
     noteGrp.dataset.resizing = '0';
+    if (state.notesBox?.w) noteGrp.style.width = state.notesBox.w + 'px';
+    if (state.notesBox?.h) noteGrp.style.height = state.notesBox.h + 'px';
     noteGrp.style.resize = editing ? 'both' : 'none';
+    if (editing) {
+      noteGrp.addEventListener('mousedown', (e) => {
+        const rect = noteGrp.getBoundingClientRect();
+        const withinHandle =
+          e.clientX >= rect.right - 20 && e.clientY >= rect.bottom - 20;
+        if (withinHandle) noteGrp.dataset.resizing = '1';
+      });
+    }
+    noteGrp.addEventListener('click', (e) => {
+      if (!e.shiftKey) return;
+      if (e.target.closest('button')) return;
+      e.preventDefault();
+      const idx = selectedGroups.indexOf(noteGrp);
+      if (idx === -1) {
+        selectedGroups.push(noteGrp);
+        noteGrp.classList.add('selected');
+      } else {
+        selectedGroups.splice(idx, 1);
+        noteGrp.classList.remove('selected');
+      }
+    });
     const h = document.createElement('div');
     h.className = 'group-header';
     h.innerHTML = `
         <div class="group-title">
           <span class="dot" style="background:#fef08a"></span>
-          <h2>${T.notes}</h2>
+          <h2>${escapeHtml(state.notesTitle || T.notes)}</h2>
         </div>
         ${
           editing

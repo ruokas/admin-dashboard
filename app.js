@@ -21,6 +21,7 @@ const T = {
   theme: 'Tema',
   colors: 'Spalvos',
   notes: 'Pastabos',
+  noteTitle: 'Pastabų pavadinimas',
   noteSize: 'Šrifto dydis (px)',
   notePadding: 'Paraštės (px)',
   toDark: 'Perjungti į tamsią temą',
@@ -73,6 +74,8 @@ const pageIconEl = document.getElementById('pageIcon');
 let state = load() || seed();
 if (!('notes' in state)) state.notes = localStorage.getItem('notes') || '';
 if (!('notesOpts' in state)) state.notesOpts = { size: 16, padding: 8 };
+if (!state.notesTitle) state.notesTitle = T.notes;
+if (!('notesBox' in state)) state.notesBox = { w: 0, h: 0 };
 let editing = false;
 
 const baseThemes = [
@@ -234,11 +237,14 @@ async function addChart() {
 }
 
 async function editNotes() {
-  const res = await notesDialog(
-    T,
-    { text: state.notes || '', ...state.notesOpts },
-  );
+  const res = await notesDialog(T, {
+    title: state.notesTitle || '',
+    text: state.notes || '',
+    size: state.notesOpts.size,
+    padding: state.notesOpts.padding,
+  });
   if (res === null) return;
+  state.notesTitle = res.title || T.notes;
   state.notes = res.text;
   state.notesOpts = { size: res.size, padding: res.padding };
   save(state);

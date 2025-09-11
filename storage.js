@@ -11,8 +11,15 @@ export function load() {
         }),
       );
       if (typeof data.notes !== 'string') data.notes = '';
+      if (typeof data.notesTitle !== 'string') data.notesTitle = '';
       if (typeof data.title !== 'string') data.title = '';
       if (typeof data.icon !== 'string') data.icon = '';
+      if (
+        !data.notesBox ||
+        typeof data.notesBox.w !== 'number' ||
+        typeof data.notesBox.h !== 'number'
+      )
+        data.notesBox = { w: 0, h: 0 };
       if (
         !data.notesOpts ||
         typeof data.notesOpts.size !== 'number' ||
@@ -34,6 +41,8 @@ export function seed() {
   const data = {
     groups: [],
     notes: '',
+    notesTitle: '',
+    notesBox: { w: 0, h: 0 },
     notesOpts: { size: 16, padding: 8 },
     title: '',
     icon: '',
