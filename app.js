@@ -14,6 +14,7 @@ const T = {
   add: 'Pridėti',
   addGroup: 'Pridėti grupę',
   addChart: 'Pridėti grafiką',
+  addNote: 'Pridėti pastabas',
   import: 'Importuoti',
   export: 'Eksportuoti',
   theme: 'Tema',
@@ -61,9 +62,11 @@ const editBtn = document.getElementById('editBtn');
 // const syncStatus = document.getElementById('syncStatus'); // Sheets sync indikatorius (išjungta)
 const searchEl = document.getElementById('q');
 const themeBtn = document.getElementById('themeBtn');
-const notesBtn = document.getElementById('notesBtn');
 
 let state = load() || seed();
+if (!('notes' in state)) {
+  state.notes = localStorage.getItem('notes') || '';
+}
 let editing = false;
 
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -87,6 +90,7 @@ function renderAll() {
       editGroup,
       editItem,
       editChart,
+      editNotes,
       toggleCollapse,
       confirmDialog: (msg) => confirmDlg(T, msg),
     },
@@ -135,6 +139,14 @@ async function addChart() {
     h: parsed.h ? parsed.h + 56 : undefined,
     resized: !!parsed.h,
   });
+  save(state);
+  renderAll();
+}
+
+async function editNotes() {
+  const res = await notesDialog(T, state.notes || '');
+  if (res === null) return;
+  state.notes = res;
   save(state);
   renderAll();
 }
@@ -292,6 +304,10 @@ document.getElementById('addChart').addEventListener('click', () => {
   hideAddMenu();
   addChart();
 });
+document.getElementById('addNote').addEventListener('click', () => {
+  hideAddMenu();
+  editNotes();
+});
 document.getElementById('exportBtn').addEventListener('click', () => {
   exportJson();
 });
@@ -307,12 +323,6 @@ themeBtn.addEventListener('click', toggleTheme);
 editBtn.addEventListener('click', () => {
   editing = !editing;
   updateUI();
-});
-notesBtn.setAttribute('aria-label', T.notes);
-notesBtn.addEventListener('click', async () => {
-  const current = localStorage.getItem('notes') || '';
-  const res = await notesDialog(T, current);
-  if (res !== null) localStorage.setItem('notes', res);
 });
 searchEl.placeholder = T.searchPH;
 searchEl.addEventListener('input', renderAll);

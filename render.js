@@ -164,6 +164,45 @@ export function render(state, editing, T, I, handlers, saveFn) {
 
   const q = (searchEl.value || '').toLowerCase().trim();
   groupsEl.innerHTML = '';
+  if (state.notes) {
+    const noteGrp = document.createElement('section');
+    noteGrp.className = 'group';
+    noteGrp.dataset.id = 'notes';
+    noteGrp.dataset.resizing = '0';
+    noteGrp.style.resize = editing ? 'both' : 'none';
+    const h = document.createElement('div');
+    h.className = 'group-header';
+    h.innerHTML = `
+        <div class="group-title">
+          <span class="dot" style="background:#fef08a"></span>
+          <h2>${T.notes}</h2>
+        </div>
+        ${
+          editing
+            ? `<div class="group-actions">
+          <button type="button" title="${T.edit}" aria-label="${T.edit}" data-act="edit">${I.pencil}</button>
+        </div>`
+            : ''
+        }`;
+    h.addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      if (btn.dataset.act === 'edit') handlers.editNotes();
+    });
+    noteGrp.appendChild(h);
+    const itemsWrap = document.createElement('div');
+    itemsWrap.className = 'items';
+    const itemsScroll = document.createElement('div');
+    itemsScroll.className = 'items-scroll';
+    const p = document.createElement('p');
+    p.style.whiteSpace = 'pre-wrap';
+    p.textContent = state.notes;
+    itemsScroll.appendChild(p);
+    itemsWrap.appendChild(itemsScroll);
+    noteGrp.appendChild(itemsWrap);
+    groupsEl.appendChild(noteGrp);
+    ro.observe(noteGrp);
+  }
   state.groups.forEach((g) => {
     if (g.type === 'chart') {
       const grp = document.createElement('section');
@@ -622,9 +661,11 @@ export function updateEditingUI(editing, T, I, renderFn) {
   const addBtn = document.getElementById('addBtn');
   const addGroup = document.getElementById('addGroup');
   const addChart = document.getElementById('addChart');
+  const addNote = document.getElementById('addNote');
   if (addBtn) addBtn.innerHTML = `${I.plus} <span>${T.add}</span>`;
   if (addGroup) addGroup.innerHTML = `${I.plus} ${T.addGroup}`;
   if (addChart) addChart.innerHTML = `${I.chart} ${T.addChart}`;
+  if (addNote) addNote.innerHTML = `${I.plus} ${T.addNote}`;
   renderFn();
 }
 

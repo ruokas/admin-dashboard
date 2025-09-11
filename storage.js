@@ -10,6 +10,7 @@ export function load() {
           if (!('icon' in it)) it.icon = '';
         }),
       );
+      if (typeof data.notes !== 'string') data.notes = '';
     }
     return data;
   } catch (e) {
@@ -22,7 +23,7 @@ export function save(state) {
 }
 
 export function seed() {
-  const data = { groups: [] };
+  const data = { groups: [], notes: '' };
   save(data);
   return data;
 }
