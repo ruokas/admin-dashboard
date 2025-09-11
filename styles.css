@@ -213,6 +213,9 @@ main {
   resize: both;
   width: var(--group-width);
   max-width: 100%;
+  transition:
+    0.2s ease background,
+    0.2s ease transform;
 }
 
 .group.selected {
@@ -267,9 +270,17 @@ main {
   gap: 8px;
   align-items: center;
   box-shadow: var(--shadow);
+  transition:
+    0.2s ease background,
+    0.2s ease transform;
 }
 .item.dragging {
   opacity: 0.45;
+}
+.group:hover,
+.item:hover {
+  background: var(--muted);
+  transform: translateY(-2px);
 }
 .item .meta {
   flex: 1;
