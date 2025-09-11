@@ -22,6 +22,8 @@ Statinis vieno failo HTML projektas, skirtas publikuoti per **GitHub Pages**.
 - Puslapio pavadinimą ir ikoną galima redaguoti ir jie išsaugomi naršyklėje.
 - Jei pavadinimas tuščias redagavimo režime, rodomas pilkas užrašas „Įveskite pavadinimą“.
 - Spalvų temą galima keisti paspaudus **Spalvos** – parinktys išsaugomos `localStorage`.
+- Pastabų kortelę galima perkelti tarp grupių drag-and-drop būdu.
+- Spalvų meniu turi mygtuką **Atstatyti**, grąžinantį numatytas spalvas.
 
 ## Smoke test
 

@@ -61,6 +61,7 @@ const T = {
   actions: 'Veiksmai',
   preview: 'Peržiūra',
   edit: 'Redaguoti',
+  reset: 'Atstatyti',
 };
 
 const editBtn = document.getElementById('editBtn');
@@ -76,6 +77,7 @@ if (!('notes' in state)) state.notes = localStorage.getItem('notes') || '';
 if (!('notesOpts' in state)) state.notesOpts = { size: 16, padding: 8 };
 if (!state.notesTitle) state.notesTitle = T.notes;
 if (!('notesBox' in state)) state.notesBox = { w: 0, h: 0 };
+if (!('notesPos' in state)) state.notesPos = 0;
 let editing = false;
 
 const baseThemes = [

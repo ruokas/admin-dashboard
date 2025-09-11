@@ -164,38 +164,80 @@ export function render(state, editing, T, I, handlers, saveFn) {
 
   const q = (searchEl.value || '').toLowerCase().trim();
   groupsEl.innerHTML = '';
-  if (state.notes) {
-    const noteGrp = document.createElement('section');
-    noteGrp.className = 'group';
-    noteGrp.dataset.id = 'notes';
-    noteGrp.dataset.resizing = '0';
-    if (state.notesBox?.w) noteGrp.style.width = state.notesBox.w + 'px';
-    if (state.notesBox?.h) noteGrp.style.height = state.notesBox.h + 'px';
-    noteGrp.style.resize = editing ? 'both' : 'none';
-    if (editing) {
-      noteGrp.addEventListener('mousedown', (e) => {
-        const rect = noteGrp.getBoundingClientRect();
-        const withinHandle =
-          e.clientX >= rect.right - 20 && e.clientY >= rect.bottom - 20;
-        if (withinHandle) noteGrp.dataset.resizing = '1';
-      });
+  function handleDrop(e) {
+    e.preventDefault();
+    const fromId = e.dataTransfer.getData('text/group');
+    const toId = e.currentTarget.dataset.id;
+    if (!fromId || fromId === toId) return;
+    const ids = currentState.groups.map((g) => g.id);
+    if (currentState.notes) {
+      const pos = Math.max(0, Math.min(currentState.notesPos || 0, ids.length));
+      ids.splice(pos, 0, 'notes');
     }
-    noteGrp.addEventListener('click', (e) => {
-      if (!e.shiftKey) return;
-      if (e.target.closest('button')) return;
-      e.preventDefault();
-      const idx = selectedGroups.indexOf(noteGrp);
-      if (idx === -1) {
-        selectedGroups.push(noteGrp);
-        noteGrp.classList.add('selected');
-      } else {
-        selectedGroups.splice(idx, 1);
-        noteGrp.classList.remove('selected');
+    const fromIdx = ids.indexOf(fromId);
+    const toIdx = ids.indexOf(toId);
+    if (fromIdx === -1 || toIdx === -1) return;
+    ids.splice(fromIdx, 1);
+    ids.splice(toIdx, 0, fromId);
+    const map = new Map(currentState.groups.map((g) => [g.id, g]));
+    currentState.notesPos = ids.indexOf('notes');
+    if (currentState.notesPos < 0) currentState.notesPos = 0;
+    currentState.groups = ids
+      .filter((id) => id !== 'notes')
+      .map((id) => map.get(id));
+    persist();
+    render(currentState, editing, T, I, handlers, persist);
+  }
+  const allGroups = [...state.groups];
+  if (state.notes) {
+    const pos = Math.max(0, Math.min(state.notesPos || 0, allGroups.length));
+    allGroups.splice(pos, 0, { id: 'notes' });
+  }
+  allGroups.forEach((g) => {
+    if (g.id === 'notes') {
+      const noteGrp = document.createElement('section');
+      noteGrp.className = 'group';
+      noteGrp.dataset.id = 'notes';
+      noteGrp.dataset.resizing = '0';
+      if (state.notesBox?.w) noteGrp.style.width = state.notesBox.w + 'px';
+      if (state.notesBox?.h) noteGrp.style.height = state.notesBox.h + 'px';
+      noteGrp.style.resize = editing ? 'both' : 'none';
+      if (editing) {
+        noteGrp.addEventListener('mousedown', (e) => {
+          const rect = noteGrp.getBoundingClientRect();
+          const withinHandle =
+            e.clientX >= rect.right - 20 && e.clientY >= rect.bottom - 20;
+          if (withinHandle) noteGrp.dataset.resizing = '1';
+        });
+        noteGrp.draggable = true;
+        noteGrp.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData('text/group', 'notes');
+          noteGrp.style.opacity = 0.5;
+        });
+        noteGrp.addEventListener('dragend', () => {
+          noteGrp.style.opacity = 1;
+        });
+        noteGrp.addEventListener('dragover', (e) => {
+          e.preventDefault();
+        });
+        noteGrp.addEventListener('drop', handleDrop);
       }
-    });
-    const h = document.createElement('div');
-    h.className = 'group-header';
-    h.innerHTML = `
+      noteGrp.addEventListener('click', (e) => {
+        if (!e.shiftKey) return;
+        if (e.target.closest('button')) return;
+        e.preventDefault();
+        const idx = selectedGroups.indexOf(noteGrp);
+        if (idx === -1) {
+          selectedGroups.push(noteGrp);
+          noteGrp.classList.add('selected');
+        } else {
+          selectedGroups.splice(idx, 1);
+          noteGrp.classList.remove('selected');
+        }
+      });
+      const h = document.createElement('div');
+      h.className = 'group-header';
+      h.innerHTML = `
         <div class="group-title">
           <span class="dot" style="background:#fef08a"></span>
           <h2>${escapeHtml(state.notesTitle || T.notes)}</h2>
@@ -207,28 +249,28 @@ export function render(state, editing, T, I, handlers, saveFn) {
         </div>`
             : ''
         }`;
-    h.addEventListener('click', (e) => {
-      const btn = e.target.closest('button');
-      if (!btn) return;
-      if (btn.dataset.act === 'edit') handlers.editNotes();
-    });
-    noteGrp.appendChild(h);
-    const itemsWrap = document.createElement('div');
-    itemsWrap.className = 'items';
-    const itemsScroll = document.createElement('div');
-    itemsScroll.className = 'items-scroll';
-    const p = document.createElement('p');
-    p.style.whiteSpace = 'pre-wrap';
-    p.style.padding = (state.notesOpts?.padding ?? 8) + 'px';
-    p.style.fontSize = (state.notesOpts?.size ?? 16) + 'px';
-    p.textContent = state.notes;
-    itemsScroll.appendChild(p);
-    itemsWrap.appendChild(itemsScroll);
-    noteGrp.appendChild(itemsWrap);
-    groupsEl.appendChild(noteGrp);
-    ro.observe(noteGrp);
-  }
-  state.groups.forEach((g) => {
+      h.addEventListener('click', (e) => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        if (btn.dataset.act === 'edit') handlers.editNotes();
+      });
+      noteGrp.appendChild(h);
+      const itemsWrap = document.createElement('div');
+      itemsWrap.className = 'items';
+      const itemsScroll = document.createElement('div');
+      itemsScroll.className = 'items-scroll';
+      const p = document.createElement('p');
+      p.style.whiteSpace = 'pre-wrap';
+      p.style.padding = (state.notesOpts?.padding ?? 8) + 'px';
+      p.style.fontSize = (state.notesOpts?.size ?? 16) + 'px';
+      p.textContent = state.notes;
+      itemsScroll.appendChild(p);
+      itemsWrap.appendChild(itemsScroll);
+      noteGrp.appendChild(itemsWrap);
+      groupsEl.appendChild(noteGrp);
+      ro.observe(noteGrp);
+      return;
+    }
     if (g.type === 'chart') {
       const grp = document.createElement('section');
       grp.className = 'group';
@@ -258,18 +300,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
         grp.addEventListener('dragover', (e) => {
           e.preventDefault();
         });
-        grp.addEventListener('drop', (e) => {
-          e.preventDefault();
-          const fromId = e.dataTransfer.getData('text/group');
-          if (fromId && fromId !== g.id) {
-            const fromIdx = state.groups.findIndex((x) => x.id === fromId);
-            const toIdx = state.groups.findIndex((x) => x.id === g.id);
-            const [moved] = state.groups.splice(fromIdx, 1);
-            state.groups.splice(toIdx, 0, moved);
-            persist();
-            render(state, editing, T, I, handlers, saveFn);
-          }
-        });
+        grp.addEventListener('drop', handleDrop);
       }
 
       grp.addEventListener('click', (e) => {
@@ -378,18 +409,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
       grp.addEventListener('dragover', (e) => {
         e.preventDefault();
       });
-      grp.addEventListener('drop', (e) => {
-        e.preventDefault();
-        const fromId = e.dataTransfer.getData('text/group');
-        if (fromId && fromId !== g.id) {
-          const fromIdx = state.groups.findIndex((x) => x.id === fromId);
-          const toIdx = state.groups.findIndex((x) => x.id === g.id);
-          const [moved] = state.groups.splice(fromIdx, 1);
-          state.groups.splice(toIdx, 0, moved);
-          persist();
-          render(state, editing, T, I, handlers, saveFn);
-        }
-      });
+      grp.addEventListener('drop', handleDrop);
     }
 
     grp.addEventListener('click', (e) => {

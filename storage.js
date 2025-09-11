@@ -26,6 +26,7 @@ export function load() {
         typeof data.notesOpts.padding !== 'number'
       )
         data.notesOpts = { size: 16, padding: 8 };
+      if (typeof data.notesPos !== 'number') data.notesPos = 0;
     }
     return data;
   } catch (e) {
@@ -44,6 +45,7 @@ export function seed() {
     notesTitle: '',
     notesBox: { w: 0, h: 0 },
     notesOpts: { size: 16, padding: 8 },
+    notesPos: 0,
     title: '',
     icon: '',
   };
