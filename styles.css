@@ -173,13 +173,9 @@ button:hover,
   position: relative;
 }
 .search input {
-  background: var(--panel);
-  border: 1px solid transparent;
-  color: var(--text);
   padding: 12px 14px 12px 40px;
   border-radius: 12px;
   min-width: 240px;
-  outline: none;
   box-shadow: var(--shadow);
 }
 .search svg {
@@ -453,6 +449,35 @@ dialog menu {
 dialog .error {
   color: var(--danger);
   font-size: 13px;
+}
+
+/* Form controls */
+input:not([type='color']),
+textarea,
+select {
+  background: var(--panel);
+  border: 1px solid var(--muted);
+  color: var(--text);
+  padding: 8px 10px;
+  border-radius: 8px;
+  outline: none;
+  font-family: inherit;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+
+input:not([type='color']):focus,
+textarea:focus,
+select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--subtext);
+  opacity: 0.8;
 }
 @media (max-width: 620px) {
   .controls {
