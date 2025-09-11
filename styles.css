@@ -76,6 +76,12 @@ header {
   font-size: clamp(18px, 3.5vw, 24px);
   letter-spacing: 0.2px;
 }
+.page-icon {
+  width: 28px;
+  height: 28px;
+  font-size: 28px;
+  line-height: 1;
+}
 .title .badge {
   font-size: 12px;
   padding: 4px 8px;

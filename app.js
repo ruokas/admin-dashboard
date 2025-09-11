@@ -64,11 +64,29 @@ const editBtn = document.getElementById('editBtn');
 // const syncStatus = document.getElementById('syncStatus'); // Sheets sync indikatorius (išjungta)
 const searchEl = document.getElementById('q');
 const themeBtn = document.getElementById('themeBtn');
+const pageTitleEl = document.getElementById('pageTitle');
+const pageIconEl = document.getElementById('pageIcon');
 
 let state = load() || seed();
 if (!('notes' in state)) state.notes = localStorage.getItem('notes') || '';
 if (!('notesOpts' in state)) state.notesOpts = { size: 16, padding: 8 };
 let editing = false;
+
+pageTitleEl.textContent = state.title || '';
+pageIconEl.textContent = state.icon || '';
+document.title = state.title || '';
+
+pageTitleEl.addEventListener('input', () => {
+  if (!editing) return;
+  state.title = pageTitleEl.textContent.trim();
+  document.title = state.title;
+  save(state);
+});
+pageIconEl.addEventListener('input', () => {
+  if (!editing) return;
+  state.icon = pageIconEl.textContent.trim();
+  save(state);
+});
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -101,6 +119,14 @@ function renderAll() {
 
 function updateUI() {
   updateEditingUI(editing, T, I, renderAll);
+  pageTitleEl.contentEditable = editing;
+  pageIconEl.contentEditable = editing;
+  if (!editing) {
+    state.title = pageTitleEl.textContent.trim();
+    state.icon = pageIconEl.textContent.trim();
+    document.title = state.title;
+    save(state);
+  }
 }
 
 async function addGroup() {
