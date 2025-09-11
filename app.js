@@ -2,8 +2,6 @@ import { load, save, seed } from './storage.js';
 import {
   render,
   updateEditingUI,
-  applyTheme,
-  toggleTheme,
   toSheetEmbed,
 } from './render.js';
 import {
@@ -22,6 +20,8 @@ const T = {
   import: 'Importuoti',
   export: 'Eksportuoti',
   theme: 'Tema',
+  toDark: 'Perjungti į tamsią temą',
+  toLight: 'Perjungti į šviesią temą',
   openAll: 'Atverti visas',
   addItem: 'Pridėti įrašą',
   editGroup: 'Redaguoti grupę',
@@ -60,6 +60,7 @@ const T = {
 const editBtn = document.getElementById('editBtn');
 // const syncStatus = document.getElementById('syncStatus'); // Sheets sync indikatorius (išjungta)
 const searchEl = document.getElementById('q');
+const themeBtn = document.getElementById('themeBtn');
 
 let state = load() || seed();
 let editing = false;
@@ -236,6 +237,28 @@ function importJson(file) {
   reader.readAsText(file);
 }
 
+function applyTheme() {
+  const theme = localStorage.getItem('ed_dash_theme') || 'dark';
+  if (theme === 'light') {
+    document.documentElement.classList.add('theme-light');
+    themeBtn.innerHTML = `${I.sun} <span>${T.theme}</span>`;
+    themeBtn.setAttribute('aria-label', T.toDark);
+  } else {
+    document.documentElement.classList.remove('theme-light');
+    themeBtn.innerHTML = `${I.moon} <span>${T.theme}</span>`;
+    themeBtn.setAttribute('aria-label', T.toLight);
+  }
+}
+
+function toggleTheme() {
+  const now =
+    (localStorage.getItem('ed_dash_theme') || 'dark') === 'dark'
+      ? 'light'
+      : 'dark';
+  localStorage.setItem('ed_dash_theme', now);
+  applyTheme();
+}
+
 // Google Sheets sinchronizavimas laikinai išjungtas
 // const sheets = sheetsSync(state, syncStatus, () => save(state), renderAll);
 
@@ -270,7 +293,7 @@ document.getElementById('fileInput').addEventListener('change', (e) => {
   if (f) importJson(f);
   e.target.value = '';
 });
-document.getElementById('themeBtn').addEventListener('click', toggleTheme);
+themeBtn.addEventListener('click', toggleTheme);
 editBtn.addEventListener('click', () => {
   editing = !editing;
   updateUI();
