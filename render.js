@@ -196,6 +196,8 @@ export function render(state, editing, T, I, handlers, saveFn) {
     itemsScroll.className = 'items-scroll';
     const p = document.createElement('p');
     p.style.whiteSpace = 'pre-wrap';
+    p.style.padding = (state.notesOpts?.padding ?? 8) + 'px';
+    p.style.fontSize = (state.notesOpts?.size ?? 16) + 'px';
     p.textContent = state.notes;
     itemsScroll.appendChild(p);
     itemsWrap.appendChild(itemsScroll);

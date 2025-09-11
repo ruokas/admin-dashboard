@@ -19,6 +19,8 @@ const T = {
   export: 'Eksportuoti',
   theme: 'Tema',
   notes: 'Pastabos',
+  noteSize: 'Šrifto dydis (px)',
+  notePadding: 'Paraštės (px)',
   toDark: 'Perjungti į tamsią temą',
   toLight: 'Perjungti į šviesią temą',
   openAll: 'Atverti visas',
@@ -64,9 +66,8 @@ const searchEl = document.getElementById('q');
 const themeBtn = document.getElementById('themeBtn');
 
 let state = load() || seed();
-if (!('notes' in state)) {
-  state.notes = localStorage.getItem('notes') || '';
-}
+if (!('notes' in state)) state.notes = localStorage.getItem('notes') || '';
+if (!('notesOpts' in state)) state.notesOpts = { size: 16, padding: 8 };
 let editing = false;
 
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -144,9 +145,13 @@ async function addChart() {
 }
 
 async function editNotes() {
-  const res = await notesDialog(T, state.notes || '');
+  const res = await notesDialog(
+    T,
+    { text: state.notes || '', ...state.notesOpts },
+  );
   if (res === null) return;
-  state.notes = res;
+  state.notes = res.text;
+  state.notesOpts = { size: res.size, padding: res.padding };
   save(state);
   renderAll();
 }
