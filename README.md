@@ -21,6 +21,7 @@ Statinis vieno failo HTML projektas, skirtas publikuoti per **GitHub Pages**.
 - Redagavimo režimas: išjungus puslapis tampa statinis, įjungus galima keisti grupes ir įrašus.
 - Puslapio pavadinimą ir ikoną galima redaguoti ir jie išsaugomi naršyklėje.
 - Jei pavadinimas tuščias redagavimo režime, rodomas pilkas užrašas „Įveskite pavadinimą“.
+- Spalvų temą galima keisti paspaudus **Spalvos** – parinktys išsaugomos `localStorage`.
 
 ## Smoke test
 

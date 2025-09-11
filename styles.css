@@ -5,7 +5,11 @@
   --text: #e6edf3;
   --subtext: #9fb0c0;
   --accent: #6ee7b7;
+  --accent2: #3dd6a6;
+  --btn-accent-text: #0a0f14;
   --danger: #ff6b6b;
+  --danger2: #e24a4a;
+  --btn-danger-text: #ffffff;
   --warn: #ffd166;
   --ok: #8ecae6;
   --card: #0f141a;
@@ -19,7 +23,11 @@
   --text: #0c1116;
   --subtext: #4a5a6a;
   --accent: #2563eb;
+  --accent2: #1d4ed8;
+  --btn-accent-text: #ffffff;
   --danger: #d83a3a;
+  --danger2: #b92424;
+  --btn-danger-text: #ffffff;
   --ok: #0ea5e9;
   --card: #ffffff;
   --shadow: 0 10px 24px rgba(7, 14, 22, 0.08);
@@ -163,12 +171,12 @@ button:hover,
   background: var(--muted);
 }
 .btn-accent {
-  background: linear-gradient(180deg, var(--accent), #3dd6a6);
-  color: #0a0f14;
+  background: linear-gradient(180deg, var(--accent), var(--accent2));
+  color: var(--btn-accent-text);
 }
 .btn-danger {
-  background: linear-gradient(180deg, var(--danger), #e24a4a);
-  color: white;
+  background: linear-gradient(180deg, var(--danger), var(--danger2));
+  color: var(--btn-danger-text);
 }
 .btn-outline {
   background: transparent;

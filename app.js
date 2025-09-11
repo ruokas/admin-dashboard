@@ -6,6 +6,7 @@ import {
   chartFormDialog,
   confirmDialog as confirmDlg,
   notesDialog,
+  themeDialog,
 } from './forms.js';
 import { I } from './icons.js';
 
@@ -18,6 +19,7 @@ const T = {
   import: 'Importuoti',
   export: 'Eksportuoti',
   theme: 'Tema',
+  colors: 'Spalvos',
   notes: 'Pastabos',
   noteSize: 'Šrifto dydis (px)',
   notePadding: 'Paraštės (px)',
@@ -64,6 +66,7 @@ const editBtn = document.getElementById('editBtn');
 // const syncStatus = document.getElementById('syncStatus'); // Sheets sync indikatorius (išjungta)
 const searchEl = document.getElementById('q');
 const themeBtn = document.getElementById('themeBtn');
+const colorBtn = document.getElementById('colorBtn');
 const pageTitleEl = document.getElementById('pageTitle');
 const pageIconEl = document.getElementById('pageIcon');
 
@@ -71,6 +74,66 @@ let state = load() || seed();
 if (!('notes' in state)) state.notes = localStorage.getItem('notes') || '';
 if (!('notesOpts' in state)) state.notesOpts = { size: 16, padding: 8 };
 let editing = false;
+
+const baseThemes = [
+  {
+    id: 'dark',
+    vars: {
+      bg: '#0b1117',
+      panel: '#111922',
+      muted: '#1b2530',
+      text: '#e6edf3',
+      subtext: '#9fb0c0',
+      accent: '#6ee7b7',
+      accent2: '#3dd6a6',
+      'btn-accent-text': '#0a0f14',
+      danger: '#ff6b6b',
+      danger2: '#e24a4a',
+      'btn-danger-text': '#ffffff',
+      warn: '#ffd166',
+      ok: '#8ecae6',
+      card: '#0f141a',
+    },
+  },
+  {
+    id: 'light',
+    vars: {
+      bg: '#f6f8fb',
+      panel: '#ffffff',
+      muted: '#e9eef3',
+      text: '#0c1116',
+      subtext: '#4a5a6a',
+      accent: '#2563eb',
+      accent2: '#1d4ed8',
+      'btn-accent-text': '#ffffff',
+      danger: '#d83a3a',
+      danger2: '#b92424',
+      'btn-danger-text': '#ffffff',
+      warn: '#ffd166',
+      ok: '#0ea5e9',
+      card: '#ffffff',
+    },
+  },
+  {
+    id: 'forest',
+    vars: {
+      bg: '#0d1f14',
+      panel: '#14281b',
+      muted: '#1b3625',
+      text: '#e7f8ec',
+      subtext: '#9bbfa7',
+      accent: '#34d399',
+      accent2: '#059669',
+      'btn-accent-text': '#0d1f14',
+      danger: '#f87171',
+      danger2: '#dc2626',
+      'btn-danger-text': '#ffffff',
+      warn: '#facc15',
+      ok: '#4ade80',
+      card: '#0f2418',
+    },
+  },
+];
 
 pageTitleEl.textContent = state.title || '';
 pageIconEl.textContent = state.icon || '';
@@ -290,25 +353,51 @@ function importJson(file) {
   reader.readAsText(file);
 }
 
-function applyTheme() {
-  const theme = localStorage.getItem('ed_dash_theme') || 'dark';
-  if (theme === 'light') {
-    document.documentElement.classList.add('theme-light');
-    themeBtn.innerHTML = `${I.sun} <span>${T.theme}</span>`;
-    themeBtn.setAttribute('aria-label', T.toDark);
-  } else {
-    document.documentElement.classList.remove('theme-light');
-    themeBtn.innerHTML = `${I.moon} <span>${T.theme}</span>`;
-    themeBtn.setAttribute('aria-label', T.toLight);
+function getThemes() {
+  const custom = localStorage.getItem('ed_dash_theme_custom');
+  const themes = [...baseThemes];
+  if (custom) {
+    try {
+      themes.push({ id: 'custom', vars: JSON.parse(custom) });
+    } catch (e) {
+      console.error('Nepavyko nuskaityti temų:', e);
+    }
   }
+  return themes;
+}
+
+function applyTheme() {
+  const themes = getThemes();
+  const id = localStorage.getItem('ed_dash_theme') || 'dark';
+  const theme = themes.find((t) => t.id === id) || themes[0];
+  Object.entries(theme.vars).forEach(([k, v]) => {
+    document.documentElement.style.setProperty(`--${k}`, v);
+  });
+  const light = id === 'light';
+  themeBtn.innerHTML = `${light ? I.sun : I.moon} <span>${T.theme}</span>`;
+  themeBtn.setAttribute('aria-label', light ? T.toDark : T.toLight);
 }
 
 function toggleTheme() {
-  const now =
-    (localStorage.getItem('ed_dash_theme') || 'dark') === 'dark'
-      ? 'light'
-      : 'dark';
-  localStorage.setItem('ed_dash_theme', now);
+  const themes = getThemes();
+  const ids = themes.map((t) => t.id);
+  const curr = localStorage.getItem('ed_dash_theme') || 'dark';
+  const next = ids[(ids.indexOf(curr) + 1) % ids.length];
+  localStorage.setItem('ed_dash_theme', next);
+  applyTheme();
+}
+
+async function editColors() {
+  const themes = getThemes();
+  const currId = localStorage.getItem('ed_dash_theme') || 'dark';
+  const currTheme =
+    currId === 'custom'
+      ? themes.find((t) => t.id === 'custom')
+      : baseThemes.find((t) => t.id === currId);
+  const res = await themeDialog(T, { ...currTheme.vars });
+  if (!res) return;
+  localStorage.setItem('ed_dash_theme_custom', JSON.stringify(res));
+  localStorage.setItem('ed_dash_theme', 'custom');
   applyTheme();
 }
 
@@ -351,6 +440,9 @@ document.getElementById('fileInput').addEventListener('change', (e) => {
   e.target.value = '';
 });
 themeBtn.addEventListener('click', toggleTheme);
+colorBtn.innerHTML = `🎨 <span>${T.colors}</span>`;
+colorBtn.setAttribute('aria-label', T.colors);
+colorBtn.addEventListener('click', editColors);
 editBtn.addEventListener('click', () => {
   editing = !editing;
   updateUI();
