@@ -23,6 +23,8 @@ const T = {
   toDark: 'Perjungti į tamsią temą',
   toLight: 'Perjungti į šviesią temą',
   openAll: 'Atverti visas',
+  collapse: 'Suskleisti',
+  expand: 'Išskleisti',
   addItem: 'Pridėti įrašą',
   editGroup: 'Redaguoti grupę',
   editChart: 'Redaguoti grafiką',
@@ -86,6 +88,7 @@ function renderAll() {
       editGroup,
       editItem,
       editChart,
+      toggleCollapse,
       confirmDialog: (msg) => confirmDlg(T, msg),
     },
     () => save(state),
@@ -149,6 +152,14 @@ async function editChart(gid) {
     g.h = parsed.h + 56;
     g.resized = true;
   }
+  save(state);
+  renderAll();
+}
+
+function toggleCollapse(gid) {
+  const g = state.groups.find((x) => x.id === gid);
+  if (!g) return;
+  g.collapsed = !g.collapsed;
   save(state);
   renderAll();
 }
