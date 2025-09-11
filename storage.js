@@ -11,6 +11,8 @@ export function load() {
         }),
       );
       if (typeof data.notes !== 'string') data.notes = '';
+      if (typeof data.title !== 'string') data.title = '';
+      if (typeof data.icon !== 'string') data.icon = '';
       if (
         !data.notesOpts ||
         typeof data.notesOpts.size !== 'number' ||
@@ -29,7 +31,13 @@ export function save(state) {
 }
 
 export function seed() {
-  const data = { groups: [], notes: '', notesOpts: { size: 16, padding: 8 } };
+  const data = {
+    groups: [],
+    notes: '',
+    notesOpts: { size: 16, padding: 8 },
+    title: '',
+    icon: '',
+  };
   save(data);
   return data;
 }
