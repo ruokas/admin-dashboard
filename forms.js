@@ -270,6 +270,63 @@ export function notesDialog(
   });
 }
 
+export function themeDialog(T, data = {}) {
+  return new Promise((resolve) => {
+    const fields = [
+      { key: 'bg', label: 'Fonas' },
+      { key: 'panel', label: 'Skydelio fonas' },
+      { key: 'muted', label: 'Pasyvi zona' },
+      { key: 'text', label: 'Tekstas' },
+      { key: 'subtext', label: 'Antrinis tekstas' },
+      { key: 'accent', label: 'Akcentas' },
+      { key: 'accent2', label: 'Akcentas (2)' },
+      { key: 'btn-accent-text', label: 'Akcento tekstas' },
+      { key: 'danger', label: 'Pavojaus spalva' },
+      { key: 'danger2', label: 'Pavojaus spalva (2)' },
+      { key: 'btn-danger-text', label: 'Pavojaus teksto spalva' },
+      { key: 'warn', label: 'Įspėjimas' },
+      { key: 'ok', label: 'OK' },
+      { key: 'card', label: 'Kortelės fonas' },
+    ];
+    const inputs = fields
+      .map(
+        ({ key, label }) =>
+          `<label>${label}<br><input name="${key}" type="color" value="${
+            data[key] || '#000000'
+          }"></label>`,
+      )
+      .join('');
+    const dlg = document.createElement('dialog');
+    dlg.innerHTML = `<form method="dialog" id="themeForm">${inputs}<menu><button type="button" data-act="cancel">${T.cancel}</button><button type="submit" class="btn-accent">${T.save}</button></menu></form>`;
+    document.body.appendChild(dlg);
+    const form = dlg.querySelector('form');
+    const cancel = form.querySelector('[data-act="cancel"]');
+
+    function cleanup() {
+      form.removeEventListener('submit', submit);
+      cancel.removeEventListener('click', close);
+      dlg.remove();
+    }
+
+    function submit(e) {
+      e.preventDefault();
+      const formData = Object.fromEntries(new FormData(form));
+      resolve(formData);
+      cleanup();
+    }
+
+    function close() {
+      resolve(null);
+      cleanup();
+    }
+
+    form.addEventListener('submit', submit);
+    cancel.addEventListener('click', close);
+    dlg.addEventListener('cancel', close);
+    dlg.showModal();
+  });
+}
+
 export function confirmDialog(T, msg) {
   return new Promise((resolve) => {
     const dlg = document.createElement('dialog');
