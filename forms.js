@@ -300,14 +300,16 @@ export function themeDialog(T, data = {}) {
       )
       .join('');
     const dlg = document.createElement('dialog');
-    dlg.innerHTML = `<form method="dialog" id="themeForm">${inputs}<menu><button type="button" data-act="cancel">${T.cancel}</button><button type="submit" class="btn-accent">${T.save}</button></menu></form>`;
+    dlg.innerHTML = `<form method="dialog" id="themeForm">${inputs}<menu><button type="button" data-act="reset">${T.reset}</button><button type="button" data-act="cancel">${T.cancel}</button><button type="submit" class="btn-accent">${T.save}</button></menu></form>`;
     document.body.appendChild(dlg);
     const form = dlg.querySelector('form');
     const cancel = form.querySelector('[data-act="cancel"]');
+    const resetBtn = form.querySelector('[data-act="reset"]');
 
     function cleanup() {
       form.removeEventListener('submit', submit);
       cancel.removeEventListener('click', close);
+      resetBtn.removeEventListener('click', reset);
       dlg.remove();
     }
 
@@ -323,8 +325,15 @@ export function themeDialog(T, data = {}) {
       cleanup();
     }
 
+    function reset() {
+      fields.forEach(({ key }) => {
+        form.elements[key].value = data[key] || '#000000';
+      });
+    }
+
     form.addEventListener('submit', submit);
     cancel.addEventListener('click', close);
+    resetBtn.addEventListener('click', reset);
     dlg.addEventListener('cancel', close);
     dlg.showModal();
   });
