@@ -20,6 +20,7 @@ Statinis vieno failo HTML projektas, skirtas publikuoti per **GitHub Pages**.
 - Eksportas ir importas į Google Sheets per Apps Script "web app" (laikinai išjungta).
 - Redagavimo režimas: išjungus puslapis tampa statinis, įjungus galima keisti grupes ir įrašus.
 - Puslapio pavadinimą ir ikoną galima redaguoti ir jie išsaugomi naršyklėje.
+- Jei pavadinimas tuščias redagavimo režime, rodomas pilkas užrašas „Įveskite pavadinimą“.
 
 ## Smoke test
 
