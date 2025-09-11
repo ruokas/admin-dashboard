@@ -143,7 +143,11 @@ export function itemFormDialog(T, data = {}) {
         return;
       }
       try {
-        new URL(formData.url);
+        const u = new URL(formData.url);
+        if (!/^https?:$/.test(u.protocol)) {
+          err.textContent = T.invalidUrl;
+          return;
+        }
       } catch {
         err.textContent = T.invalidUrl;
         return;
