@@ -10,20 +10,24 @@ const GRID = 40;
 const ro = new ResizeObserver((entries) => {
   for (const entry of entries) {
     if (entry.target.dataset.resizing === '1') {
-      let w = Math.round(entry.contentRect.width / GRID) * GRID;
-      let h = Math.round(entry.contentRect.height / GRID) * GRID;
-      const minW = entry.target.scrollWidth;
-      const minH = entry.target.scrollHeight;
-      if (w < minW) w = minW;
-      if (h < minH) h = minH;
+      const baseW = Math.round(entry.contentRect.width / GRID) * GRID;
+      const baseH = Math.round(entry.contentRect.height / GRID) * GRID;
 
       const targets = selectedGroups.includes(entry.target)
         ? selectedGroups
         : [entry.target];
 
       targets.forEach((el) => {
+        const minW = el.scrollWidth;
+        const minH = el.scrollHeight;
+        let w = baseW;
+        let h = baseH;
+        if (w < minW) w = minW;
+        if (h < minH) h = minH;
         el.style.width = w + 'px';
         el.style.height = h + 'px';
+        el.style.minWidth = minW + 'px';
+        el.style.minHeight = minH + 'px';
         if (el.dataset.id === 'notes') {
           currentState.notesBox = { w, h };
         } else {
@@ -43,9 +47,11 @@ const ro = new ResizeObserver((entries) => {
 });
 
 document.addEventListener('mouseup', () => {
-  document
-    .querySelectorAll('.group')
-    .forEach((g) => (g.dataset.resizing = '0'));
+  document.querySelectorAll('.group').forEach((g) => {
+    g.dataset.resizing = '0';
+    g.style.minWidth = '';
+    g.style.minHeight = '';
+  });
 });
 
 document.addEventListener('click', (e) => {
@@ -207,7 +213,11 @@ export function render(state, editing, T, I, handlers, saveFn) {
           const rect = noteGrp.getBoundingClientRect();
           const withinHandle =
             e.clientX >= rect.right - 20 && e.clientY >= rect.bottom - 20;
-          if (withinHandle) noteGrp.dataset.resizing = '1';
+          if (withinHandle) {
+            noteGrp.dataset.resizing = '1';
+            noteGrp.style.minWidth = noteGrp.scrollWidth + 'px';
+            noteGrp.style.minHeight = noteGrp.scrollHeight + 'px';
+          }
         });
         noteGrp.draggable = true;
         noteGrp.addEventListener('dragstart', (e) => {
@@ -287,7 +297,11 @@ export function render(state, editing, T, I, handlers, saveFn) {
           const rect = grp.getBoundingClientRect();
           const withinHandle =
             e.clientX >= rect.right - 20 && e.clientY >= rect.bottom - 20;
-          if (withinHandle) grp.dataset.resizing = '1';
+          if (withinHandle) {
+            grp.dataset.resizing = '1';
+            grp.style.minWidth = grp.scrollWidth + 'px';
+            grp.style.minHeight = grp.scrollHeight + 'px';
+          }
         });
         grp.draggable = true;
         grp.addEventListener('dragstart', (e) => {
@@ -396,7 +410,11 @@ export function render(state, editing, T, I, handlers, saveFn) {
         const rect = grp.getBoundingClientRect();
         const withinHandle =
           e.clientX >= rect.right - 20 && e.clientY >= rect.bottom - 20;
-        if (withinHandle) grp.dataset.resizing = '1';
+        if (withinHandle) {
+          grp.dataset.resizing = '1';
+          grp.style.minWidth = grp.scrollWidth + 'px';
+          grp.style.minHeight = grp.scrollHeight + 'px';
+        }
       });
       grp.draggable = true;
       grp.addEventListener('dragstart', (e) => {
