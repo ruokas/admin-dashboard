@@ -12,6 +12,7 @@ import { I } from './icons.js';
 
 const T = {
   searchPH: 'Paieška nuorodose…',
+  searchLabel: 'Paieška',
   add: 'Pridėti',
   addGroup: 'Pridėti grupę',
   addChart: 'Pridėti grafiką',
@@ -67,6 +68,7 @@ const T = {
 const editBtn = document.getElementById('editBtn');
 // const syncStatus = document.getElementById('syncStatus'); // Sheets sync indikatorius (išjungta)
 const searchEl = document.getElementById('q');
+const searchLabelEl = document.getElementById('searchLabel');
 const themeBtn = document.getElementById('themeBtn');
 const colorBtn = document.getElementById('colorBtn');
 const pageTitleEl = document.getElementById('pageTitle');
@@ -455,6 +457,8 @@ editBtn.addEventListener('click', () => {
   editing = !editing;
   updateUI();
 });
+if (searchLabelEl) searchLabelEl.textContent = T.searchLabel;
+searchEl.setAttribute('aria-label', T.searchLabel);
 searchEl.placeholder = T.searchPH;
 searchEl.addEventListener('input', renderAll);
 
