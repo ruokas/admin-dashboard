@@ -219,6 +219,7 @@ button:hover,
   top: 50%;
   transform: translateY(-50%);
   opacity: 0.6;
+  pointer-events: none;
 }
 /* Expand layout to use full screen width */
 main {
