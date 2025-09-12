@@ -65,6 +65,8 @@ const T = {
   reset: 'Atstatyti',
 };
 
+const DEFAULT_TITLE = 'Admin skydelis';
+
 const editBtn = document.getElementById('editBtn');
 // const syncStatus = document.getElementById('syncStatus'); // Sheets sync indikatorius (išjungta)
 const searchEl = document.getElementById('q');
@@ -80,6 +82,7 @@ if (!('notesOpts' in state)) state.notesOpts = { size: 16, padding: 8 };
 if (!state.notesTitle) state.notesTitle = T.notes;
 if (!('notesBox' in state)) state.notesBox = { w: 0, h: 0 };
 if (!('notesPos' in state)) state.notesPos = 0;
+if (!state.title) state.title = DEFAULT_TITLE;
 let editing = false;
 
 const baseThemes = [
@@ -142,9 +145,9 @@ const baseThemes = [
   },
 ];
 
-pageTitleEl.textContent = state.title || '';
+pageTitleEl.textContent = state.title;
 pageIconEl.textContent = state.icon || '';
-document.title = state.title || '';
+document.title = state.title;
 
 pageTitleEl.addEventListener('input', () => {
   if (!editing) return;
