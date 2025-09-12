@@ -2,16 +2,19 @@ import { I } from './icons.js';
 
 export function groupFormDialog(T, data = {}) {
   return new Promise((resolve) => {
+    const prevFocus = document.activeElement;
     const dlg = document.createElement('dialog');
     dlg.innerHTML = `<form method="dialog" id="groupForm">
-      <label>${T.groupName}<br><input name="name" required></label>
+      <label id="groupFormLabel">${T.groupName}<br><input name="name" required></label>
       <label>${T.groupColor}<br><input name="color" type="color" value="#6ee7b7"></label>
-      <p class="error" id="groupErr"></p>
+      <p class="error" id="groupErr" role="status" aria-live="polite"></p>
       <menu>
         <button type="button" data-act="cancel">${T.cancel}</button>
         <button type="submit" class="btn-accent">${T.save}</button>
       </menu>
     </form>`;
+    dlg.setAttribute('aria-modal', 'true');
+    dlg.setAttribute('aria-labelledby', 'groupFormLabel');
     document.body.appendChild(dlg);
     const form = dlg.querySelector('form');
     const err = dlg.querySelector('#groupErr');
@@ -23,6 +26,7 @@ export function groupFormDialog(T, data = {}) {
       form.removeEventListener('submit', submit);
       cancel.removeEventListener('click', close);
       dlg.remove();
+      prevFocus?.focus();
     }
 
     function submit(e) {
@@ -45,6 +49,10 @@ export function groupFormDialog(T, data = {}) {
     cancel.addEventListener('click', close);
     dlg.addEventListener('cancel', close);
     dlg.showModal();
+    const first = dlg.querySelector(
+      'input, select, textarea, button, [href], [tabindex]:not([tabindex="-1"])',
+    );
+    first?.focus();
   });
 }
 
@@ -74,9 +82,10 @@ export function itemFormDialog(T, data = {}) {
           `<button type="button" data-val="${k}" title="${k}">${I[k]}</button>`,
       )
       .join('');
+    const prevFocus = document.activeElement;
     const dlg = document.createElement('dialog');
     dlg.innerHTML = `<form method="dialog" id="itemForm">
-      <label>${T.itemType}<br>
+      <label id="itemFormLabel">${T.itemType}<br>
         <select name="type">
           <option value="link">link</option>
           <option value="sheet">sheet</option>
@@ -93,12 +102,14 @@ export function itemFormDialog(T, data = {}) {
         </div>
       </label>
       <label>${T.itemNote}<br><textarea name="note" rows="2"></textarea></label>
-      <p class="error" id="itemErr"></p>
+      <p class="error" id="itemErr" role="status" aria-live="polite"></p>
       <menu>
         <button type="button" data-act="cancel">${T.cancel}</button>
         <button type="submit" class="btn-accent">${T.save}</button>
       </menu>
     </form>`;
+    dlg.setAttribute('aria-modal', 'true');
+    dlg.setAttribute('aria-labelledby', 'itemFormLabel');
     document.body.appendChild(dlg);
     const form = dlg.querySelector('form');
     const err = dlg.querySelector('#itemErr');
@@ -129,6 +140,7 @@ export function itemFormDialog(T, data = {}) {
       form.removeEventListener('submit', submit);
       cancel.removeEventListener('click', close);
       dlg.remove();
+      prevFocus?.focus();
     }
 
     function submit(e) {
@@ -165,22 +177,28 @@ export function itemFormDialog(T, data = {}) {
     cancel.addEventListener('click', close);
     dlg.addEventListener('cancel', close);
     dlg.showModal();
-    form.title.focus();
+    const first = dlg.querySelector(
+      'input, select, textarea, button, [href], [tabindex]:not([tabindex="-1"])',
+    );
+    first?.focus();
   });
 }
 
 export function chartFormDialog(T, data = {}) {
   return new Promise((resolve) => {
+    const prevFocus = document.activeElement;
     const dlg = document.createElement('dialog');
     dlg.innerHTML = `<form method="dialog" id="chartForm">
-      <label>${T.itemTitle}<br><input name="title" required></label>
+      <label id="chartFormLabel">${T.itemTitle}<br><input name="title" required></label>
       <label>${T.itemUrl}<br><input name="url" required></label>
-      <p class="error" id="chartErr"></p>
+      <p class="error" id="chartErr" role="status" aria-live="polite"></p>
       <menu>
         <button type="button" data-act="cancel">${T.cancel}</button>
         <button type="submit" class="btn-accent">${T.save}</button>
       </menu>
     </form>`;
+    dlg.setAttribute('aria-modal', 'true');
+    dlg.setAttribute('aria-labelledby', 'chartFormLabel');
     document.body.appendChild(dlg);
     const form = dlg.querySelector('form');
     const err = dlg.querySelector('#chartErr');
@@ -192,6 +210,7 @@ export function chartFormDialog(T, data = {}) {
       form.removeEventListener('submit', submit);
       cancel.removeEventListener('click', close);
       dlg.remove();
+      prevFocus?.focus();
     }
 
     function submit(e) {
@@ -215,7 +234,10 @@ export function chartFormDialog(T, data = {}) {
     cancel.addEventListener('click', close);
     dlg.addEventListener('cancel', close);
     dlg.showModal();
-    form.title.focus();
+    const first = dlg.querySelector(
+      'input, select, textarea, button, [href], [tabindex]:not([tabindex="-1"])',
+    );
+    first?.focus();
   });
 }
 
@@ -224,9 +246,10 @@ export function notesDialog(
   data = { title: '', text: '', size: 16, padding: 8 },
 ) {
   return new Promise((resolve) => {
+    const prevFocus = document.activeElement;
     const dlg = document.createElement('dialog');
     dlg.innerHTML = `<form method="dialog" id="notesForm">
-      <label>${T.noteTitle}<br><input name="title" type="text"></label>
+      <label id="notesFormLabel">${T.noteTitle}<br><input name="title" type="text"></label>
       <label>${T.notes}<br><textarea name="note" rows="8"></textarea></label>
       <label>${T.noteSize}<br><input name="size" type="number" min="10" max="48"></label>
       <label>${T.notePadding}<br><input name="padding" type="number" min="0" max="100"></label>
@@ -235,6 +258,8 @@ export function notesDialog(
         <button type="submit" class="btn-accent">${T.save}</button>
       </menu>
     </form>`;
+    dlg.setAttribute('aria-modal', 'true');
+    dlg.setAttribute('aria-labelledby', 'notesFormLabel');
     document.body.appendChild(dlg);
     const form = dlg.querySelector('form');
     const cancel = form.querySelector('[data-act="cancel"]');
@@ -247,6 +272,7 @@ export function notesDialog(
       form.removeEventListener('submit', submit);
       cancel.removeEventListener('click', close);
       dlg.remove();
+      prevFocus?.focus();
     }
 
     function submit(e) {
@@ -269,7 +295,10 @@ export function notesDialog(
     cancel.addEventListener('click', close);
     dlg.addEventListener('cancel', close);
     dlg.showModal();
-    form.note.focus();
+    const first = dlg.querySelector(
+      'input, select, textarea, button, [href], [tabindex]:not([tabindex="-1"])',
+    );
+    first?.focus();
   });
 }
 
@@ -299,10 +328,17 @@ export function themeDialog(T, data = {}) {
           }"></label>`,
       )
       .join('');
+    const prevFocus = document.activeElement;
     const dlg = document.createElement('dialog');
     dlg.innerHTML = `<form method="dialog" id="themeForm">${inputs}<menu><button type="button" data-act="reset">${T.reset}</button><button type="button" data-act="cancel">${T.cancel}</button><button type="submit" class="btn-accent">${T.save}</button></menu></form>`;
+    dlg.setAttribute('aria-modal', 'true');
     document.body.appendChild(dlg);
     const form = dlg.querySelector('form');
+    const firstLabel = form.querySelector('label');
+    if (firstLabel) {
+      firstLabel.id = 'themeFormLabel';
+      dlg.setAttribute('aria-labelledby', 'themeFormLabel');
+    }
     const cancel = form.querySelector('[data-act="cancel"]');
     const resetBtn = form.querySelector('[data-act="reset"]');
 
@@ -311,6 +347,7 @@ export function themeDialog(T, data = {}) {
       cancel.removeEventListener('click', close);
       resetBtn.removeEventListener('click', reset);
       dlg.remove();
+      prevFocus?.focus();
     }
 
     function submit(e) {
@@ -336,18 +373,30 @@ export function themeDialog(T, data = {}) {
     resetBtn.addEventListener('click', reset);
     dlg.addEventListener('cancel', close);
     dlg.showModal();
+    const first = dlg.querySelector(
+      'input, select, textarea, button, [href], [tabindex]:not([tabindex="-1"])',
+    );
+    first?.focus();
   });
 }
 
 export function confirmDialog(T, msg) {
   return new Promise((resolve) => {
+    const prevFocus = document.activeElement;
     const dlg = document.createElement('dialog');
-    dlg.innerHTML = `<form method="dialog"><p>${msg}</p><menu><button value="cancel">${T.cancel}</button><button value="ok" class="btn-danger">${T.remove}</button></menu></form>`;
+    dlg.innerHTML = `<form method="dialog"><p id="confirmMsg">${msg}</p><menu><button value="cancel">${T.cancel}</button><button value="ok" class="btn-danger">${T.remove}</button></menu></form>`;
+    dlg.setAttribute('aria-modal', 'true');
+    dlg.setAttribute('aria-labelledby', 'confirmMsg');
     document.body.appendChild(dlg);
     dlg.addEventListener('close', () => {
       resolve(dlg.returnValue === 'ok');
       dlg.remove();
+      prevFocus?.focus();
     });
     dlg.showModal();
+    const first = dlg.querySelector(
+      'input, select, textarea, button, [href], [tabindex]:not([tabindex="-1"])',
+    );
+    first?.focus();
   });
 }
