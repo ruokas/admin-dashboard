@@ -302,6 +302,59 @@ export function notesDialog(
   });
 }
 
+export function themeSelectDialog(T, themes = [], current = 'dark') {
+  return new Promise((resolve) => {
+    const prevFocus = document.activeElement;
+    const options = themes
+      .map((t) => {
+        const v = t.vars;
+        const name = t.id.charAt(0).toUpperCase() + t.id.slice(1);
+        const sel = t.id === current ? ' aria-current="true"' : '';
+        return `<button type="button" data-id="${t.id}" class="theme-opt"${sel}><span style="display:inline-block;width:24px;height:24px;background:${v.bg};border:4px solid ${v.accent};margin-right:8px;"></span>${name}</button>`;
+      })
+      .join('');
+    const dlg = document.createElement('dialog');
+    dlg.innerHTML = `<div class="theme-list">${options}</div><menu><button type="button" data-act="custom">${T.customize}</button><button type="button" data-act="cancel">${T.cancel}</button></menu>`;
+    dlg.setAttribute('aria-modal', 'true');
+    document.body.appendChild(dlg);
+    const list = dlg.querySelector('.theme-list');
+    const cancel = dlg.querySelector('[data-act="cancel"]');
+    const custom = dlg.querySelector('[data-act="custom"]');
+
+    function cleanup() {
+      list.removeEventListener('click', choose);
+      cancel.removeEventListener('click', close);
+      custom.removeEventListener('click', customize);
+      dlg.remove();
+      prevFocus?.focus();
+    }
+
+    function choose(e) {
+      const btn = e.target.closest('button[data-id]');
+      if (!btn) return;
+      resolve(btn.dataset.id);
+      cleanup();
+    }
+
+    function close() {
+      resolve(null);
+      cleanup();
+    }
+
+    function customize() {
+      resolve('customize');
+      cleanup();
+    }
+
+    list.addEventListener('click', choose);
+    cancel.addEventListener('click', close);
+    custom.addEventListener('click', customize);
+    dlg.addEventListener('cancel', close);
+    dlg.showModal();
+    list.querySelector('button')?.focus();
+  });
+}
+
 export function themeDialog(T, data = {}) {
   return new Promise((resolve) => {
     const fields = [

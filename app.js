@@ -7,6 +7,7 @@ import {
   confirmDialog as confirmDlg,
   notesDialog,
   themeDialog,
+  themeSelectDialog,
 } from './forms.js';
 import { I } from './icons.js';
 
@@ -20,7 +21,7 @@ const T = {
   import: 'Importuoti',
   export: 'Eksportuoti',
   theme: 'Tema',
-  colors: 'Spalvos',
+  customize: 'Tinkinti',
   notes: 'Pastabos',
   noteTitle: 'Pastabų pavadinimas',
   noteSize: 'Šrifto dydis (px)',
@@ -400,17 +401,22 @@ function toggleTheme() {
   applyTheme();
 }
 
-async function editColors() {
-  const themes = getThemes();
+async function selectTheme() {
   const currId = localStorage.getItem('ed_dash_theme') || 'dark';
-  const currTheme =
-    currId === 'custom'
-      ? themes.find((t) => t.id === 'custom')
-      : baseThemes.find((t) => t.id === currId);
-  const res = await themeDialog(T, { ...currTheme.vars });
+  const res = await themeSelectDialog(T, baseThemes, currId);
   if (!res) return;
-  localStorage.setItem('ed_dash_theme_custom', JSON.stringify(res));
-  localStorage.setItem('ed_dash_theme', 'custom');
+  if (res === 'customize') {
+    const currTheme =
+      currId === 'custom'
+        ? getThemes().find((t) => t.id === 'custom')
+        : baseThemes.find((t) => t.id === currId);
+    const custom = await themeDialog(T, { ...currTheme.vars });
+    if (!custom) return;
+    localStorage.setItem('ed_dash_theme_custom', JSON.stringify(custom));
+    localStorage.setItem('ed_dash_theme', 'custom');
+  } else {
+    localStorage.setItem('ed_dash_theme', res);
+  }
   applyTheme();
 }
 
@@ -453,9 +459,9 @@ document.getElementById('fileInput').addEventListener('change', (e) => {
   e.target.value = '';
 });
 themeBtn.addEventListener('click', toggleTheme);
-colorBtn.innerHTML = `🎨 <span>${T.colors}</span>`;
-colorBtn.setAttribute('aria-label', T.colors);
-colorBtn.addEventListener('click', editColors);
+colorBtn.innerHTML = `🎨 <span>${T.theme}</span>`;
+colorBtn.setAttribute('aria-label', T.theme);
+colorBtn.addEventListener('click', selectTheme);
 editBtn.addEventListener('click', () => {
   editing = !editing;
   updateUI();
