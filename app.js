@@ -6,8 +6,6 @@ import {
   chartFormDialog,
   confirmDialog as confirmDlg,
   notesDialog,
-  themeDialog,
-  themeSelectDialog,
 } from './forms.js';
 import { I } from './icons.js';
 
@@ -21,6 +19,7 @@ const T = {
   import: 'Importuoti',
   export: 'Eksportuoti',
   theme: 'Tema',
+  color: 'Spalva',
   customize: 'Tinkinti',
   notes: 'Pastabos',
   noteTitle: 'Pastabų pavadinimas',
@@ -74,6 +73,8 @@ const searchEl = document.getElementById('q');
 const searchLabelEl = document.getElementById('searchLabel');
 const themeBtn = document.getElementById('themeBtn');
 const colorBtn = document.getElementById('colorBtn');
+const colorMenuList = document.getElementById('colorMenuList');
+const colorMenu = document.getElementById('colorMenu');
 const pageTitleEl = document.getElementById('pageTitle');
 const pageIconEl = document.getElementById('pageIcon');
 
@@ -86,65 +87,6 @@ if (!('notesPos' in state)) state.notesPos = 0;
 if (!state.title) state.title = DEFAULT_TITLE;
 let editing = false;
 
-const baseThemes = [
-  {
-    id: 'dark',
-    vars: {
-      bg: '#0b1117',
-      panel: '#111922',
-      muted: '#1b2530',
-      text: '#e6edf3',
-      subtext: '#9fb0c0',
-      accent: '#6ee7b7',
-      accent2: '#3dd6a6',
-      'btn-accent-text': '#0a0f14',
-      danger: '#ff6b6b',
-      danger2: '#e24a4a',
-      'btn-danger-text': '#ffffff',
-      warn: '#ffd166',
-      ok: '#8ecae6',
-      card: '#0f141a',
-    },
-  },
-  {
-    id: 'light',
-    vars: {
-      bg: '#f6f8fb',
-      panel: '#ffffff',
-      muted: '#e9eef3',
-      text: '#0c1116',
-      subtext: '#4a5a6a',
-      accent: '#2563eb',
-      accent2: '#1d4ed8',
-      'btn-accent-text': '#ffffff',
-      danger: '#d83a3a',
-      danger2: '#b92424',
-      'btn-danger-text': '#ffffff',
-      warn: '#ffd166',
-      ok: '#0ea5e9',
-      card: '#ffffff',
-    },
-  },
-  {
-    id: 'forest',
-    vars: {
-      bg: '#0d1f14',
-      panel: '#14281b',
-      muted: '#1b3625',
-      text: '#e7f8ec',
-      subtext: '#9bbfa7',
-      accent: '#34d399',
-      accent2: '#059669',
-      'btn-accent-text': '#0d1f14',
-      danger: '#f87171',
-      danger2: '#dc2626',
-      'btn-danger-text': '#ffffff',
-      warn: '#facc15',
-      ok: '#4ade80',
-      card: '#0f2418',
-    },
-  },
-];
 
 pageTitleEl.textContent = state.title;
 pageIconEl.textContent = state.icon || '';
@@ -367,57 +309,33 @@ function importJson(file) {
   reader.readAsText(file);
 }
 
-function getThemes() {
-  const custom = localStorage.getItem('ed_dash_theme_custom');
-  const themes = [...baseThemes];
-  if (custom) {
-    try {
-      themes.push({ id: 'custom', vars: JSON.parse(custom) });
-    } catch (e) {
-      console.error('Nepavyko nuskaityti temų:', e);
-    }
-  }
-  return themes;
-}
-
 function applyTheme() {
-  const themes = getThemes();
-  const id = localStorage.getItem('ed_dash_theme') || 'dark';
-  const theme = themes.find((t) => t.id === id) || themes[0];
-  Object.entries(theme.vars).forEach(([k, v]) => {
-    document.documentElement.style.setProperty(`--${k}`, v);
-  });
-  const light = id === 'light';
+  const light = localStorage.getItem('ed_dash_theme') === 'light';
+  document.documentElement.classList.toggle('theme-light', light);
   themeBtn.innerHTML = `${light ? I.sun : I.moon} <span>${T.theme}</span>`;
   themeBtn.setAttribute('aria-label', light ? T.toDark : T.toLight);
 }
 
 function toggleTheme() {
-  const themes = getThemes();
-  const ids = themes.map((t) => t.id);
-  const curr = localStorage.getItem('ed_dash_theme') || 'dark';
-  const next = ids[(ids.indexOf(curr) + 1) % ids.length];
-  localStorage.setItem('ed_dash_theme', next);
+  const curr = localStorage.getItem('ed_dash_theme') === 'light';
+  localStorage.setItem('ed_dash_theme', curr ? 'dark' : 'light');
   applyTheme();
 }
 
-async function selectTheme() {
-  const currId = localStorage.getItem('ed_dash_theme') || 'dark';
-  const res = await themeSelectDialog(T, baseThemes, currId);
-  if (!res) return;
-  if (res === 'customize') {
-    const currTheme =
-      currId === 'custom'
-        ? getThemes().find((t) => t.id === 'custom')
-        : baseThemes.find((t) => t.id === currId);
-    const custom = await themeDialog(T, { ...currTheme.vars });
-    if (!custom) return;
-    localStorage.setItem('ed_dash_theme_custom', JSON.stringify(custom));
-    localStorage.setItem('ed_dash_theme', 'custom');
-  } else {
-    localStorage.setItem('ed_dash_theme', res);
-  }
-  applyTheme();
+// Galimos spalvų schemos; pridėkite savo jei reikia
+const colorThemes = ['emerald', 'sky', 'rose', 'amber', 'violet'];
+
+function applyColor() {
+  const color = localStorage.getItem('ed_dash_color') || 'emerald';
+  document.documentElement.classList.remove(
+    ...colorThemes.map((c) => `color-${c}`),
+  );
+  document.documentElement.classList.add(`color-${color}`);
+}
+
+function setColor(color) {
+  localStorage.setItem('ed_dash_color', color);
+  applyColor();
 }
 
 // Google Sheets sinchronizavimas laikinai išjungtas
@@ -459,9 +377,25 @@ document.getElementById('fileInput').addEventListener('change', (e) => {
   e.target.value = '';
 });
 themeBtn.addEventListener('click', toggleTheme);
-colorBtn.innerHTML = `🎨 <span>${T.theme}</span>`;
-colorBtn.setAttribute('aria-label', T.theme);
-colorBtn.addEventListener('click', selectTheme);
+colorBtn.innerHTML = `🎨 <span>${T.color}</span>`;
+colorBtn.setAttribute('aria-label', T.color);
+const colorOptions = document.querySelectorAll('#colorMenuList button');
+function hideColorMenu() {
+  colorMenuList.style.display = 'none';
+}
+colorBtn.addEventListener('click', () => {
+  colorMenuList.style.display =
+    colorMenuList.style.display === 'flex' ? 'none' : 'flex';
+});
+document.addEventListener('click', (e) => {
+  if (!colorMenu.contains(e.target)) hideColorMenu();
+});
+colorOptions.forEach((btn) => {
+  btn.addEventListener('click', () => {
+    setColor(btn.dataset.color);
+    hideColorMenu();
+  });
+});
 editBtn.addEventListener('click', () => {
   editing = !editing;
   updateUI();
@@ -472,6 +406,7 @@ searchEl.placeholder = T.searchPH;
 searchEl.addEventListener('input', renderAll);
 
 applyTheme();
+applyColor();
 updateUI();
 
 window.addEventListener('error', (e) => {

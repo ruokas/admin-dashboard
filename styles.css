@@ -4,9 +4,9 @@
   --muted: #1b2530;
   --text: #e6edf3;
   --subtext: #9fb0c0;
-  --accent: #6ee7b7;
-  --accent2: #3dd6a6;
-  --btn-accent-text: #0a0f14;
+  --accent: #10b981;
+  --accent2: #059669;
+  --btn-accent-text: #ffffff;
   --danger: #ff6b6b;
   --danger2: #e24a4a;
   --btn-danger-text: #ffffff;
@@ -22,15 +22,37 @@
   --muted: #e9eef3;
   --text: #0c1116;
   --subtext: #4a5a6a;
-  --accent: #2563eb;
-  --accent2: #1d4ed8;
-  --btn-accent-text: #ffffff;
   --danger: #d83a3a;
   --danger2: #b92424;
   --btn-danger-text: #ffffff;
   --ok: #0ea5e9;
   --card: #ffffff;
   --shadow: 0 10px 24px rgba(7, 14, 22, 0.08);
+}
+
+.color-emerald:root {
+  --accent: #10b981;
+  --accent2: #059669;
+}
+
+.color-sky:root {
+  --accent: #0ea5e9;
+  --accent2: #0284c7;
+}
+
+.color-rose:root {
+  --accent: #f472b6;
+  --accent2: #ec4899;
+}
+
+.color-amber:root {
+  --accent: #f59e0b;
+  --accent2: #d97706;
+}
+
+.color-violet:root {
+  --accent: #a78bfa;
+  --accent2: #7c3aed;
 }
 *,
 *::before,
