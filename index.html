@@ -40,10 +40,12 @@
           <input id="q" placeholder="Paieška nuorodose…" />
         </div>
         <!-- Fallback labels so buttons are visible before JS initializes -->
-        <button id="editBtn" class="btn-outline" type="button">Redaguoti</button>
-        <div id="addMenu" class="dropdown" style="display: none">
+        <button id="editBtn" class="btn-outline" type="button">
+          Redaguoti
+        </button>
+        <div id="addMenu" style="display: none">
           <button id="addBtn" type="button">＋ Pridėti</button>
-          <div id="addMenuList" class="dropdown-list">
+          <div id="addMenuList">
             <button id="addGroup" type="button">＋ Pridėti grupę</button>
             <button id="addChart" type="button">📈 Pridėti grafiką</button>
             <button id="addNote" type="button">＋ Pridėti pastabas</button>
@@ -78,18 +80,6 @@
             <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" /></svg
           ><span>Tema</span>
         </button>
-          <div id="colorMenu" class="dropdown">
-            <button id="colorBtn" class="btn-outline" type="button">
-              🎨 <span>Spalva</span>
-            </button>
-            <div id="colorMenuList" class="dropdown-list">
-              <button data-color="emerald" type="button">Žalsva</button>
-              <button data-color="sky" type="button">Mėlyna</button>
-              <button data-color="rose" type="button">Rožinė</button>
-              <button data-color="amber" type="button">Gintarinė</button>
-              <button data-color="violet" type="button">Violetinė</button>
-            </div>
-          </div>
         <span id="syncStatus" role="status" aria-live="polite"></span>
       </div>
     </header>
