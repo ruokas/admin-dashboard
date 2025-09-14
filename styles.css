@@ -148,37 +148,6 @@ header {
   align-items: center;
 }
 
-.dropdown {
-  position: relative;
-}
-
-.dropdown-list {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  display: none;
-  flex-direction: column;
-  background: var(--panel);
-  border: 1px solid var(--muted);
-  border-radius: 12px;
-  padding: 4px;
-  margin-top: 4px;
-  box-shadow: var(--shadow);
-  z-index: 10;
-}
-
-.dropdown-list button {
-  background: transparent;
-  border: none;
-  box-shadow: none;
-  padding: 8px 12px;
-  border-radius: 8px;
-  justify-content: flex-start;
-}
-
-.dropdown-list button:hover {
-  background: var(--muted);
-}
 button,
 .btn {
   border: 1px solid transparent;
