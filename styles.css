@@ -29,31 +29,6 @@
   --card: #ffffff;
   --shadow: 0 10px 24px rgba(7, 14, 22, 0.08);
 }
-
-.color-emerald:root {
-  --accent: #10b981;
-  --accent2: #059669;
-}
-
-.color-sky:root {
-  --accent: #0ea5e9;
-  --accent2: #0284c7;
-}
-
-.color-rose:root {
-  --accent: #f472b6;
-  --accent2: #ec4899;
-}
-
-.color-amber:root {
-  --accent: #f59e0b;
-  --accent2: #d97706;
-}
-
-.color-violet:root {
-  --accent: #a78bfa;
-  --accent2: #7c3aed;
-}
 *,
 *::before,
 *::after {

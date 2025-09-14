@@ -23,7 +23,6 @@ Statinis vieno failo HTML projektas, skirtas publikuoti per **GitHub Pages**.
 - Jei pavadinimas tuščias redagavimo režime, rodomas pilkas užrašas „Įveskite pavadinimą“.
 - Spalvų temą galima keisti paspaudus **Tema** – parinktys išsaugomos `localStorage`.
 - Pastabų kortelę galima perkelti tarp grupių drag-and-drop būdu.
-- Spalvų meniu turi mygtuką **Atstatyti**, grąžinantį numatytas spalvas.
 
 ## Smoke test
 

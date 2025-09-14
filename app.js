@@ -19,7 +19,6 @@ const T = {
   import: 'Importuoti',
   export: 'Eksportuoti',
   theme: 'Tema',
-  color: 'Spalva',
   customize: 'Tinkinti',
   notes: 'Pastabos',
   noteTitle: 'Pastabų pavadinimas',
@@ -72,9 +71,6 @@ const editBtn = document.getElementById('editBtn');
 const searchEl = document.getElementById('q');
 const searchLabelEl = document.getElementById('searchLabel');
 const themeBtn = document.getElementById('themeBtn');
-const colorBtn = document.getElementById('colorBtn');
-const colorMenuList = document.getElementById('colorMenuList');
-const colorMenu = document.getElementById('colorMenu');
 const pageTitleEl = document.getElementById('pageTitle');
 const pageIconEl = document.getElementById('pageIcon');
 
@@ -86,7 +82,6 @@ if (!('notesBox' in state)) state.notesBox = { w: 0, h: 0 };
 if (!('notesPos' in state)) state.notesPos = 0;
 if (!state.title) state.title = DEFAULT_TITLE;
 let editing = false;
-
 
 pageTitleEl.textContent = state.title;
 pageIconEl.textContent = state.icon || '';
@@ -322,22 +317,6 @@ function toggleTheme() {
   applyTheme();
 }
 
-// Galimos spalvų schemos; pridėkite savo jei reikia
-const colorThemes = ['emerald', 'sky', 'rose', 'amber', 'violet'];
-
-function applyColor() {
-  const color = localStorage.getItem('ed_dash_color') || 'emerald';
-  document.documentElement.classList.remove(
-    ...colorThemes.map((c) => `color-${c}`),
-  );
-  document.documentElement.classList.add(`color-${color}`);
-}
-
-function setColor(color) {
-  localStorage.setItem('ed_dash_color', color);
-  applyColor();
-}
-
 // Google Sheets sinchronizavimas laikinai išjungtas
 // const sheets = sheetsSync(state, syncStatus, () => save(state), renderAll);
 
@@ -377,25 +356,6 @@ document.getElementById('fileInput').addEventListener('change', (e) => {
   e.target.value = '';
 });
 themeBtn.addEventListener('click', toggleTheme);
-colorBtn.innerHTML = `🎨 <span>${T.color}</span>`;
-colorBtn.setAttribute('aria-label', T.color);
-const colorOptions = document.querySelectorAll('#colorMenuList button');
-function hideColorMenu() {
-  colorMenuList.style.display = 'none';
-}
-colorBtn.addEventListener('click', () => {
-  colorMenuList.style.display =
-    colorMenuList.style.display === 'flex' ? 'none' : 'flex';
-});
-document.addEventListener('click', (e) => {
-  if (!colorMenu.contains(e.target)) hideColorMenu();
-});
-colorOptions.forEach((btn) => {
-  btn.addEventListener('click', () => {
-    setColor(btn.dataset.color);
-    hideColorMenu();
-  });
-});
 editBtn.addEventListener('click', () => {
   editing = !editing;
   updateUI();
@@ -406,7 +366,6 @@ searchEl.placeholder = T.searchPH;
 searchEl.addEventListener('input', renderAll);
 
 applyTheme();
-applyColor();
 updateUI();
 
 window.addEventListener('error', (e) => {
