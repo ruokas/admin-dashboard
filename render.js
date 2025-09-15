@@ -39,8 +39,6 @@ const ro = new ResizeObserver((entries) => {
         if (h < minH) h = minH;
         el.style.width = w + 'px';
         el.style.height = h + 'px';
-        el.style.minWidth = minW + 'px';
-        el.style.minHeight = minH + 'px';
         if (el.dataset.id === 'notes') {
           currentState.notesBox = { w, h };
         } else {
