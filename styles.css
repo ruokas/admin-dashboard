@@ -306,6 +306,14 @@ main {
     0.2s ease background,
     0.2s ease transform;
 }
+a.item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
 .item.dragging {
   opacity: 0.45;
 }
