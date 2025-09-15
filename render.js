@@ -7,7 +7,10 @@ let floatingMenu;
 // Holds references to currently shift-selected groups
 let selectedGroups = [];
 // Snap resizing to this grid size (px)
-const GRID = 10;
+const GRID = 20;
+
+// Allow snapping to existing card sizes when within this distance (px)
+const SNAP_THRESHOLD = GRID;
 
 function applySize(el, width, height, wSize = sizeFromWidth(width), hSize = sizeFromHeight(height)) {
   el.style.width = width + 'px';
@@ -32,8 +35,23 @@ function schedulePersist() {
 const ro = new ResizeObserver((entries) => {
   for (const entry of entries) {
     if (entry.target.dataset.resizing === '1') {
-      const baseW = Math.round(entry.contentRect.width / GRID) * GRID;
-      const baseH = Math.round(entry.contentRect.height / GRID) * GRID;
+      // Snap to grid first
+      let baseW = Math.round(entry.contentRect.width / GRID) * GRID;
+      let baseH = Math.round(entry.contentRect.height / GRID) * GRID;
+
+      // Snap to widths/heights of other cards if close enough
+      const groups = Array.from(document.querySelectorAll('.group')).filter(
+        (g) => g !== entry.target,
+      );
+      for (const g of groups) {
+        const rect = g.getBoundingClientRect();
+        if (Math.abs(baseW - Math.round(rect.width)) <= SNAP_THRESHOLD) {
+          baseW = Math.round(rect.width);
+        }
+        if (Math.abs(baseH - Math.round(rect.height)) <= SNAP_THRESHOLD) {
+          baseH = Math.round(rect.height);
+        }
+      }
       const wSize = sizeFromWidth(baseW);
       const hSize = sizeFromHeight(baseH);
 
