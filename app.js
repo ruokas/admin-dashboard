@@ -37,6 +37,7 @@ const T = {
   editMode: 'Redaguoti',
   done: 'Baigti',
   deleteGroup: 'Pašalinti grupę',
+  deleteNotes: 'Pašalinti pastabų kortelę',
   empty: 'Nėra įrašų. Spauskite ＋, kad pridėtumėte nuorodą ar įterpimą.',
   noMatches: 'Nėra atitikmenų šioje grupėje.',
   itemType: 'Įrašo tipas',
@@ -52,6 +53,7 @@ const T = {
   confirmDelGroup: 'Pašalinti šią grupę ir visus jos įrašus?',
   confirmDelChart: 'Pašalinti šį grafiką?',
   confirmDelItem: 'Pašalinti šį įrašą?',
+  confirmDelNotes: 'Pašalinti pastabų kortelę?',
   invalidImport: 'Netinkamas failo formatas',
   save: 'Išsaugoti',
   cancel: 'Atšaukti',
@@ -130,6 +132,7 @@ function renderAll() {
       editItem,
       editChart,
       editNotes,
+      removeNotes,
       toggleCollapse,
       confirmDialog: (msg) => confirmDlg(T, msg),
     },
@@ -215,6 +218,16 @@ async function editNotes() {
   state.notesTitle = res.title || T.notes;
   state.notes = res.text;
   state.notesOpts = { size: res.size, padding: res.padding };
+  save(state);
+  renderAll();
+}
+
+// Ištrina pastabų kortelę, bet palieka paskutines parinktis ateičiai
+async function removeNotes() {
+  const ok = await confirmDlg(T, T.confirmDelNotes);
+  if (!ok) return;
+  state.notes = '';
+  state.notesTitle = T.notes;
   save(state);
   renderAll();
 }
