@@ -83,7 +83,7 @@ let state = load() || seed();
 if (!('notes' in state)) state.notes = localStorage.getItem('notes') || '';
 if (!('notesOpts' in state)) state.notesOpts = { size: 16, padding: 8 };
 if (!state.notesTitle) state.notesTitle = T.notes;
-if (!('notesBox' in state)) state.notesBox = { size: 'md' };
+if (!('notesBox' in state)) state.notesBox = { width: 360, height: 360 };
 if (!('notesPos' in state)) state.notesPos = 0;
 if (!state.title) state.title = DEFAULT_TITLE;
 let editing = false;
@@ -105,6 +105,19 @@ pageIconEl.addEventListener('input', () => {
 });
 
 const uid = () => Math.random().toString(36).slice(2, 10);
+
+const SIZE_MAP = {
+  sm: { width: 240, height: 240 },
+  md: { width: 360, height: 360 },
+  lg: { width: 480, height: 480 },
+};
+
+function sizeFromDims(w, h) {
+  const max = Math.max(w, h);
+  if (max >= 420) return 'lg';
+  if (max >= 300) return 'md';
+  return 'sm';
+}
 
 function parseIframe(html) {
   const match = html.match(/<iframe[^>]*src="([^"]+)"[^>]*>/i);
@@ -152,7 +165,7 @@ async function addGroup() {
     id: uid(),
     name: res.name,
     color: res.color,
-    size: res.size,
+    ...(SIZE_MAP[res.size] ?? SIZE_MAP.md),
     items: [],
   });
   save(state);
@@ -165,12 +178,12 @@ async function editGroup(gid) {
   const res = await groupFormDialog(T, {
     name: g.name,
     color: g.color,
-    size: g.size,
+    size: sizeFromDims(g.width ?? 360, g.height ?? 360),
   });
   if (!res) return;
   g.name = res.name;
   g.color = res.color;
-  g.size = res.size;
+  Object.assign(g, SIZE_MAP[res.size] ?? SIZE_MAP.md);
   save(state);
   renderAll();
 }
@@ -185,7 +198,7 @@ async function addChart() {
     name: res.title,
     url: parsed.src,
     h: parsed.h ? parsed.h + 56 : undefined,
-    size: 'md',
+    ...SIZE_MAP.md,
   });
   save(state);
   renderAll();

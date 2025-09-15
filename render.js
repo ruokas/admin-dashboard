@@ -6,11 +6,15 @@ let floatingMenu;
 let selectedGroups = [];
 // Snap resizing to this grid size (px)
 const GRID = 10;
+const SIZE_MAP = {
+  sm: { width: 240, height: 240 },
+  md: { width: 360, height: 360 },
+  lg: { width: 480, height: 480 },
+};
 
-function applySize(el, size) {
-  el.dataset.size = size;
-  el.classList.remove('group--sm', 'group--md', 'group--lg');
-  el.classList.add('group--' + size);
+function applySize(el, width, height) {
+  el.style.width = width + 'px';
+  el.style.height = height + 'px';
 }
 
 // Debounce state persistence while resizing
@@ -31,23 +35,24 @@ const ro = new ResizeObserver((entries) => {
     if (entry.target.dataset.resizing === '1') {
       const baseW = Math.round(entry.contentRect.width / GRID) * GRID;
       const baseH = Math.round(entry.contentRect.height / GRID) * GRID;
-      const maxDim = Math.max(baseW, baseH);
-      let size = 'sm';
-      if (maxDim >= 300 && maxDim < 420) size = 'md';
-      else if (maxDim >= 420) size = 'lg';
 
       const targets = selectedGroups.includes(entry.target)
         ? selectedGroups
         : [entry.target];
 
       targets.forEach((el) => {
-        applySize(el, size);
+        applySize(el, baseW, baseH);
         if (el.dataset.id === 'notes') {
-          currentState.notesBox = { size };
+          currentState.notesBox = {
+            width: baseW,
+            height: baseH,
+          };
         } else {
           const sg = currentState.groups.find((x) => x.id === el.dataset.id);
           if (sg) {
-            sg.size = size;
+            sg.width = baseW;
+            sg.height = baseH;
+            delete sg.size;
           }
         }
       });
@@ -86,7 +91,6 @@ document.addEventListener('keydown', (e) => {
     floatingMenu = null;
   }
 });
-
 
 function toFavicon(u) {
   try {
@@ -202,8 +206,12 @@ export function render(state, editing, T, I, handlers, saveFn) {
       noteGrp.className = 'group';
       noteGrp.dataset.id = 'notes';
       noteGrp.dataset.resizing = '0';
-      const nSize = state.notesBox?.size || 'md';
-      applySize(noteGrp, nSize);
+      const nDims = state.notesBox?.size
+        ? SIZE_MAP[state.notesBox.size]
+        : { width: 360, height: 360 };
+      const nWidth = state.notesBox?.width ?? nDims.width;
+      const nHeight = state.notesBox?.height ?? nDims.height;
+      applySize(noteGrp, nWidth, nHeight);
       noteGrp.style.resize = editing ? 'both' : 'none';
       if (editing) {
         noteGrp.addEventListener('mousedown', (e) => {
@@ -283,7 +291,8 @@ export function render(state, editing, T, I, handlers, saveFn) {
       grp.className = 'group';
       grp.dataset.id = g.id;
       grp.dataset.resizing = '0';
-      applySize(grp, g.size || 'md');
+      const gDims = g.size ? SIZE_MAP[g.size] : { width: 360, height: 360 };
+      applySize(grp, g.width ?? gDims.width, g.height ?? gDims.height);
       grp.style.resize = editing ? 'both' : 'none';
       if (editing) {
         grp.addEventListener('mousedown', (e) => {
@@ -394,7 +403,8 @@ export function render(state, editing, T, I, handlers, saveFn) {
     grp.className = 'group';
     grp.dataset.id = g.id;
     grp.dataset.resizing = '0';
-    applySize(grp, g.size || 'md');
+    const gDims2 = g.size ? SIZE_MAP[g.size] : { width: 360, height: 360 };
+    applySize(grp, g.width ?? gDims2.width, g.height ?? gDims2.height);
     grp.style.resize = editing ? 'both' : 'none';
     if (editing) {
       grp.addEventListener('mousedown', (e) => {
