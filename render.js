@@ -4,8 +4,21 @@ let floatingMenu;
 
 // Holds references to currently shift-selected groups
 let selectedGroups = [];
+// Snap resizing to this grid size (px)
+const GRID = 10;
 
-const GRID = 40;
+// Debounce state persistence while resizing
+let resizeDirty = false;
+let resizeTimeout;
+function schedulePersist() {
+  clearTimeout(resizeTimeout);
+  resizeTimeout = setTimeout(() => {
+    if (resizeDirty) {
+      persist();
+      resizeDirty = false;
+    }
+  }, 200);
+}
 
 const ro = new ResizeObserver((entries) => {
   for (const entry of entries) {
@@ -40,8 +53,8 @@ const ro = new ResizeObserver((entries) => {
           }
         }
       });
-
-      persist();
+      resizeDirty = true;
+      schedulePersist();
     }
   }
 });
@@ -52,6 +65,10 @@ document.addEventListener('mouseup', () => {
     g.style.minWidth = '';
     g.style.minHeight = '';
   });
+  if (resizeDirty) {
+    persist();
+    resizeDirty = false;
+  }
 });
 
 document.addEventListener('click', (e) => {
