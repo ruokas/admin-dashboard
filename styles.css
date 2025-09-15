@@ -147,6 +147,29 @@ header {
   align-items: center;
 }
 
+#addMenu {
+  position: relative;
+}
+
+#addMenuList {
+  display: none;
+  flex-direction: column;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: var(--panel);
+  border: 1px solid var(--muted);
+  border-radius: 8px;
+  padding: 4px;
+  gap: 4px;
+  z-index: 10;
+}
+
+#addMenuList button {
+  width: 100%;
+  text-align: left;
+}
+
 button,
 .btn {
   border: 1px solid transparent;
@@ -408,14 +431,15 @@ a.item {
 }
 
 .icon-picker {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+  gap: 6px;
   margin-top: 4px;
+  max-width: 280px;
 }
 .icon-picker button {
-  width: 32px;
-  height: 32px;
+  width: 48px;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -428,8 +452,8 @@ a.item {
   border-color: var(--accent);
 }
 .icon-picker svg {
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
 }
 .embed {
   border-radius: 12px;
@@ -474,6 +498,23 @@ dialog::backdrop {
 dialog form {
   display: grid;
   gap: 12px;
+}
+
+#itemForm {
+  min-width: 320px;
+}
+
+#itemForm label {
+  display: block;
+}
+
+#itemForm input[name='title'],
+#itemForm input[name='url'] {
+  width: 100%;
+}
+
+#itemForm textarea {
+  width: 100%;
 }
 dialog menu {
   display: flex;
