@@ -219,9 +219,10 @@ main {
   flex: 1;
 }
 .grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 16px;
+  align-content: flex-start;
 }
 .group {
   background: var(--panel);
@@ -230,6 +231,7 @@ main {
   box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
+  flex: 0 0 auto;
   min-height: 100px;
   overflow: auto;
   resize: both;
