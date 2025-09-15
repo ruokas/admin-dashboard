@@ -10,6 +10,7 @@ import {
 } from './forms.js';
 import { I } from './icons.js';
 import { Tlt } from './i18n.js';
+import { exportJson } from './exporter.js';
 
 const T = Tlt;
 // Hook future English localisation: fill T.en when translations are ready.
@@ -265,17 +266,6 @@ async function editItem(gid, iid) {
   renderAll();
 }
 
-function exportJson() {
-  const blob = new Blob([JSON.stringify(state, null, 2)], {
-    type: 'application/json',
-  });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'smp-skydas.json';
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
-
 function importJson(file) {
   const reader = new FileReader();
   reader.onload = () => {
@@ -355,7 +345,7 @@ document.getElementById('addNote').addEventListener('click', () => {
   editNotes();
 });
 document.getElementById('exportBtn').addEventListener('click', () => {
-  exportJson();
+  exportJson(state);
 });
 document.getElementById('importBtn').addEventListener('click', () => {
   document.getElementById('fileInput').click();
