@@ -14,7 +14,15 @@
   --ok: #8ecae6;
   --card: #0f141a;
   --shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
-  --group-width: 360px;
+  /* numatyti grupių matmenys */
+  --group-width-sm: 240px;
+  --group-width-md: 360px;
+  --group-width-lg: 480px;
+  --group-height-sm: 240px;
+  --group-height-md: 360px;
+  --group-height-lg: 480px;
+  /* numatytasis plotis grid'e */
+  --group-width: var(--group-width-md);
 }
 .theme-light:root {
   --bg: #f6f8fb;
@@ -240,18 +248,18 @@ main {
 }
 
 .group--sm {
-  width: 240px;
-  height: 240px;
+  width: var(--group-width-sm);
+  height: var(--group-height-sm);
 }
 
 .group--md {
-  width: 360px;
-  height: 360px;
+  width: var(--group-width-md);
+  height: var(--group-height-md);
 }
 
 .group--lg {
-  width: 480px;
-  height: 480px;
+  width: var(--group-width-lg);
+  height: var(--group-height-lg);
 }
 
 .group.selected {
