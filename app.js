@@ -110,7 +110,7 @@ pageIconEl.addEventListener('input', () => {
   save(state);
 });
 
-const uid = () => Math.random().toString(36).slice(2, 10);
+const uid = () => crypto.randomUUID().slice(0, 8);
 
 function parseIframe(html) {
   const match = html.match(/<iframe[^>]*src="([^"]+)"[^>]*>/i);
