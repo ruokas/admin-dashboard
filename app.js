@@ -9,68 +9,11 @@ import {
   notesDialog,
 } from './forms.js';
 import { I } from './icons.js';
+import { Tlt } from './i18n.js';
 
-const T = {
-  searchPH: 'Paieška nuorodose…',
-  searchLabel: 'Paieška',
-  add: 'Pridėti',
-  addGroup: 'Pridėti grupę',
-  addChart: 'Pridėti grafiką',
-  addNote: 'Pridėti pastabas',
-  import: 'Importuoti',
-  export: 'Eksportuoti',
-  theme: 'Tema',
-  color: 'Spalva',
-  customize: 'Tinkinti',
-  notes: 'Pastabos',
-  noteTitle: 'Pastabų pavadinimas',
-  noteSize: 'Šrifto dydis (px)',
-  notePadding: 'Paraštės (px)',
-  toDark: 'Perjungti į tamsią temą',
-  toLight: 'Perjungti į šviesią temą',
-  openAll: 'Atverti visas',
-  collapse: 'Suskleisti',
-  expand: 'Išskleisti',
-  addItem: 'Pridėti įrašą',
-  editGroup: 'Redaguoti grupę',
-  editChart: 'Redaguoti grafiką',
-  editMode: 'Redaguoti',
-  done: 'Baigti',
-  deleteGroup: 'Pašalinti grupę',
-  deleteNotes: 'Pašalinti pastabų kortelę',
-  empty: 'Nėra įrašų. Spauskite ＋, kad pridėtumėte nuorodą ar įterpimą.',
-  noMatches: 'Nėra atitikmenų šioje grupėje.',
-  itemType: 'Įrašo tipas',
-  groupName: 'Grupės pavadinimas (pvz., „Kasdieniai darbai“, „Gairės“)',
-  groupColor: 'Akcento spalva',
-  renameGroup: 'Pervadinti grupę',
-  itemTitle: 'Pavadinimas',
-  itemUrl: 'URL',
-  itemIcon: 'Pasirinkite piktogramą (nebūtina)',
-  itemNote: 'Pastaba (nebūtina)',
-  sheetTip:
-    'Patarimas: Google Sheets turi būti „Publish to web“ arba bendrinamas.',
-  confirmDelGroup: 'Pašalinti šią grupę ir visus jos įrašus?',
-  confirmDelChart: 'Pašalinti šį grafiką?',
-  confirmDelItem: 'Pašalinti šį įrašą?',
-  confirmDelNotes: 'Pašalinti pastabų kortelę?',
-  invalidImport: 'Netinkamas failo formatas',
-  save: 'Išsaugoti',
-  cancel: 'Atšaukti',
-  required: 'Užpildykite visus laukus.',
-  invalidUrl: 'Neteisingas URL.',
-  remove: 'Pašalinti',
-  moveUp: 'Perkelti aukštyn',
-  moveDown: 'Perkelti žemyn',
-  actions: 'Veiksmai',
-  preview: 'Peržiūra',
-  edit: 'Redaguoti',
-  reset: 'Atstatyti',
-  groupSize: 'Dydis',
-  sizeSm: 'Mažas',
-  sizeMd: 'Vidutinis',
-  sizeLg: 'Didelis',
-};
+const T = Tlt;
+// Hook future English localisation: fill T.en when translations are ready.
+T.en = T.en || {};
 
 const DEFAULT_TITLE = 'Admin skydelis';
 
