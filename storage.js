@@ -1,3 +1,5 @@
+import { sizeFromWidth, sizeFromHeight } from './sizes.js';
+
 const STORAGE_KEY = 'ed_dashboard_lt_v1';
 
 export function load() {
@@ -22,6 +24,8 @@ export function load() {
           g.width = width;
           g.height = height;
         }
+        g.wSize = g.wSize || sizeFromWidth(g.width);
+        g.hSize = g.hSize || sizeFromHeight(g.height);
         delete g.size;
       });
       if (typeof data.notes !== 'string') data.notes = '';
@@ -43,7 +47,11 @@ export function load() {
           width = 480;
           height = 480;
         }
-        data.notesBox = { width, height };
+        data.notesBox = { width, height, wSize: sizeFromWidth(width), hSize: sizeFromHeight(height) };
+      } else {
+        data.notesBox.wSize = data.notesBox.wSize || sizeFromWidth(data.notesBox.width);
+        data.notesBox.hSize = data.notesBox.hSize || sizeFromHeight(data.notesBox.height);
+        delete data.notesBox.size;
       }
       if (
         !data.notesOpts ||
@@ -68,7 +76,7 @@ export function seed() {
     groups: [],
     notes: '',
     notesTitle: '',
-    notesBox: { width: 360, height: 360 },
+    notesBox: { width: 360, height: 360, wSize: 'md', hSize: 'md' },
     notesOpts: { size: 16, padding: 8 },
     notesPos: 0,
     title: '',
