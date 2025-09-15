@@ -1,3 +1,5 @@
+import { SIZE_MAP, sizeFromWidth, sizeFromHeight } from './sizes.js';
+
 let currentState;
 let persist;
 let floatingMenu;
@@ -6,15 +8,12 @@ let floatingMenu;
 let selectedGroups = [];
 // Snap resizing to this grid size (px)
 const GRID = 10;
-const SIZE_MAP = {
-  sm: { width: 240, height: 240 },
-  md: { width: 360, height: 360 },
-  lg: { width: 480, height: 480 },
-};
 
-function applySize(el, width, height) {
+function applySize(el, width, height, wSize = sizeFromWidth(width), hSize = sizeFromHeight(height)) {
   el.style.width = width + 'px';
   el.style.height = height + 'px';
+  el.classList.remove('w-sm', 'w-md', 'w-lg', 'h-sm', 'h-md', 'h-lg');
+  el.classList.add(`w-${wSize}`, `h-${hSize}`);
 }
 
 // Debounce state persistence while resizing
@@ -35,23 +34,29 @@ const ro = new ResizeObserver((entries) => {
     if (entry.target.dataset.resizing === '1') {
       const baseW = Math.round(entry.contentRect.width / GRID) * GRID;
       const baseH = Math.round(entry.contentRect.height / GRID) * GRID;
+      const wSize = sizeFromWidth(baseW);
+      const hSize = sizeFromHeight(baseH);
 
       const targets = selectedGroups.includes(entry.target)
         ? selectedGroups
         : [entry.target];
 
       targets.forEach((el) => {
-        applySize(el, baseW, baseH);
+        applySize(el, baseW, baseH, wSize, hSize);
         if (el.dataset.id === 'notes') {
           currentState.notesBox = {
             width: baseW,
             height: baseH,
+            wSize,
+            hSize,
           };
         } else {
           const sg = currentState.groups.find((x) => x.id === el.dataset.id);
           if (sg) {
             sg.width = baseW;
             sg.height = baseH;
+            sg.wSize = wSize;
+            sg.hSize = hSize;
             delete sg.size;
           }
         }
@@ -206,12 +211,15 @@ export function render(state, editing, T, I, handlers, saveFn) {
       noteGrp.className = 'group';
       noteGrp.dataset.id = 'notes';
       noteGrp.dataset.resizing = '0';
-      const nDims = state.notesBox?.size
-        ? SIZE_MAP[state.notesBox.size]
-        : { width: 360, height: 360 };
-      const nWidth = state.notesBox?.width ?? nDims.width;
-      const nHeight = state.notesBox?.height ?? nDims.height;
-      applySize(noteGrp, nWidth, nHeight);
+      const nWidth =
+        state.notesBox?.width ??
+        SIZE_MAP[state.notesBox?.wSize ?? 'md'].width;
+      const nHeight =
+        state.notesBox?.height ??
+        SIZE_MAP[state.notesBox?.hSize ?? 'md'].height;
+      const nWSize = state.notesBox?.wSize ?? sizeFromWidth(nWidth);
+      const nHSize = state.notesBox?.hSize ?? sizeFromHeight(nHeight);
+      applySize(noteGrp, nWidth, nHeight, nWSize, nHSize);
       noteGrp.style.resize = editing ? 'both' : 'none';
       if (editing) {
         noteGrp.addEventListener('mousedown', (e) => {
@@ -291,8 +299,13 @@ export function render(state, editing, T, I, handlers, saveFn) {
       grp.className = 'group';
       grp.dataset.id = g.id;
       grp.dataset.resizing = '0';
-      const gDims = g.size ? SIZE_MAP[g.size] : { width: 360, height: 360 };
-      applySize(grp, g.width ?? gDims.width, g.height ?? gDims.height);
+      const gWidth =
+        g.width ?? SIZE_MAP[g.wSize ?? 'md'].width;
+      const gHeight =
+        g.height ?? SIZE_MAP[g.hSize ?? 'md'].height;
+      const gWSize = g.wSize ?? sizeFromWidth(gWidth);
+      const gHSize = g.hSize ?? sizeFromHeight(gHeight);
+      applySize(grp, gWidth, gHeight, gWSize, gHSize);
       grp.style.resize = editing ? 'both' : 'none';
       if (editing) {
         grp.addEventListener('mousedown', (e) => {
@@ -403,8 +416,13 @@ export function render(state, editing, T, I, handlers, saveFn) {
     grp.className = 'group';
     grp.dataset.id = g.id;
     grp.dataset.resizing = '0';
-    const gDims2 = g.size ? SIZE_MAP[g.size] : { width: 360, height: 360 };
-    applySize(grp, g.width ?? gDims2.width, g.height ?? gDims2.height);
+    const gWidth2 =
+      g.width ?? SIZE_MAP[g.wSize ?? 'md'].width;
+    const gHeight2 =
+      g.height ?? SIZE_MAP[g.hSize ?? 'md'].height;
+    const gWSize2 = g.wSize ?? sizeFromWidth(gWidth2);
+    const gHSize2 = g.hSize ?? sizeFromHeight(gHeight2);
+    applySize(grp, gWidth2, gHeight2, gWSize2, gHSize2);
     grp.style.resize = editing ? 'both' : 'none';
     if (editing) {
       grp.addEventListener('mousedown', (e) => {

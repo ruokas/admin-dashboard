@@ -1,5 +1,6 @@
 import { load, save, seed } from './storage.js';
 import { render, updateEditingUI, toSheetEmbed } from './render.js';
+import { SIZE_MAP, sizeFromWidth, sizeFromHeight } from './sizes.js';
 import {
   groupFormDialog,
   itemFormDialog,
@@ -83,7 +84,10 @@ let state = load() || seed();
 if (!('notes' in state)) state.notes = localStorage.getItem('notes') || '';
 if (!('notesOpts' in state)) state.notesOpts = { size: 16, padding: 8 };
 if (!state.notesTitle) state.notesTitle = T.notes;
-if (!('notesBox' in state)) state.notesBox = { width: 360, height: 360 };
+if (!('notesBox' in state))
+  state.notesBox = { width: 360, height: 360, wSize: 'md', hSize: 'md' };
+if (!state.notesBox.wSize) state.notesBox.wSize = sizeFromWidth(state.notesBox.width);
+if (!state.notesBox.hSize) state.notesBox.hSize = sizeFromHeight(state.notesBox.height);
 if (!('notesPos' in state)) state.notesPos = 0;
 if (!state.title) state.title = DEFAULT_TITLE;
 let editing = false;
@@ -105,19 +109,6 @@ pageIconEl.addEventListener('input', () => {
 });
 
 const uid = () => Math.random().toString(36).slice(2, 10);
-
-const SIZE_MAP = {
-  sm: { width: 240, height: 240 },
-  md: { width: 360, height: 360 },
-  lg: { width: 480, height: 480 },
-};
-
-function sizeFromDims(w, h) {
-  const max = Math.max(w, h);
-  if (max >= 420) return 'lg';
-  if (max >= 300) return 'md';
-  return 'sm';
-}
 
 function parseIframe(html) {
   const match = html.match(/<iframe[^>]*src="([^"]+)"[^>]*>/i);
@@ -161,11 +152,14 @@ function updateUI() {
 async function addGroup() {
   const res = await groupFormDialog(T);
   if (!res) return;
+  const dims = SIZE_MAP[res.size] ?? SIZE_MAP.md;
   state.groups.push({
     id: uid(),
     name: res.name,
     color: res.color,
-    ...(SIZE_MAP[res.size] ?? SIZE_MAP.md),
+    ...dims,
+    wSize: sizeFromWidth(dims.width),
+    hSize: sizeFromHeight(dims.height),
     items: [],
   });
   save(state);
@@ -178,12 +172,15 @@ async function editGroup(gid) {
   const res = await groupFormDialog(T, {
     name: g.name,
     color: g.color,
-    size: sizeFromDims(g.width ?? 360, g.height ?? 360),
+    size: sizeFromWidth(g.width ?? 360),
   });
   if (!res) return;
   g.name = res.name;
   g.color = res.color;
-  Object.assign(g, SIZE_MAP[res.size] ?? SIZE_MAP.md);
+  const dims2 = SIZE_MAP[res.size] ?? SIZE_MAP.md;
+  Object.assign(g, dims2);
+  g.wSize = sizeFromWidth(dims2.width);
+  g.hSize = sizeFromHeight(dims2.height);
   save(state);
   renderAll();
 }
@@ -192,13 +189,16 @@ async function addChart() {
   const res = await chartFormDialog(T);
   if (!res) return;
   const parsed = parseIframe(res.url);
+  const cDims = SIZE_MAP.md;
   state.groups.push({
     id: uid(),
     type: 'chart',
     name: res.title,
     url: parsed.src,
     h: parsed.h ? parsed.h + 56 : undefined,
-    ...SIZE_MAP.md,
+    ...cDims,
+    wSize: sizeFromWidth(cDims.width),
+    hSize: sizeFromHeight(cDims.height),
   });
   save(state);
   renderAll();
