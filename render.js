@@ -287,6 +287,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
           editing
             ? `<div class="group-actions">
           <button type="button" title="${T.edit}" aria-label="${T.edit}" data-act="edit">${I.pencil}</button>
+          <button type="button" class="btn-danger" title="${T.deleteNotes}" aria-label="${T.deleteNotes}" data-act="del">${I.trash}</button>
         </div>`
             : ''
         }`;
@@ -294,6 +295,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
         const btn = e.target.closest('button');
         if (!btn) return;
         if (btn.dataset.act === 'edit') handlers.editNotes();
+        if (btn.dataset.act === 'del') handlers.removeNotes();
       });
       noteGrp.appendChild(h);
       const itemsWrap = document.createElement('div');

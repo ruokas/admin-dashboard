@@ -83,6 +83,12 @@ export function itemFormDialog(T, data = {}) {
       'calendar',
       'clock',
       'user',
+      'clipboard',
+      'chat',
+      'video',
+      'map',
+      'shield',
+      'alert',
     ];
     const iconButtons = iconKeys
       .map(
