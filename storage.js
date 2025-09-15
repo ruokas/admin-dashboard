@@ -4,22 +4,47 @@ export function load() {
   try {
     const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '');
     if (data && Array.isArray(data.groups)) {
-      data.groups.forEach((g) =>
+      data.groups.forEach((g) => {
         g.items?.forEach((it) => {
           if (!('iconUrl' in it)) it.iconUrl = '';
           if (!('icon' in it)) it.icon = '';
-        }),
-      );
+        });
+        if (typeof g.width !== 'number' || typeof g.height !== 'number') {
+          let width = 360;
+          let height = 360;
+          if (g.size === 'sm') {
+            width = 240;
+            height = 240;
+          } else if (g.size === 'lg') {
+            width = 480;
+            height = 480;
+          }
+          g.width = width;
+          g.height = height;
+        }
+        delete g.size;
+      });
       if (typeof data.notes !== 'string') data.notes = '';
       if (typeof data.notesTitle !== 'string') data.notesTitle = '';
       if (typeof data.title !== 'string') data.title = '';
       if (typeof data.icon !== 'string') data.icon = '';
       if (
         !data.notesBox ||
-        typeof data.notesBox.size !== 'string' ||
-        !['sm', 'md', 'lg'].includes(data.notesBox.size)
-      )
-        data.notesBox = { size: 'md' };
+        typeof data.notesBox.width !== 'number' ||
+        typeof data.notesBox.height !== 'number'
+      ) {
+        const sz = data.notesBox?.size;
+        let width = 360;
+        let height = 360;
+        if (sz === 'sm') {
+          width = 240;
+          height = 240;
+        } else if (sz === 'lg') {
+          width = 480;
+          height = 480;
+        }
+        data.notesBox = { width, height };
+      }
       if (
         !data.notesOpts ||
         typeof data.notesOpts.size !== 'number' ||
@@ -43,7 +68,7 @@ export function seed() {
     groups: [],
     notes: '',
     notesTitle: '',
-    notesBox: { size: 'md' },
+    notesBox: { width: 360, height: 360 },
     notesOpts: { size: 16, padding: 8 },
     notesPos: 0,
     title: '',
