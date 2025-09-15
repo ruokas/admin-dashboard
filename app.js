@@ -294,10 +294,21 @@ function importJson(file) {
 }
 
 function applyTheme() {
-  const light = localStorage.getItem('ed_dash_theme') === 'light';
+  let theme = localStorage.getItem('ed_dash_theme');
+  if (!theme) {
+    const prefersLight =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-color-scheme: light)').matches;
+    // Pakeiskite numatytą temą, jei skyriui reikia kitokio starto varianto.
+    theme = prefersLight ? 'light' : 'dark';
+    localStorage.setItem('ed_dash_theme', theme);
+  }
+  const light = theme === 'light';
   document.documentElement.classList.toggle('theme-light', light);
-  themeBtn.innerHTML = `${light ? I.sun : I.moon} <span>${T.theme}</span>`;
-  themeBtn.setAttribute('aria-label', light ? T.toDark : T.toLight);
+  const label = light ? T.toDark : T.toLight;
+  const icon = light ? I.moon : I.sun;
+  themeBtn.innerHTML = `${icon} <span>${label}</span>`;
+  themeBtn.setAttribute('aria-label', label);
 }
 
 function toggleTheme() {

@@ -773,7 +773,15 @@ export function updateEditingUI(editing, T, I, renderFn) {
 }
 
 export function applyTheme() {
-  const theme = localStorage.getItem('ed_dash_theme') || 'dark';
+  let theme = localStorage.getItem('ed_dash_theme');
+  if (!theme) {
+    const prefersLight =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-color-scheme: light)').matches;
+    // Jei reikia kitos pradinės temos – keiskite šiame bloke.
+    theme = prefersLight ? 'light' : 'dark';
+    localStorage.setItem('ed_dash_theme', theme);
+  }
   if (theme === 'light') document.documentElement.classList.add('theme-light');
   else document.documentElement.classList.remove('theme-light');
 }
