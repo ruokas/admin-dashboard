@@ -25,6 +25,21 @@ Statinis vieno failo HTML projektas, skirtas publikuoti per **GitHub Pages**.
 - Pastabų kortelę galima perkelti tarp grupių drag-and-drop būdu.
 - Spalvų meniu turi mygtuką **Atstatyti**, grąžinantį numatytas spalvas.
 
+## Dizaino nustatymai
+
+Grupių kortelių matmenys valdomi CSS kintamaisiais:
+
+| Kintamasis | Reikšmė | Aprašymas |
+|------------|---------|-----------|
+| `--group-width-sm` | `240px` | Mažos grupės plotis |
+| `--group-width-md` | `360px` | Vidutinės grupės plotis (numatytas) |
+| `--group-width-lg` | `480px` | Didelės grupės plotis |
+| `--group-height-sm` | `240px` | Mažos grupės aukštis |
+| `--group-height-md` | `360px` | Vidutinės grupės aukštis |
+| `--group-height-lg` | `480px` | Didelės grupės aukštis |
+
+Šie kintamieji naudojami `.group--sm`, `.group--md` ir `.group--lg` klasėms.
+
 ## Smoke test
 
 Šie žingsniai aktualūs tik atnaujinus ir vėl įjungus Google Sheets sinchronizavimą.
