@@ -10,7 +10,7 @@ const GRID = 40;
 const ro = new ResizeObserver((entries) => {
   for (const entry of entries) {
     if (entry.target.dataset.resizing === '1') {
-      const baseW = Math.round(entry.contentRect.width / GRID) * GRID;
+      // Snap only the height to grid units
       const baseH = Math.round(entry.contentRect.height / GRID) * GRID;
 
       const targets = selectedGroups.includes(entry.target)
@@ -20,7 +20,7 @@ const ro = new ResizeObserver((entries) => {
       targets.forEach((el) => {
         const minW = el.scrollWidth;
         const minH = el.scrollHeight;
-        let w = baseW;
+        let w = entry.contentRect.width;
         let h = baseH;
         if (w < minW) w = minW;
         if (h < minH) h = minH;
