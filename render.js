@@ -541,11 +541,17 @@ export function render(state, editing, T, I, handlers, saveFn) {
       itemsScroll.appendChild(empty);
     } else {
       filteredItems.forEach((it) => {
-        const card = document.createElement('div');
+        const isLink = !editing && it.type === 'link';
+        const card = document.createElement(isLink ? 'a' : 'div');
         card.className = 'item';
         card.dataset.gid = g.id;
         card.dataset.iid = it.id;
         card.draggable = editing;
+        if (isLink) {
+          card.href = it.url;
+          card.target = '_blank';
+          card.rel = 'noopener';
+        }
         if (editing) {
           card.addEventListener('dragstart', (e) => {
             e.dataTransfer.setData(
@@ -598,10 +604,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
                       : I.puzzle
                 }</div>`;
 
-        const metaHtml =
-          it.type === 'link'
-            ? `<a class="meta" href="${it.url}" target="_blank" rel="noopener"><div class="title">${escapeHtml(it.title || '(be pavadinimo)')}</div><div class="sub">${escapeHtml(it.note || '')}</div></a>`
-            : `<div class="meta"><div class="title">${escapeHtml(it.title || '(be pavadinimo)')}</div><div class="sub">${escapeHtml(it.note || '')}</div></div>`;
+        const metaHtml = `<div class="meta"><div class="title">${escapeHtml(it.title || '(be pavadinimo)')}</div><div class="sub">${escapeHtml(it.note || '')}</div></div>`;
 
         const actionsHtml = editing
           ? `<div class="actions">
@@ -689,8 +692,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
               return;
             }
           } else {
-            if (it.type === 'link') window.open(it.url, '_blank');
-            else previewItem(it, card);
+            if (it.type !== 'link') previewItem(it, card);
           }
         });
 
