@@ -113,11 +113,22 @@ pageIconEl.addEventListener('input', () => {
 const uid = () => crypto.randomUUID().slice(0, 8);
 
 function parseIframe(html) {
-  const match = html.match(/<iframe[^>]*src="([^"]+)"[^>]*>/i);
-  if (!match) return { src: html };
-  const src = match[1];
-  const hMatch = html.match(/height="(\d+)"/i);
-  return { src, h: hMatch ? parseInt(hMatch[1], 10) : undefined };
+  const raw = typeof html === 'string' ? html.trim() : '';
+  if (!raw) return { src: '', height: undefined };
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(raw, 'text/html');
+  const iframe = doc.querySelector('iframe');
+
+  if (!iframe) {
+    return { src: raw, height: undefined };
+  }
+
+  const src = iframe.getAttribute('src')?.trim() || raw;
+  const heightAttr = iframe.getAttribute('height');
+  const height = heightAttr ? parseInt(heightAttr, 10) : undefined;
+
+  return { src, height };
 }
 
 function renderAll() {
@@ -198,7 +209,7 @@ async function addChart() {
     type: 'chart',
     name: res.title,
     url: parsed.src,
-    h: parsed.h ? parsed.h + 56 : undefined,
+    h: parsed.height ? parsed.height + 56 : undefined,
     ...cDims,
     wSize: sizeFromWidth(cDims.width),
     hSize: sizeFromHeight(cDims.height),
@@ -240,8 +251,8 @@ async function editChart(gid) {
   const parsed = parseIframe(res.url);
   g.name = res.title;
   g.url = parsed.src;
-  if (parsed.h) {
-    g.h = parsed.h + 56;
+  if (parsed.height) {
+    g.h = parsed.height + 56;
   }
   save(state);
   renderAll();
@@ -268,7 +279,7 @@ async function addItem(gid) {
   if (data.type === 'embed' || data.type === 'chart') {
     const parsed = parseIframe(data.url);
     data.url = parsed.src;
-    if (parsed.h) data.h = parsed.h;
+    if (parsed.height) data.h = parsed.height;
   }
   g.items.push({
     id: uid(),
@@ -297,7 +308,7 @@ async function editItem(gid, iid) {
   if (data.type === 'embed' || data.type === 'chart') {
     const parsed = parseIframe(data.url);
     data.url = parsed.src;
-    if (parsed.h) data.h = parsed.h;
+    if (parsed.height) data.h = parsed.height;
     else delete data.h;
   }
   it.type = data.type;
