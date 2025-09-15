@@ -453,10 +453,11 @@ a.item {
   min-height: 120px;
 }
 .embed iframe {
+  aspect-ratio: 16/9;
   width: 100%;
+  height: auto;
   border: 0;
   background: white;
-  height: 100%;
 }
 .empty {
   border: 1px dashed rgba(255, 255, 255, 0.15);

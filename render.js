@@ -48,7 +48,6 @@ const ro = new ResizeObserver((entries) => {
           const sg = currentState.groups.find((x) => x.id === el.dataset.id);
           if (sg) {
             sg.size = size;
-            resizeEmbeds(el);
           }
         }
       });
@@ -88,23 +87,6 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-const embedObserver = new ResizeObserver((entries) => {
-  for (const entry of entries) {
-    if (entry.target.dataset.custom === '1') continue;
-    const w = entry.contentRect.width;
-    entry.target.style.height = Math.round(w * 0.5625) + 'px';
-  }
-});
-
-function resizeEmbeds(root) {
-  if (!root) return;
-  root.querySelectorAll('.embed').forEach((box) => {
-    embedObserver.observe(box);
-    if (box.dataset.custom === '1') return;
-    const w = box.clientWidth;
-    box.style.height = Math.round(w * 0.5625) + 'px';
-  });
-}
 
 function toFavicon(u) {
   try {
@@ -171,7 +153,6 @@ function previewItem(it, mount) {
     persist();
   });
   mount.after(wrap);
-  resizeEmbeds(mount.closest('.group'));
 }
 
 export function render(state, editing, T, I, handlers, saveFn) {
@@ -407,7 +388,6 @@ export function render(state, editing, T, I, handlers, saveFn) {
       if (g.collapsed) grp.classList.add('collapsed');
       groupsEl.appendChild(grp);
       ro.observe(grp);
-      resizeEmbeds(grp);
       return;
     }
     const grp = document.createElement('section');
@@ -716,7 +696,6 @@ export function render(state, editing, T, I, handlers, saveFn) {
     if (g.collapsed) grp.classList.add('collapsed');
     groupsEl.appendChild(grp);
     ro.observe(grp);
-    resizeEmbeds(grp);
   });
 
   const totalGroups = state.groups.length;
