@@ -6,15 +6,9 @@ let floatingMenu;
 let selectedGroups = [];
 
 const GRID = 40;
-// Pixels from bottom-right corner that count as resize handle hitbox
-const RESIZE_HITBOX = 24;
 
 const ro = new ResizeObserver((entries) => {
   for (const entry of entries) {
-    if (entry.target.dataset.resizing === '0') {
-      // If an element was resized without the flag, enable it to snap to grid
-      entry.target.dataset.resizing = '1';
-    }
     if (entry.target.dataset.resizing === '1') {
       const baseW = Math.round(entry.contentRect.width / GRID) * GRID;
       const baseH = Math.round(entry.contentRect.height / GRID) * GRID;
@@ -52,7 +46,7 @@ const ro = new ResizeObserver((entries) => {
   }
 });
 
-document.addEventListener('pointerup', () => {
+document.addEventListener('mouseup', () => {
   document.querySelectorAll('.group').forEach((g) => {
     g.dataset.resizing = '0';
     g.style.minWidth = '';
@@ -215,11 +209,10 @@ export function render(state, editing, T, I, handlers, saveFn) {
       if (state.notesBox?.h) noteGrp.style.height = state.notesBox.h + 'px';
       noteGrp.style.resize = editing ? 'both' : 'none';
       if (editing) {
-        noteGrp.addEventListener('pointerdown', (e) => {
+        noteGrp.addEventListener('mousedown', (e) => {
           const rect = noteGrp.getBoundingClientRect();
           const withinHandle =
-            e.clientX >= rect.right - RESIZE_HITBOX &&
-            e.clientY >= rect.bottom - RESIZE_HITBOX;
+            e.clientX >= rect.right - 20 && e.clientY >= rect.bottom - 20;
           if (withinHandle) {
             noteGrp.dataset.resizing = '1';
             noteGrp.style.minWidth = noteGrp.scrollWidth + 'px';
@@ -300,11 +293,10 @@ export function render(state, editing, T, I, handlers, saveFn) {
       }
       grp.style.resize = editing ? 'both' : 'none';
       if (editing) {
-        grp.addEventListener('pointerdown', (e) => {
+        grp.addEventListener('mousedown', (e) => {
           const rect = grp.getBoundingClientRect();
           const withinHandle =
-            e.clientX >= rect.right - RESIZE_HITBOX &&
-            e.clientY >= rect.bottom - RESIZE_HITBOX;
+            e.clientX >= rect.right - 20 && e.clientY >= rect.bottom - 20;
           if (withinHandle) {
             grp.dataset.resizing = '1';
             grp.style.minWidth = grp.scrollWidth + 'px';
@@ -414,11 +406,10 @@ export function render(state, editing, T, I, handlers, saveFn) {
     if (g.resized) grp.style.height = g.h + 'px';
     grp.style.resize = editing ? 'both' : 'none';
     if (editing) {
-      grp.addEventListener('pointerdown', (e) => {
+      grp.addEventListener('mousedown', (e) => {
         const rect = grp.getBoundingClientRect();
         const withinHandle =
-          e.clientX >= rect.right - RESIZE_HITBOX &&
-          e.clientY >= rect.bottom - RESIZE_HITBOX;
+          e.clientX >= rect.right - 20 && e.clientY >= rect.bottom - 20;
         if (withinHandle) {
           grp.dataset.resizing = '1';
           grp.style.minWidth = grp.scrollWidth + 'px';
