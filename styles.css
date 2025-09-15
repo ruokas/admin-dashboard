@@ -234,11 +234,24 @@ main {
   min-height: 100px;
   overflow: auto;
   resize: both;
-  width: var(--group-width);
-  max-width: 100%;
   transition:
     0.2s ease background,
     0.2s ease transform;
+}
+
+.group--sm {
+  width: 240px;
+  height: 240px;
+}
+
+.group--md {
+  width: 360px;
+  height: 360px;
+}
+
+.group--lg {
+  width: 480px;
+  height: 480px;
 }
 
 .group.selected {

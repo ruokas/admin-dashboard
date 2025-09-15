@@ -7,6 +7,12 @@ let selectedGroups = [];
 // Snap resizing to this grid size (px)
 const GRID = 10;
 
+function applySize(el, size) {
+  el.dataset.size = size;
+  el.classList.remove('group--sm', 'group--md', 'group--lg');
+  el.classList.add('group--' + size);
+}
+
 // Debounce state persistence while resizing
 let resizeDirty = false;
 let resizeTimeout;
@@ -25,28 +31,23 @@ const ro = new ResizeObserver((entries) => {
     if (entry.target.dataset.resizing === '1') {
       const baseW = Math.round(entry.contentRect.width / GRID) * GRID;
       const baseH = Math.round(entry.contentRect.height / GRID) * GRID;
+      const maxDim = Math.max(baseW, baseH);
+      let size = 'sm';
+      if (maxDim >= 300 && maxDim < 420) size = 'md';
+      else if (maxDim >= 420) size = 'lg';
 
       const targets = selectedGroups.includes(entry.target)
         ? selectedGroups
         : [entry.target];
 
       targets.forEach((el) => {
-        const minW = el.scrollWidth;
-        const minH = el.scrollHeight;
-        let w = baseW;
-        let h = baseH;
-        if (w < minW) w = minW;
-        if (h < minH) h = minH;
-        el.style.width = w + 'px';
-        el.style.height = h + 'px';
+        applySize(el, size);
         if (el.dataset.id === 'notes') {
-          currentState.notesBox = { w, h };
+          currentState.notesBox = { size };
         } else {
           const sg = currentState.groups.find((x) => x.id === el.dataset.id);
           if (sg) {
-            sg.w = w;
-            sg.h = h;
-            sg.resized = true;
+            sg.size = size;
             resizeEmbeds(el);
           }
         }
@@ -220,8 +221,8 @@ export function render(state, editing, T, I, handlers, saveFn) {
       noteGrp.className = 'group';
       noteGrp.dataset.id = 'notes';
       noteGrp.dataset.resizing = '0';
-      if (state.notesBox?.w) noteGrp.style.width = state.notesBox.w + 'px';
-      if (state.notesBox?.h) noteGrp.style.height = state.notesBox.h + 'px';
+      const nSize = state.notesBox?.size || 'md';
+      applySize(noteGrp, nSize);
       noteGrp.style.resize = editing ? 'both' : 'none';
       if (editing) {
         noteGrp.addEventListener('mousedown', (e) => {
@@ -301,11 +302,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
       grp.className = 'group';
       grp.dataset.id = g.id;
       grp.dataset.resizing = '0';
-      if (g.w) grp.style.width = g.w + 'px';
-      if (g.h) {
-        grp.style.height = g.h + 'px';
-        g.resized = true;
-      }
+      applySize(grp, g.size || 'md');
       grp.style.resize = editing ? 'both' : 'none';
       if (editing) {
         grp.addEventListener('mousedown', (e) => {
@@ -417,8 +414,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
     grp.className = 'group';
     grp.dataset.id = g.id;
     grp.dataset.resizing = '0';
-    if (g.w) grp.style.width = g.w + 'px';
-    if (g.resized) grp.style.height = g.h + 'px';
+    applySize(grp, g.size || 'md');
     grp.style.resize = editing ? 'both' : 'none';
     if (editing) {
       grp.addEventListener('mousedown', (e) => {
