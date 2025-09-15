@@ -16,10 +16,10 @@ export function load() {
       if (typeof data.icon !== 'string') data.icon = '';
       if (
         !data.notesBox ||
-        typeof data.notesBox.w !== 'number' ||
-        typeof data.notesBox.h !== 'number'
+        typeof data.notesBox.size !== 'string' ||
+        !['sm', 'md', 'lg'].includes(data.notesBox.size)
       )
-        data.notesBox = { w: 0, h: 0 };
+        data.notesBox = { size: 'md' };
       if (
         !data.notesOpts ||
         typeof data.notesOpts.size !== 'number' ||
@@ -43,7 +43,7 @@ export function seed() {
     groups: [],
     notes: '',
     notesTitle: '',
-    notesBox: { w: 0, h: 0 },
+    notesBox: { size: 'md' },
     notesOpts: { size: 16, padding: 8 },
     notesPos: 0,
     title: '',

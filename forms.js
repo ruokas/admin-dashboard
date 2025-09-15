@@ -7,6 +7,13 @@ export function groupFormDialog(T, data = {}) {
     dlg.innerHTML = `<form method="dialog" id="groupForm">
       <label id="groupFormLabel">${T.groupName}<br><input name="name" required></label>
       <label>${T.groupColor}<br><input name="color" type="color" value="#6ee7b7"></label>
+      <label>${T.groupSize}<br>
+        <select name="size">
+          <option value="sm">${T.sizeSm}</option>
+          <option value="md">${T.sizeMd}</option>
+          <option value="lg">${T.sizeLg}</option>
+        </select>
+      </label>
       <p class="error" id="groupErr" role="status" aria-live="polite"></p>
       <menu>
         <button type="button" data-act="cancel">${T.cancel}</button>
@@ -21,6 +28,7 @@ export function groupFormDialog(T, data = {}) {
     const cancel = form.querySelector('[data-act="cancel"]');
     form.name.value = data.name || '';
     form.color.value = data.color || '#6ee7b7';
+    form.size.value = data.size || 'md';
 
     function cleanup() {
       form.removeEventListener('submit', submit);
@@ -36,7 +44,7 @@ export function groupFormDialog(T, data = {}) {
         err.textContent = T.required;
         return;
       }
-      resolve({ name, color: form.color.value });
+      resolve({ name, color: form.color.value, size: form.size.value });
       cleanup();
     }
 

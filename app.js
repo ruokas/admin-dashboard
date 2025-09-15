@@ -63,6 +63,10 @@ const T = {
   preview: 'Peržiūra',
   edit: 'Redaguoti',
   reset: 'Atstatyti',
+  groupSize: 'Dydis',
+  sizeSm: 'Mažas',
+  sizeMd: 'Vidutinis',
+  sizeLg: 'Didelis',
 };
 
 const DEFAULT_TITLE = 'Admin skydelis';
@@ -79,7 +83,7 @@ let state = load() || seed();
 if (!('notes' in state)) state.notes = localStorage.getItem('notes') || '';
 if (!('notesOpts' in state)) state.notesOpts = { size: 16, padding: 8 };
 if (!state.notesTitle) state.notesTitle = T.notes;
-if (!('notesBox' in state)) state.notesBox = { w: 0, h: 0 };
+if (!('notesBox' in state)) state.notesBox = { size: 'md' };
 if (!('notesPos' in state)) state.notesPos = 0;
 if (!state.title) state.title = DEFAULT_TITLE;
 let editing = false;
@@ -148,8 +152,8 @@ async function addGroup() {
     id: uid(),
     name: res.name,
     color: res.color,
+    size: res.size,
     items: [],
-    resized: false,
   });
   save(state);
   renderAll();
@@ -158,10 +162,15 @@ async function addGroup() {
 async function editGroup(gid) {
   const g = state.groups.find((x) => x.id === gid);
   if (!g) return;
-  const res = await groupFormDialog(T, { name: g.name, color: g.color });
+  const res = await groupFormDialog(T, {
+    name: g.name,
+    color: g.color,
+    size: g.size,
+  });
   if (!res) return;
   g.name = res.name;
   g.color = res.color;
+  g.size = res.size;
   save(state);
   renderAll();
 }
@@ -176,7 +185,7 @@ async function addChart() {
     name: res.title,
     url: parsed.src,
     h: parsed.h ? parsed.h + 56 : undefined,
-    resized: !!parsed.h,
+    size: 'md',
   });
   save(state);
   renderAll();
@@ -207,7 +216,6 @@ async function editChart(gid) {
   g.url = parsed.src;
   if (parsed.h) {
     g.h = parsed.h + 56;
-    g.resized = true;
   }
   save(state);
   renderAll();
