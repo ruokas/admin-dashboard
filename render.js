@@ -5,6 +5,9 @@ let floatingMenu;
 // Holds references to currently shift-selected groups
 let selectedGroups = [];
 
+// Tracks if state changes need to be persisted
+let pendingPersist = false;
+
 const GRID = 40;
 
 const ro = new ResizeObserver((entries) => {
@@ -41,7 +44,7 @@ const ro = new ResizeObserver((entries) => {
         }
       });
 
-      persist();
+      pendingPersist = true;
     }
   }
 });
@@ -52,6 +55,14 @@ document.addEventListener('mouseup', () => {
     g.style.minWidth = '';
     g.style.minHeight = '';
   });
+  if (pendingPersist) {
+    requestAnimationFrame(() => {
+      if (pendingPersist) {
+        persist();
+        pendingPersist = false;
+      }
+    });
+  }
 });
 
 document.addEventListener('click', (e) => {
