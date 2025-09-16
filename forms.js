@@ -30,6 +30,23 @@ function setupReminderControls(form) {
   modeSelect.addEventListener('change', update);
 }
 
+function setupReminderQuickButtons(form) {
+  const minutesSection = form.querySelector('[data-reminder="minutes"]');
+  if (!minutesSection) return;
+  const input = form.reminderMinutes;
+  if (!input) return;
+  const quickContainer = minutesSection.querySelector('[data-reminder-quick]');
+  if (!quickContainer) return;
+  quickContainer.addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-minutes]');
+    if (!button || !quickContainer.contains(button)) return;
+    const minutes = parseInt(button.dataset.minutes, 10);
+    if (!Number.isFinite(minutes)) return;
+    form.reminderMinutes.value = String(minutes);
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+}
+
 function escapeHtml(str = '') {
   return str
     .replace(/&/g, '&amp;')
@@ -247,7 +264,16 @@ export function itemFormDialog(T, data = {}) {
         </select>
       </label>
       <label data-reminder="${REMINDER_DATETIME}" hidden>${T.reminderExactTime}<br><input name="reminderAt" type="datetime-local"></label>
-      <label data-reminder="${REMINDER_MINUTES}" hidden>${T.reminderMinutes}<br><input name="reminderMinutes" type="number" min="0" step="1"></label>
+      <label data-reminder="${REMINDER_MINUTES}" hidden>
+        ${T.reminderMinutes}<br>
+        <input name="reminderMinutes" type="number" min="0" step="1">
+        <div class="reminder-quick-buttons" data-reminder-quick>
+          <button type="button" data-minutes="5">${T.reminderPlus5}</button>
+          <button type="button" data-minutes="10">${T.reminderPlus10}</button>
+          <button type="button" data-minutes="15">${T.reminderPlus15}</button>
+          <button type="button" data-minutes="30">${T.reminderPlus30}</button>
+        </div>
+      </label>
       <p class="error" id="itemErr" role="status" aria-live="polite"></p>
       <menu>
         <button type="button" data-act="cancel">${T.cancel}</button>
@@ -279,6 +305,7 @@ export function itemFormDialog(T, data = {}) {
       ? formatDateTimeLocal(data.reminderAt)
       : '';
     setupReminderControls(form);
+    setupReminderQuickButtons(form);
 
     const initBtn = picker.querySelector(
       `button[data-val="${iconInput.value}"]`,
@@ -439,7 +466,16 @@ export function notesDialog(
         </select>
       </label>
       <label data-reminder="${REMINDER_DATETIME}" hidden>${T.reminderExactTime}<br><input name="reminderAt" type="datetime-local"></label>
-      <label data-reminder="${REMINDER_MINUTES}" hidden>${T.reminderMinutes}<br><input name="reminderMinutes" type="number" min="0" step="1"></label>
+      <label data-reminder="${REMINDER_MINUTES}" hidden>
+        ${T.reminderMinutes}<br>
+        <input name="reminderMinutes" type="number" min="0" step="1">
+        <div class="reminder-quick-buttons" data-reminder-quick>
+          <button type="button" data-minutes="5">${T.reminderPlus5}</button>
+          <button type="button" data-minutes="10">${T.reminderPlus10}</button>
+          <button type="button" data-minutes="15">${T.reminderPlus15}</button>
+          <button type="button" data-minutes="30">${T.reminderPlus30}</button>
+        </div>
+      </label>
       <menu>
         <button type="button" data-act="cancel">${T.cancel}</button>
         <button type="submit" class="btn-accent">${T.save}</button>
@@ -466,6 +502,7 @@ export function notesDialog(
       ? formatDateTimeLocal(data.reminderAt)
       : '';
     setupReminderControls(form);
+    setupReminderQuickButtons(form);
 
     function cleanup() {
       form.removeEventListener('submit', submit);
