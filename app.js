@@ -7,7 +7,6 @@ import {
   chartFormDialog,
   confirmDialog as confirmDlg,
   notesDialog,
-  remindersDialog,
 } from './forms.js';
 import { I } from './icons.js';
 import { Tlt } from './i18n.js';
@@ -24,6 +23,35 @@ const REMINDER_MODE_NONE = 'none';
 const REMINDER_MODE_DATETIME = 'datetime';
 const REMINDER_MODE_MINUTES = 'minutes';
 const REMINDER_SNOOZE_MINUTES = 5;
+const REMINDER_QUICK_MINUTES = [5, 10, 15, 30];
+
+const reminderFormDefaults = {
+  editingId: null,
+  values: null,
+  error: '',
+};
+
+let reminderFormState = { ...reminderFormDefaults };
+
+function resetReminderFormState() {
+  reminderFormState = { ...reminderFormDefaults };
+}
+
+function updateReminderFormState(partial = {}) {
+  reminderFormState = { ...reminderFormState, ...partial };
+}
+
+function formatDateTimeLocal(ts) {
+  if (!Number.isFinite(ts)) return '';
+  const date = new Date(ts);
+  const pad = (val) => String(val).padStart(2, '0');
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  const hours = pad(date.getHours());
+  const minutes = pad(date.getMinutes());
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
 
 const editBtn = document.getElementById('editBtn');
 // const syncStatus = document.getElementById('syncStatus'); // Sheets sync indikatorius (išjungta)
@@ -159,6 +187,50 @@ function normaliseReminderState() {
       Math.round(state.notesReminderMinutes || 0),
     );
   }
+  if (!Array.isArray(state.customReminders)) state.customReminders = [];
+  else
+    state.customReminders = state.customReminders
+      .filter((rem) => Number.isFinite(rem?.at))
+      .map((rem) => ({
+        id: typeof rem.id === 'string' && rem.id ? rem.id : uid(),
+        title: typeof rem.title === 'string' ? rem.title : '',
+        at: Math.round(rem.at),
+        minutes:
+          Number.isFinite(rem.minutes) && rem.minutes > 0
+            ? Math.max(0, Math.round(rem.minutes))
+            : null,
+        createdAt: Number.isFinite(rem.createdAt)
+          ? Math.round(rem.createdAt)
+          : Date.now(),
+      }));
+  if (!state.remindersCard) {
+    state.remindersCard = {
+      enabled: false,
+      title: '',
+      width: SIZE_MAP.md.width,
+      height: SIZE_MAP.md.height,
+      wSize: 'md',
+      hSize: 'md',
+    };
+  } else {
+    const fallbackWidth = SIZE_MAP[state.remindersCard.wSize || 'md']?.width || 360;
+    const fallbackHeight =
+      SIZE_MAP[state.remindersCard.hSize || 'md']?.height || 360;
+    if (!Number.isFinite(state.remindersCard.width))
+      state.remindersCard.width = fallbackWidth;
+    if (!Number.isFinite(state.remindersCard.height))
+      state.remindersCard.height = fallbackHeight;
+    state.remindersCard.wSize =
+      state.remindersCard.wSize || sizeFromWidth(state.remindersCard.width);
+    state.remindersCard.hSize =
+      state.remindersCard.hSize || sizeFromHeight(state.remindersCard.height);
+    state.remindersCard.title =
+      typeof state.remindersCard.title === 'string'
+        ? state.remindersCard.title
+        : '';
+    state.remindersCard.enabled = Boolean(state.remindersCard.enabled);
+  }
+  if (typeof state.remindersPos !== 'number') state.remindersPos = 0;
   const groups = Array.isArray(state.groups) ? state.groups : [];
   groups.forEach((g) => {
     (g.items || []).forEach((it) => {
@@ -232,6 +304,32 @@ function buildReminderEntries() {
     });
   });
 
+  (state.customReminders || []).forEach((rem) => {
+    if (!Number.isFinite(rem.at)) return;
+    const title = clean(rem.title || '') || T.reminderDefaultTitle;
+    const duration = Number.isFinite(rem.minutes)
+      ? rem.minutes * 60000
+      : Number.isFinite(rem.createdAt)
+        ? Math.max(0, rem.at - rem.createdAt)
+        : null;
+    entries.push({
+      key: `custom:${rem.id}`,
+      at: rem.at,
+      title,
+      body: title,
+      data: { type: 'custom', id: rem.id },
+      duration,
+      createdAt: rem.createdAt,
+      onTrigger: () => {
+        state.customReminders = (state.customReminders || []).filter(
+          (item) => item.id !== rem.id,
+        );
+        persistState();
+        renderAll();
+      },
+    });
+  });
+
   return entries;
 }
 
@@ -249,6 +347,11 @@ function clearReminder(key) {
         break;
       }
     }
+  } else if (key.startsWith('custom:')) {
+    const id = key.slice(7);
+    state.customReminders = (state.customReminders || []).filter(
+      (rem) => rem.id !== id,
+    );
   }
   persistState();
   renderAll();
@@ -272,6 +375,16 @@ function snoozeReminder(key, minutes) {
       }
     }
   }
+  if (key.startsWith('custom:')) {
+    const id = key.slice(7);
+    const rem = (state.customReminders || []).find((item) => item.id === id);
+    if (rem) {
+      rem.minutes = minutes;
+      rem.at = newAt;
+      rem.createdAt = Date.now();
+      return newAt;
+    }
+  }
   return NaN;
 }
 
@@ -283,47 +396,190 @@ async function editReminder(entry) {
   }
   if (entry.data.type === 'item' && entry.data.gid && entry.data.iid) {
     await editItem(entry.data.gid, entry.data.iid);
+    return;
+  }
+  if (entry.data.type === 'custom' && entry.data.id) {
+    beginEditCustomReminder(entry.data.id);
   }
 }
 
-async function openReminders() {
-  let entries = buildReminderEntries().sort((a, b) => a.at - b.at);
-  let entryMap = new Map(entries.map((entry) => [entry.key, entry]));
-  await remindersDialog(T, entries, async (action, key) => {
-    if (action === 'remove') {
-      clearReminder(key);
-      entryMap.delete(key);
-      return { removed: true };
-    }
+function focusReminderCard() {
+  if (typeof document === 'undefined') return false;
+  const card = document.querySelector('.group[data-id="reminders"]');
+  if (!card) return false;
+  try {
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } catch {
+    card.scrollIntoView();
+  }
+  card.classList.add('reminder-highlight');
+  setTimeout(() => card.classList.remove('reminder-highlight'), 2000);
+  return true;
+}
 
-    const entry = entryMap.get(key);
-    if (!entry) return null;
+function beginEditCustomReminder(id) {
+  const reminder = (state.customReminders || []).find((item) => item.id === id);
+  if (!reminder) return;
+  const usesMinutes = Number.isFinite(reminder.minutes) && reminder.minutes > 0;
+  const values = {
+    title: reminder.title || '',
+    reminderMode: usesMinutes ? REMINDER_MODE_MINUTES : REMINDER_MODE_DATETIME,
+    reminderMinutes: usesMinutes ? reminder.minutes : '',
+    reminderAt:
+      !usesMinutes && Number.isFinite(reminder.at)
+        ? formatDateTimeLocal(reminder.at)
+        : '',
+  };
+  if (values.reminderMode === REMINDER_MODE_DATETIME && !values.reminderAt) {
+    values.reminderMode = REMINDER_MODE_MINUTES;
+  }
+  updateReminderFormState({ editingId: id, values, error: '' });
+  renderAll();
+  focusReminderCard();
+}
 
-    if (action === 'snooze') {
-      const newAt = snoozeReminder(key, REMINDER_SNOOZE_MINUTES);
-      if (!Number.isFinite(newAt)) return null;
-      entry.at = newAt;
-      persistState();
-      renderAll();
-      syncReminders();
-      return { at: newAt };
-    }
+function cancelEditCustomReminder() {
+  resetReminderFormState();
+  renderAll();
+}
 
-    if (action === 'edit') {
-      await editReminder(entry);
-      entries = buildReminderEntries().sort((a, b) => a.at - b.at);
-      entryMap = new Map(entries.map((item) => [item.key, item]));
-      persistState();
-      syncReminders();
-      const updated = entryMap.get(key);
-      if (updated) {
-        return { at: updated.at };
-      }
-      return { removed: true };
-    }
+function formatTimerTitle(minutes) {
+  const template = T.reminderTimerPattern || 'Laikmatis {min} min.';
+  if (template.includes('{min}')) return template.replace('{min}', minutes);
+  return `${template} ${minutes} min.`;
+}
 
-    return null;
+function createQuickReminder(minutes) {
+  const parsed = Math.max(0, Math.round(minutes || 0));
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    updateReminderFormState({ error: T.reminderFormError });
+    renderAll();
+    return { error: T.reminderFormError };
+  }
+  const now = Date.now();
+  state.customReminders.push({
+    id: uid(),
+    title: formatTimerTitle(parsed),
+    at: now + parsed * 60000,
+    minutes: parsed,
+    createdAt: now,
   });
+  resetReminderFormState();
+  persistState();
+  renderAll();
+  reminders?.ensurePermission?.();
+  return { success: true };
+}
+
+function submitReminderForm(formData = {}) {
+  const parsed = parseReminderInput(formData);
+  const now = Date.now();
+  let at = NaN;
+  let minutes = 0;
+  if (parsed.mode === REMINDER_MODE_MINUTES && parsed.reminderMinutes > 0) {
+    minutes = parsed.reminderMinutes;
+    at = now + minutes * 60000;
+  } else if (
+    parsed.mode === REMINDER_MODE_DATETIME &&
+    Number.isFinite(parsed.reminderAt)
+  ) {
+    at = parsed.reminderAt;
+    minutes = Math.max(0, Math.round((parsed.reminderAt - now) / 60000));
+  }
+
+  const values = {
+    title: (formData.title || '').trim(),
+    reminderMode: parsed.mode,
+    reminderMinutes:
+      parsed.mode === REMINDER_MODE_MINUTES && parsed.reminderMinutes > 0
+        ? parsed.reminderMinutes
+        : '',
+    reminderAt:
+      parsed.mode === REMINDER_MODE_DATETIME && Number.isFinite(parsed.reminderAt)
+        ? formatDateTimeLocal(parsed.reminderAt)
+        : '',
+  };
+  updateReminderFormState({ values, error: '' });
+
+  if (!Number.isFinite(at) || at <= now) {
+    updateReminderFormState({ error: T.reminderFormError, values });
+    renderAll();
+    return { error: T.reminderFormError };
+  }
+
+  const title = values.title || T.reminderDefaultTitle;
+  const record = {
+    title,
+    at: Math.round(at),
+    minutes: minutes > 0 ? minutes : null,
+    createdAt: now,
+  };
+
+  if (reminderFormState.editingId) {
+    const target = (state.customReminders || []).find(
+      (item) => item.id === reminderFormState.editingId,
+    );
+    if (!target) {
+      resetReminderFormState();
+      renderAll();
+      return { error: T.reminderFormError };
+    }
+    target.title = record.title;
+    target.at = record.at;
+    target.minutes = record.minutes;
+    target.createdAt = record.createdAt;
+  } else {
+    state.customReminders.push({ id: uid(), ...record });
+  }
+
+  resetReminderFormState();
+  persistState();
+  renderAll();
+  reminders?.ensurePermission?.();
+  return { success: true };
+}
+
+function addRemindersCard() {
+  if (!state.remindersCard) {
+    state.remindersCard = {
+      enabled: true,
+      title: '',
+      width: SIZE_MAP.md.width,
+      height: SIZE_MAP.md.height,
+      wSize: 'md',
+      hSize: 'md',
+    };
+  } else {
+    state.remindersCard.enabled = true;
+  }
+  if (typeof state.remindersPos !== 'number' || state.remindersPos < 0) {
+    state.remindersPos = state.groups.length;
+  }
+  resetReminderFormState();
+  persistState();
+  renderAll();
+  focusReminderCard();
+}
+
+function removeRemindersCard() {
+  if (!state.remindersCard) return;
+  state.remindersCard.enabled = false;
+  resetReminderFormState();
+  persistState();
+  renderAll();
+}
+
+function setRemindersCardTitle(title) {
+  if (!state.remindersCard) return;
+  state.remindersCard.title = title.trim();
+  persistState();
+}
+
+function openReminders() {
+  if (state.remindersCard?.enabled && focusReminderCard()) {
+    return;
+  }
+  alert(T.reminderCardMissing);
 }
 
 /**
@@ -382,13 +638,36 @@ function renderAll() {
       removeNotes,
       toggleCollapse,
       confirmDialog: (msg) => confirmDlg(T, msg),
+      reminders: {
+        entries: () => buildReminderEntries().sort((a, b) => a.at - b.at),
+        clear: (key) => clearReminder(key),
+        snooze: (key, minutes) => {
+          const newAt = snoozeReminder(key, minutes);
+          if (Number.isFinite(newAt)) {
+            persistState();
+            renderAll();
+          }
+        },
+        edit: (entry) => editReminder(entry),
+        quick: (minutes) => createQuickReminder(minutes),
+        submit: (payload) => submitReminderForm(payload),
+        formState: () => reminderFormState,
+        cancelEdit: () => cancelEditCustomReminder(),
+        focus: () => focusReminderCard(),
+        startEditCustom: (id) => beginEditCustomReminder(id),
+        removeCard: () => removeRemindersCard(),
+        setTitle: (title) => setRemindersCardTitle(title),
+        cardState: () => state.remindersCard,
+        quickPresets: () => [...REMINDER_QUICK_MINUTES],
+        snoozeMinutes: REMINDER_SNOOZE_MINUTES,
+      },
     },
     () => persistState(),
   );
 }
 
 function updateUI() {
-  updateEditingUI(editing, T, I, renderAll);
+  updateEditingUI(editing, state, T, I, renderAll);
   pageTitleEl.contentEditable = editing;
   pageIconEl.contentEditable = editing;
   if (!editing) {
@@ -686,6 +965,13 @@ document.getElementById('addNote').addEventListener('click', () => {
   hideAddMenu();
   editNotes();
 });
+const addRemindersBtn = document.getElementById('addRemindersCard');
+if (addRemindersBtn) {
+  addRemindersBtn.addEventListener('click', () => {
+    hideAddMenu();
+    addRemindersCard();
+  });
+}
 document.getElementById('exportBtn').addEventListener('click', () => {
   exportJson(state);
 });
