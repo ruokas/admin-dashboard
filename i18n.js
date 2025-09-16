@@ -22,6 +22,8 @@ export const Tlt = {
   reminderNotificationTitle: 'Priminimas',
   reminderNoteBody: 'Patikrinkite pastabas',
   reminderItemBody: 'Patikrinkite įrašą',
+  reminders: 'Priminimai',
+  noReminders: 'Priminimų nėra',
   toDark: 'Perjungti į tamsią temą',
   toLight: 'Perjungti į šviesią temą',
   openAll: 'Atverti visas',
@@ -44,7 +46,8 @@ export const Tlt = {
   itemUrl: 'URL',
   itemIcon: 'Pasirinkite piktogramą (nebūtina)',
   itemNote: 'Pastaba (nebūtina)',
-  sheetTip: 'Patarimas: Google Sheets turi būti „Publish to web“ arba bendrinamas.',
+  sheetTip:
+    'Patarimas: Google Sheets turi būti „Publish to web“ arba bendrinamas.',
   confirmDelGroup: 'Pašalinti šią grupę ir visus jos įrašus?',
   confirmDelChart: 'Pašalinti šį grafiką?',
   confirmDelItem: 'Pašalinti šį įrašą?',

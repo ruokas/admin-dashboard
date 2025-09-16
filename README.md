@@ -25,6 +25,7 @@ Statinis vieno failo HTML projektas, skirtas publikuoti per **GitHub Pages**.
 - Pastabų kortelę galima perkelti tarp grupių drag-and-drop būdu.
 - Spalvų meniu turi mygtuką **Atstatyti**, grąžinantį numatytas spalvas.
 - Galima nustatyti priminimus kortelėms ir pastabų blokui (reikalingas naršyklės pranešimų leidimas).
+- Priminimų skydelis leidžia peržiūrėti ir atšaukti aktyvius priminimus.
 
 ## Priminimai ir privatumas
 
