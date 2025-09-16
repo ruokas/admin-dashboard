@@ -23,6 +23,7 @@ Statinis vieno failo HTML projektas, skirtas publikuoti per **GitHub Pages**.
 - Jei pavadinimas tuščias redagavimo režime, rodomas pilkas užrašas „Įveskite pavadinimą“.
 - Spalvų temą galima keisti paspaudus **Tema** – parinktys išsaugomos `localStorage`.
 - Pastabų kortelę galima perkelti tarp grupių drag-and-drop būdu.
+- Galima kurti kelias pastabų korteles, kiekvienai parenkant taškelio spalvą, šrifto dydį ir paraštes.
 - Spalvų meniu turi mygtuką **Atstatyti**, grąžinantį numatytas spalvas.
 - Galima nustatyti priminimus kortelėms ir pastabų blokui (reikalingas naršyklės pranešimų leidimas).
 - Priminimų skydelis leidžia peržiūrėti ir atšaukti aktyvius priminimus.
@@ -40,6 +41,8 @@ Statinis vieno failo HTML projektas, skirtas publikuoti per **GitHub Pages**.
 Grupių kortelių matmenys nustatomi per `style` atributus ir saugomi naršyklėje
 (`group.width`, `group.height`, `notesBox.width`, `notesBox.height`).
 Numatyti matmenys – 360×360 px.
+
+Pastabų kortelės pagal nutylėjimą naudoja 20 px šriftą ir 20 px paraštes.
 
 ## Smoke test
 

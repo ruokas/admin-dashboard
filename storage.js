@@ -1,87 +1,190 @@
 import { sizeFromWidth, sizeFromHeight } from './sizes.js';
 
 const STORAGE_KEY = 'ed_dashboard_lt_v1';
+const NOTE_DEFAULT_COLOR = '#fef08a';
+const NOTE_DEFAULT_FONT = 20;
+const NOTE_DEFAULT_PADDING = 20;
+const DEFAULT_CARD_WIDTH = 360;
+const DEFAULT_CARD_HEIGHT = 360;
+
+function makeId(prefix = 'note') {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return `${prefix}-${crypto.randomUUID().slice(0, 8)}`;
+  }
+  return `${prefix}-${Date.now().toString(16)}-${Math.random()
+    .toString(16)
+    .slice(2, 6)}`;
+}
+
+function sanitizeColor(value, fallback = NOTE_DEFAULT_COLOR) {
+  if (typeof value !== 'string') return fallback;
+  const trimmed = value.trim();
+  if (/^#([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(trimmed)) {
+    return trimmed;
+  }
+  return fallback;
+}
+
+function sanitizeTimestamp(value) {
+  if (Number.isFinite(value)) return Math.round(value);
+  if (typeof value === 'string' && value) {
+    const parsed = Date.parse(value);
+    if (Number.isFinite(parsed)) return Math.round(parsed);
+  }
+  return null;
+}
 
 export function load() {
   try {
     const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '');
     if (data && Array.isArray(data.groups)) {
-      data.groups.forEach((g) => {
-        g.items?.forEach((it) => {
-          if (!('iconUrl' in it)) it.iconUrl = '';
-          if (!('icon' in it)) it.icon = '';
-          if (Number.isFinite(it.reminderMinutes) && it.reminderMinutes > 0) {
-            it.reminderMinutes = Math.max(0, Math.round(it.reminderMinutes));
-          } else {
-            delete it.reminderMinutes;
-          }
-          if (typeof it.reminderAt === 'string' && it.reminderAt) {
-            const parsed = Date.parse(it.reminderAt);
-            if (Number.isFinite(parsed)) it.reminderAt = Math.round(parsed);
-            else delete it.reminderAt;
-          } else if (Number.isFinite(it.reminderAt)) {
-            it.reminderAt = Math.round(it.reminderAt);
-          } else {
-            delete it.reminderAt;
-          }
-        });
-        if (typeof g.width !== 'number' || typeof g.height !== 'number') {
-          let width = 360;
-          let height = 360;
-          if (g.size === 'sm') {
+      const groups = Array.isArray(data.groups) ? [...data.groups] : [];
+
+      const legacyText = typeof data.notes === 'string' ? data.notes : '';
+      const legacyTitle = typeof data.notesTitle === 'string' ? data.notesTitle : '';
+      const legacyOpts = data.notesOpts || {};
+      const legacyBox = data.notesBox || {};
+      const legacyReminderMinutes = Number.isFinite(data.notesReminderMinutes)
+        ? Math.max(0, Math.round(data.notesReminderMinutes))
+        : 0;
+      const legacyReminderAt = sanitizeTimestamp(data.notesReminderAt);
+      const migrateLegacy =
+        legacyText.trim().length > 0 ||
+        legacyTitle.trim().length > 0 ||
+        legacyReminderMinutes > 0 ||
+        Number.isFinite(legacyReminderAt);
+      if (migrateLegacy) {
+        let width = Number.isFinite(legacyBox.width) ? legacyBox.width : DEFAULT_CARD_WIDTH;
+        let height = Number.isFinite(legacyBox.height) ? legacyBox.height : DEFAULT_CARD_HEIGHT;
+        if (!Number.isFinite(legacyBox.width) || !Number.isFinite(legacyBox.height)) {
+          if (legacyBox.size === 'sm') {
             width = 240;
             height = 240;
-          } else if (g.size === 'lg') {
+          } else if (legacyBox.size === 'lg') {
             width = 480;
             height = 480;
           }
-          g.width = width;
-          g.height = height;
         }
-        g.wSize = g.wSize || sizeFromWidth(g.width);
-        g.hSize = g.hSize || sizeFromHeight(g.height);
-        delete g.size;
-      });
-      if (typeof data.notes !== 'string') data.notes = '';
-      if (typeof data.notesTitle !== 'string') data.notesTitle = '';
-      if (typeof data.title !== 'string') data.title = '';
-      if (typeof data.icon !== 'string') data.icon = '';
-      if (!Number.isFinite(data.notesReminderMinutes))
-        data.notesReminderMinutes = 0;
-      else data.notesReminderMinutes = Math.max(0, Math.round(data.notesReminderMinutes));
-      if (typeof data.notesReminderAt === 'string' && data.notesReminderAt) {
-        const parsed = Date.parse(data.notesReminderAt);
-        data.notesReminderAt = Number.isFinite(parsed) ? Math.round(parsed) : null;
+        const note = {
+          id: makeId(),
+          type: 'note',
+          title: legacyTitle || 'Pastabos',
+          name: legacyTitle || 'Pastabos',
+          text: legacyText,
+          color: NOTE_DEFAULT_COLOR,
+          width,
+          height,
+          wSize: sizeFromWidth(width),
+          hSize: sizeFromHeight(height),
+          fontSize:
+            Number.isFinite(legacyOpts.size) && legacyOpts.size > 0
+              ? Math.round(legacyOpts.size)
+              : NOTE_DEFAULT_FONT,
+          padding:
+            Number.isFinite(legacyOpts.padding) && legacyOpts.padding >= 0
+              ? Math.round(legacyOpts.padding)
+              : NOTE_DEFAULT_PADDING,
+          reminderMinutes: legacyReminderMinutes,
+          reminderAt: legacyReminderAt,
+        };
+        const pos = Math.max(
+          0,
+          Math.min(Number.isFinite(data.notesPos) ? Math.round(data.notesPos) : 0, groups.length),
+        );
+        groups.splice(pos, 0, note);
       }
-      if (!Number.isFinite(data.notesReminderAt)) data.notesReminderAt = null;
-      if (
-        !data.notesBox ||
-        typeof data.notesBox.width !== 'number' ||
-        typeof data.notesBox.height !== 'number'
-      ) {
-        const sz = data.notesBox?.size;
-        let width = 360;
-        let height = 360;
-        if (sz === 'sm') {
-          width = 240;
-          height = 240;
-        } else if (sz === 'lg') {
-          width = 480;
-          height = 480;
-        }
-        data.notesBox = { width, height, wSize: sizeFromWidth(width), hSize: sizeFromHeight(height) };
-      } else {
-        data.notesBox.wSize = data.notesBox.wSize || sizeFromWidth(data.notesBox.width);
-        data.notesBox.hSize = data.notesBox.hSize || sizeFromHeight(data.notesBox.height);
-        delete data.notesBox.size;
-      }
-      if (
-        !data.notesOpts ||
-        typeof data.notesOpts.size !== 'number' ||
-        typeof data.notesOpts.padding !== 'number'
-      )
-        data.notesOpts = { size: 16, padding: 8 };
-      if (typeof data.notesPos !== 'number') data.notesPos = 0;
+
+      const normalisedGroups = groups
+        .map((g) => {
+          if (!g || typeof g !== 'object') return null;
+          let width = Number.isFinite(g.width) ? g.width : DEFAULT_CARD_WIDTH;
+          let height = Number.isFinite(g.height) ? g.height : DEFAULT_CARD_HEIGHT;
+          if (!Number.isFinite(g.width) || !Number.isFinite(g.height)) {
+            if (g.size === 'sm') {
+              width = 240;
+              height = 240;
+            } else if (g.size === 'lg') {
+              width = 480;
+              height = 480;
+            }
+          }
+
+          if (g.type === 'note') {
+            const title =
+              typeof g.title === 'string' && g.title.trim()
+                ? g.title.trim()
+                : typeof g.name === 'string' && g.name.trim()
+                  ? g.name.trim()
+                  : 'Pastabos';
+            const fontSize =
+              Number.isFinite(g.fontSize) && g.fontSize > 0
+                ? Math.round(g.fontSize)
+                : NOTE_DEFAULT_FONT;
+            const padding =
+              Number.isFinite(g.padding) && g.padding >= 0
+                ? Math.round(g.padding)
+                : NOTE_DEFAULT_PADDING;
+            return {
+              id: typeof g.id === 'string' && g.id ? g.id : makeId(),
+              type: 'note',
+              title,
+              name: title,
+              text: typeof g.text === 'string' ? g.text : '',
+              color: sanitizeColor(g.color),
+              width,
+              height,
+              wSize: g.wSize || sizeFromWidth(width),
+              hSize: g.hSize || sizeFromHeight(height),
+              fontSize,
+              padding,
+              reminderMinutes:
+                Number.isFinite(g.reminderMinutes) && g.reminderMinutes > 0
+                  ? Math.max(0, Math.round(g.reminderMinutes))
+                  : 0,
+              reminderAt: sanitizeTimestamp(g.reminderAt),
+            };
+          }
+
+          const group = { ...g };
+          group.id = typeof g.id === 'string' && g.id ? g.id : makeId('group');
+          group.width = width;
+          group.height = height;
+          group.wSize = g.wSize || sizeFromWidth(group.width);
+          group.hSize = g.hSize || sizeFromHeight(group.height);
+          delete group.size;
+          if (!Array.isArray(group.items)) group.items = [];
+          group.items = group.items.map((it) => {
+            if (!it || typeof it !== 'object') return null;
+            const item = { ...it };
+            if (!('iconUrl' in item)) item.iconUrl = '';
+            if (!('icon' in item)) item.icon = '';
+            if (Number.isFinite(item.reminderMinutes) && item.reminderMinutes > 0) {
+              item.reminderMinutes = Math.max(0, Math.round(item.reminderMinutes));
+            } else {
+              delete item.reminderMinutes;
+            }
+            const reminderAt = sanitizeTimestamp(item.reminderAt);
+            if (reminderAt) item.reminderAt = reminderAt;
+            else delete item.reminderAt;
+            return item;
+          }).filter(Boolean);
+          return group;
+        })
+        .filter(Boolean);
+
+      data.groups = normalisedGroups;
+
+      delete data.notes;
+      delete data.notesTitle;
+      delete data.notesBox;
+      delete data.notesOpts;
+      delete data.notesPos;
+      delete data.notesReminderMinutes;
+      delete data.notesReminderAt;
+
+      data.title = typeof data.title === 'string' ? data.title : '';
+      data.icon = typeof data.icon === 'string' ? data.icon : '';
+
       if (!Array.isArray(data.customReminders)) data.customReminders = [];
       else
         data.customReminders = data.customReminders
@@ -103,13 +206,14 @@ export function load() {
               ? Math.round(entry.createdAt)
               : Date.now(),
           }));
+
       if (
         !data.remindersCard ||
         typeof data.remindersCard.width !== 'number' ||
         typeof data.remindersCard.height !== 'number'
       ) {
-        const width = 360;
-        const height = 360;
+        const width = DEFAULT_CARD_WIDTH;
+        const height = DEFAULT_CARD_HEIGHT;
         data.remindersCard = {
           enabled: false,
           title: '',
@@ -144,20 +248,13 @@ export function save(state) {
 export function seed() {
   const data = {
     groups: [],
-    notes: '',
-    notesTitle: '',
-    notesBox: { width: 360, height: 360, wSize: 'md', hSize: 'md' },
-    notesOpts: { size: 16, padding: 8 },
-    notesPos: 0,
-    notesReminderMinutes: 0,
-    notesReminderAt: null,
     remindersCard: {
       enabled: false,
       title: '',
-      width: 360,
-      height: 360,
-      wSize: 'md',
-      hSize: 'md',
+      width: DEFAULT_CARD_WIDTH,
+      height: DEFAULT_CARD_HEIGHT,
+      wSize: sizeFromWidth(DEFAULT_CARD_WIDTH),
+      hSize: sizeFromHeight(DEFAULT_CARD_HEIGHT),
     },
     remindersPos: 0,
     customReminders: [],
