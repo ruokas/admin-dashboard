@@ -326,9 +326,39 @@ async function openReminders() {
   });
 }
 
+/**
+ * Updates the reminders button badge with the current count.
+ * @param {number} count Total reminder entries detected.
+ */
+function updateReminderBadge(count) {
+  if (!remindersBtn) return;
+
+  const safeCount = Number.isFinite(count) && count > 0 ? Math.round(count) : 0;
+  const label = safeCount > 0 ? `${T.reminders} (${safeCount})` : T.reminders;
+  remindersBtn.setAttribute('aria-label', label);
+  remindersBtn.title = label;
+
+  let badge = remindersBtn.querySelector('.reminder-badge');
+  if (safeCount > 0) {
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'reminder-badge';
+      badge.setAttribute('aria-hidden', 'true');
+      remindersBtn.appendChild(badge);
+    }
+    const displayCount = safeCount > 99 ? '99+' : String(safeCount);
+    badge.textContent = displayCount;
+  } else if (badge) {
+    badge.remove();
+  }
+}
+
 function syncReminders() {
-  if (!reminders) return;
-  reminders.sync(buildReminderEntries());
+  const entries = buildReminderEntries();
+  if (reminders) {
+    reminders.sync(entries);
+  }
+  updateReminderBadge(entries.length);
 }
 
 function persistState() {
@@ -669,10 +699,10 @@ document.getElementById('fileInput').addEventListener('change', (e) => {
 });
 
 reminders = createReminderManager();
-syncReminders();
 remindersBtn.innerHTML = `${I.clock} <span>${T.reminders}</span>`;
-remindersBtn.setAttribute('aria-label', T.reminders);
 remindersBtn.addEventListener('click', openReminders);
+updateReminderBadge(0);
+syncReminders();
 themeBtn.addEventListener('click', toggleTheme);
 editBtn.addEventListener('click', () => {
   editing = !editing;
