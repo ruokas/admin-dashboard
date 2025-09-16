@@ -381,6 +381,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
       const rHSize = cardState.hSize || sizeFromHeight(rHeight);
       applySize(remGrp, rWidth, rHeight, rWSize, rHSize);
       remGrp.style.resize = editing ? 'both' : 'none';
+      remGrp.style.overflow = editing ? 'auto' : 'visible';
       if (editing) {
         remGrp.addEventListener('mousedown', (e) => {
           const rect = remGrp.getBoundingClientRect();
@@ -784,6 +785,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
       const nHSize = g.hSize || sizeFromHeight(nHeight);
       applySize(noteGrp, nWidth, nHeight, nWSize, nHSize);
       noteGrp.style.resize = editing ? 'both' : 'none';
+      noteGrp.style.overflow = editing ? 'auto' : 'visible';
       if (editing) {
         noteGrp.addEventListener('mousedown', (e) => {
           const rect = noteGrp.getBoundingClientRect();
@@ -878,6 +880,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
       const gHSize = g.hSize ?? sizeFromHeight(gHeight);
       applySize(grp, gWidth, gHeight, gWSize, gHSize);
       grp.style.resize = editing ? 'both' : 'none';
+      grp.style.overflow = editing ? 'auto' : 'visible';
       if (editing) {
         grp.addEventListener('mousedown', (e) => {
           const rect = grp.getBoundingClientRect();
@@ -997,6 +1000,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
     const gHSize2 = g.hSize ?? sizeFromHeight(gHeight2);
     applySize(grp, gWidth2, gHeight2, gWSize2, gHSize2);
     grp.style.resize = editing ? 'both' : 'none';
+    grp.style.overflow = editing ? 'auto' : 'visible';
     if (editing) {
       grp.addEventListener('mousedown', (e) => {
         const rect = grp.getBoundingClientRect();
