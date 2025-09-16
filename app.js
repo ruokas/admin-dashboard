@@ -19,6 +19,10 @@ T.en = T.en || {};
 
 const DEFAULT_TITLE = 'Admin skydelis';
 
+const REMINDER_MODE_NONE = 'none';
+const REMINDER_MODE_DATETIME = 'datetime';
+const REMINDER_MODE_MINUTES = 'minutes';
+
 const editBtn = document.getElementById('editBtn');
 // const syncStatus = document.getElementById('syncStatus'); // Sheets sync indikatorius (išjungta)
 const searchEl = document.getElementById('q');
@@ -77,6 +81,57 @@ function parseIframe(html) {
   const height = heightAttr ? parseInt(heightAttr, 10) : undefined;
 
   return { src, height };
+}
+
+function parseReminderInput(data = {}) {
+  const rawMode = typeof data.reminderMode === 'string' ? data.reminderMode : '';
+  let mode;
+  if (rawMode === REMINDER_MODE_MINUTES || rawMode === REMINDER_MODE_DATETIME) {
+    mode = rawMode;
+  } else if (rawMode === REMINDER_MODE_NONE) {
+    mode = REMINDER_MODE_NONE;
+  }
+  if (!mode) {
+    if ((typeof data.reminderAt === 'string' && data.reminderAt) || Number.isFinite(data.reminderAt)) {
+      mode = REMINDER_MODE_DATETIME;
+    } else if (Number.isFinite(data.reminderMinutes) && data.reminderMinutes > 0) {
+      mode = REMINDER_MODE_MINUTES;
+    } else {
+      mode = REMINDER_MODE_NONE;
+    }
+  }
+
+  let reminderMinutes = 0;
+  if (mode === REMINDER_MODE_MINUTES) {
+    const minutesVal = Number.parseInt(data.reminderMinutes, 10);
+    if (Number.isFinite(minutesVal) && minutesVal > 0) {
+      reminderMinutes = Math.max(0, Math.round(minutesVal));
+    } else if (Number.isFinite(data.reminderMinutes) && data.reminderMinutes > 0) {
+      reminderMinutes = Math.max(0, Math.round(data.reminderMinutes));
+    }
+    if (reminderMinutes <= 0) {
+      reminderMinutes = 0;
+      mode = REMINDER_MODE_NONE;
+    }
+  }
+
+  let reminderAt = null;
+  if (mode === REMINDER_MODE_DATETIME) {
+    let parsed = NaN;
+    if (typeof data.reminderAt === 'string') {
+      const raw = data.reminderAt.trim();
+      if (raw) parsed = Date.parse(raw);
+    } else if (Number.isFinite(data.reminderAt)) {
+      parsed = data.reminderAt;
+    }
+    if (Number.isFinite(parsed)) {
+      reminderAt = Math.round(parsed);
+    } else {
+      mode = REMINDER_MODE_NONE;
+    }
+  }
+
+  return { mode, reminderMinutes, reminderAt };
 }
 
 function normaliseReminderState() {
@@ -268,16 +323,23 @@ async function editNotes() {
     size: state.notesOpts.size,
     padding: state.notesOpts.padding,
     reminderMinutes: state.notesReminderMinutes || 0,
+    reminderAt: state.notesReminderAt,
   });
   if (res === null) return;
   state.notesTitle = res.title || T.notes;
   state.notes = res.text;
   state.notesOpts = { size: res.size, padding: res.padding };
-  state.notesReminderMinutes = Math.max(0, Math.round(res.reminderMinutes || 0));
-  if (state.notesReminderMinutes > 0) {
-    state.notesReminderAt = Date.now() + state.notesReminderMinutes * 60000;
+  const reminder = parseReminderInput(res);
+  if (reminder.mode === REMINDER_MODE_MINUTES && reminder.reminderMinutes > 0) {
+    state.notesReminderMinutes = reminder.reminderMinutes;
+    state.notesReminderAt = Date.now() + reminder.reminderMinutes * 60000;
+    if (reminders) await reminders.ensurePermission();
+  } else if (reminder.mode === REMINDER_MODE_DATETIME && Number.isFinite(reminder.reminderAt)) {
+    state.notesReminderMinutes = 0;
+    state.notesReminderAt = reminder.reminderAt;
     if (reminders) await reminders.ensurePermission();
   } else {
+    state.notesReminderMinutes = 0;
     state.notesReminderAt = null;
   }
   persistState();
@@ -334,10 +396,6 @@ async function addItem(gid) {
     data.url = parsed.src;
     if (parsed.height) data.h = parsed.height;
   }
-  const reminderMinutes =
-    Number.isFinite(data.reminderMinutes) && data.reminderMinutes > 0
-      ? Math.max(0, Math.round(data.reminderMinutes))
-      : 0;
   const newItem = {
     id: uid(),
     type: data.type,
@@ -347,9 +405,13 @@ async function addItem(gid) {
     icon: data.icon,
   };
   if (data.h) newItem.h = data.h;
-  if (reminderMinutes > 0) {
-    newItem.reminderMinutes = reminderMinutes;
-    newItem.reminderAt = Date.now() + reminderMinutes * 60000;
+  const reminder = parseReminderInput(data);
+  if (reminder.mode === REMINDER_MODE_MINUTES && reminder.reminderMinutes > 0) {
+    newItem.reminderMinutes = reminder.reminderMinutes;
+    newItem.reminderAt = Date.now() + reminder.reminderMinutes * 60000;
+    if (reminders) await reminders.ensurePermission();
+  } else if (reminder.mode === REMINDER_MODE_DATETIME && Number.isFinite(reminder.reminderAt)) {
+    newItem.reminderAt = reminder.reminderAt;
     if (reminders) await reminders.ensurePermission();
   }
   g.items.push(newItem);
@@ -381,13 +443,14 @@ async function editItem(gid, iid) {
   it.icon = data.icon;
   if (data.h) it.h = data.h;
   else delete it.h;
-  const reminderMinutes =
-    Number.isFinite(data.reminderMinutes) && data.reminderMinutes > 0
-      ? Math.max(0, Math.round(data.reminderMinutes))
-      : 0;
-  if (reminderMinutes > 0) {
-    it.reminderMinutes = reminderMinutes;
-    it.reminderAt = Date.now() + reminderMinutes * 60000;
+  const reminder = parseReminderInput(data);
+  if (reminder.mode === REMINDER_MODE_MINUTES && reminder.reminderMinutes > 0) {
+    it.reminderMinutes = reminder.reminderMinutes;
+    it.reminderAt = Date.now() + reminder.reminderMinutes * 60000;
+    if (reminders) await reminders.ensurePermission();
+  } else if (reminder.mode === REMINDER_MODE_DATETIME && Number.isFinite(reminder.reminderAt)) {
+    delete it.reminderMinutes;
+    it.reminderAt = reminder.reminderAt;
     if (reminders) await reminders.ensurePermission();
   } else {
     delete it.reminderMinutes;

@@ -15,7 +15,13 @@ export function load() {
           } else {
             delete it.reminderMinutes;
           }
-          if (!Number.isFinite(it.reminderAt)) {
+          if (typeof it.reminderAt === 'string' && it.reminderAt) {
+            const parsed = Date.parse(it.reminderAt);
+            if (Number.isFinite(parsed)) it.reminderAt = Math.round(parsed);
+            else delete it.reminderAt;
+          } else if (Number.isFinite(it.reminderAt)) {
+            it.reminderAt = Math.round(it.reminderAt);
+          } else {
             delete it.reminderAt;
           }
         });
@@ -43,6 +49,10 @@ export function load() {
       if (!Number.isFinite(data.notesReminderMinutes))
         data.notesReminderMinutes = 0;
       else data.notesReminderMinutes = Math.max(0, Math.round(data.notesReminderMinutes));
+      if (typeof data.notesReminderAt === 'string' && data.notesReminderAt) {
+        const parsed = Date.parse(data.notesReminderAt);
+        data.notesReminderAt = Number.isFinite(parsed) ? Math.round(parsed) : null;
+      }
       if (!Number.isFinite(data.notesReminderAt)) data.notesReminderAt = null;
       if (
         !data.notesBox ||

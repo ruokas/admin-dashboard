@@ -1,5 +1,35 @@
 import { I } from './icons.js';
 
+const REMINDER_NONE = 'none';
+const REMINDER_DATETIME = 'datetime';
+const REMINDER_MINUTES = 'minutes';
+
+function formatDateTimeLocal(timestamp) {
+  if (!Number.isFinite(timestamp)) return '';
+  const date = new Date(timestamp);
+  const pad = (val) => String(val).padStart(2, '0');
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  const hours = pad(date.getHours());
+  const minutes = pad(date.getMinutes());
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+function setupReminderControls(form) {
+  const modeSelect = form.querySelector('[name="reminderMode"]');
+  if (!modeSelect) return;
+  const sections = form.querySelectorAll('[data-reminder]');
+  const update = () => {
+    const mode = modeSelect.value || REMINDER_NONE;
+    sections.forEach((section) => {
+      section.hidden = section.dataset.reminder !== mode;
+    });
+  };
+  update();
+  modeSelect.addEventListener('change', update);
+}
+
 export function groupFormDialog(T, data = {}) {
   return new Promise((resolve) => {
     const prevFocus = document.activeElement;
@@ -116,7 +146,15 @@ export function itemFormDialog(T, data = {}) {
         </div>
       </label>
       <label>${T.itemNote}<br><textarea name="note" rows="2"></textarea></label>
-      <label>${T.reminderMinutes}<br><input name="reminder" type="number" min="0" step="1"></label>
+      <label>${T.reminderMode}<br>
+        <select name="reminderMode">
+          <option value="${REMINDER_NONE}">${T.reminderNone}</option>
+          <option value="${REMINDER_DATETIME}">${T.reminderExactTime}</option>
+          <option value="${REMINDER_MINUTES}">${T.reminderAfter}</option>
+        </select>
+      </label>
+      <label data-reminder="${REMINDER_DATETIME}" hidden>${T.reminderExactTime}<br><input name="reminderAt" type="datetime-local"></label>
+      <label data-reminder="${REMINDER_MINUTES}" hidden>${T.reminderMinutes}<br><input name="reminderMinutes" type="number" min="0" step="1"></label>
       <p class="error" id="itemErr" role="status" aria-live="polite"></p>
       <menu>
         <button type="button" data-act="cancel">${T.cancel}</button>
@@ -136,10 +174,16 @@ export function itemFormDialog(T, data = {}) {
     form.url.value = data.url || '';
     iconInput.value = data.icon || '';
     form.note.value = data.note || '';
-    form.reminder.value =
-      typeof data.reminderMinutes === 'number' && data.reminderMinutes > 0
-        ? data.reminderMinutes
-        : '';
+    const hasReminderMinutes =
+      typeof data.reminderMinutes === 'number' && data.reminderMinutes > 0;
+    const hasReminderAt = Number.isFinite(data.reminderAt);
+    let reminderMode = REMINDER_NONE;
+    if (hasReminderAt) reminderMode = REMINDER_DATETIME;
+    else if (hasReminderMinutes) reminderMode = REMINDER_MINUTES;
+    form.reminderMode.value = reminderMode;
+    form.reminderMinutes.value = hasReminderMinutes ? data.reminderMinutes : '';
+    form.reminderAt.value = hasReminderAt ? formatDateTimeLocal(data.reminderAt) : '';
+    setupReminderControls(form);
 
     const initBtn = picker.querySelector(
       `button[data-val="${iconInput.value}"]`,
@@ -169,9 +213,17 @@ export function itemFormDialog(T, data = {}) {
       formData.url = formData.url.trim();
       formData.icon = formData.icon.trim();
       formData.note = formData.note.trim();
-      const reminderVal = parseInt(formData.reminder, 10);
-      formData.reminderMinutes = Number.isFinite(reminderVal) && reminderVal > 0 ? reminderVal : 0;
-      delete formData.reminder;
+      const reminderMode = formData.reminderMode || REMINDER_NONE;
+      const minutesVal = parseInt(formData.reminderMinutes, 10);
+      formData.reminderMode = reminderMode;
+      formData.reminderMinutes =
+        reminderMode === REMINDER_MINUTES && Number.isFinite(minutesVal) && minutesVal > 0
+          ? Math.max(0, Math.round(minutesVal))
+          : 0;
+      formData.reminderAt =
+        reminderMode === REMINDER_DATETIME && formData.reminderAt
+          ? formData.reminderAt
+          : '';
       if (!formData.title || !formData.url) {
         err.textContent = T.required;
         return;
@@ -265,7 +317,14 @@ export function chartFormDialog(T, data = {}) {
 
 export function notesDialog(
   T,
-  data = { title: '', text: '', size: 16, padding: 8, reminderMinutes: 0 },
+  data = {
+    title: '',
+    text: '',
+    size: 16,
+    padding: 8,
+    reminderMinutes: 0,
+    reminderAt: null,
+  },
 ) {
   return new Promise((resolve) => {
     const prevFocus = document.activeElement;
@@ -275,7 +334,15 @@ export function notesDialog(
       <label>${T.notes}<br><textarea name="note" rows="8"></textarea></label>
       <label>${T.noteSize}<br><input name="size" type="number" min="10" max="48"></label>
       <label>${T.notePadding}<br><input name="padding" type="number" min="0" max="100"></label>
-      <label>${T.reminderMinutes}<br><input name="reminder" type="number" min="0" step="1"></label>
+      <label>${T.reminderMode}<br>
+        <select name="reminderMode">
+          <option value="${REMINDER_NONE}">${T.reminderNone}</option>
+          <option value="${REMINDER_DATETIME}">${T.reminderExactTime}</option>
+          <option value="${REMINDER_MINUTES}">${T.reminderAfter}</option>
+        </select>
+      </label>
+      <label data-reminder="${REMINDER_DATETIME}" hidden>${T.reminderExactTime}<br><input name="reminderAt" type="datetime-local"></label>
+      <label data-reminder="${REMINDER_MINUTES}" hidden>${T.reminderMinutes}<br><input name="reminderMinutes" type="number" min="0" step="1"></label>
       <menu>
         <button type="button" data-act="cancel">${T.cancel}</button>
         <button type="submit" class="btn-accent">${T.save}</button>
@@ -290,10 +357,16 @@ export function notesDialog(
     form.note.value = data.text || '';
     form.size.value = data.size || 16;
     form.padding.value = data.padding || 8;
-    form.reminder.value =
-      typeof data.reminderMinutes === 'number' && data.reminderMinutes > 0
-        ? data.reminderMinutes
-        : '';
+    const hasReminderMinutes =
+      typeof data.reminderMinutes === 'number' && data.reminderMinutes > 0;
+    const hasReminderAt = Number.isFinite(data.reminderAt);
+    let reminderMode = REMINDER_NONE;
+    if (hasReminderAt) reminderMode = REMINDER_DATETIME;
+    else if (hasReminderMinutes) reminderMode = REMINDER_MINUTES;
+    form.reminderMode.value = reminderMode;
+    form.reminderMinutes.value = hasReminderMinutes ? data.reminderMinutes : '';
+    form.reminderAt.value = hasReminderAt ? formatDateTimeLocal(data.reminderAt) : '';
+    setupReminderControls(form);
 
     function cleanup() {
       form.removeEventListener('submit', submit);
@@ -304,15 +377,24 @@ export function notesDialog(
 
     function submit(e) {
       e.preventDefault();
-      const reminderVal = parseInt(form.reminder.value, 10);
+      const reminderMode = form.reminderMode.value || REMINDER_NONE;
+      const reminderVal = parseInt(form.reminderMinutes.value, 10);
       const reminderMinutes =
-        Number.isFinite(reminderVal) && reminderVal > 0 ? reminderVal : 0;
+        reminderMode === REMINDER_MINUTES && Number.isFinite(reminderVal) && reminderVal > 0
+          ? Math.max(0, Math.round(reminderVal))
+          : 0;
+      const reminderAt =
+        reminderMode === REMINDER_DATETIME && form.reminderAt.value
+          ? form.reminderAt.value
+          : '';
       resolve({
         title: form.title.value.trim(),
         text: form.note.value.trim(),
         size: parseInt(form.size.value, 10) || 16,
         padding: parseInt(form.padding.value, 10) || 8,
         reminderMinutes,
+        reminderMode,
+        reminderAt,
       });
       cleanup();
     }
