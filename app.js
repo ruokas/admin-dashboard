@@ -182,6 +182,7 @@ function buildReminderEntries() {
       at: state.notesReminderAt,
       title: T.reminderNotificationTitle,
       body,
+      data: { type: 'notes' },
       onTrigger: () => {
         state.notesReminderAt = null;
         state.notesReminderMinutes = 0;
@@ -205,6 +206,7 @@ function buildReminderEntries() {
         at: it.reminderAt,
         title: T.reminderNotificationTitle,
         body,
+        data: { type: 'item', gid: g.id, iid: it.id },
         onTrigger: () => {
           delete it.reminderAt;
           delete it.reminderMinutes;

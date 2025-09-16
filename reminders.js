@@ -1,21 +1,117 @@
 const MAX_DELAY = 2147483647;
 
+function focusWindow() {
+  if (typeof window === 'undefined') return;
+  if (typeof window.focus !== 'function') return;
+  try {
+    window.focus();
+  } catch (err) {
+    console.debug('Nepavyko sufokusuoti lango', err);
+  }
+}
+
+function highlightElement(el) {
+  if (!el) return;
+  if (typeof el.scrollIntoView === 'function') {
+    try {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } catch {
+      el.scrollIntoView();
+    }
+  }
+  el.classList.add('reminder-highlight');
+  setTimeout(() => {
+    if (el && el.classList) {
+      el.classList.remove('reminder-highlight');
+    }
+  }, 2000);
+}
+
+function activateEntry(entry, attempt = 0) {
+  if (!entry?.data) return;
+  if (typeof document === 'undefined') return;
+  if (attempt > 5) return;
+  const data = entry.data;
+  if (data.type === 'notes') {
+    const notesEl = document.querySelector('.group[data-id="notes"]');
+    if (notesEl) highlightElement(notesEl);
+    return;
+  }
+  if (data.type === 'item') {
+    const { gid, iid } = data;
+    if (!gid || !iid) return;
+    const gidStr = String(gid);
+    const iidStr = String(iid);
+    let groupEl = null;
+    if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+      groupEl = document.querySelector(
+        `.group[data-id="${CSS.escape(gidStr)}"]`,
+      );
+    }
+    if (!groupEl) {
+      groupEl = Array.from(document.querySelectorAll('.group')).find(
+        (el) => el.dataset.id === gidStr,
+      );
+    }
+    if (!groupEl) {
+      setTimeout(() => activateEntry(entry, attempt + 1), 120);
+      return;
+    }
+    if (groupEl.classList.contains('collapsed')) {
+      const toggleBtn = groupEl.querySelector('[data-collapse]');
+      if (toggleBtn) {
+        toggleBtn.click();
+        setTimeout(() => activateEntry(entry, attempt + 1), 120);
+        return;
+      }
+    }
+    let itemEl = null;
+    if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+      itemEl = groupEl.querySelector(
+        `.item[data-gid="${CSS.escape(gidStr)}"][data-iid="${CSS.escape(iidStr)}"]`,
+      );
+    }
+    if (!itemEl) {
+      itemEl = Array.from(groupEl.querySelectorAll('.item')).find(
+        (el) => el.dataset.gid === gidStr && el.dataset.iid === iidStr,
+      );
+    }
+    if (!itemEl) {
+      const searchEl = document.getElementById('q');
+      if (searchEl && searchEl.value) {
+        searchEl.value = '';
+        searchEl.dispatchEvent(new Event('input', { bubbles: true }));
+        setTimeout(() => activateEntry(entry, attempt + 1), 120);
+        return;
+      }
+      setTimeout(() => activateEntry(entry, attempt + 1), 120);
+      return;
+    }
+    highlightElement(itemEl);
+  }
+}
+
 function fallbackAlert(entry, customFallback) {
+  let handled = false;
   if (typeof customFallback === 'function') {
     try {
       customFallback(entry);
-      return;
+      handled = true;
     } catch (err) {
       console.error('Reminder fallback error', err);
     }
   }
-  const message = [entry?.title, entry?.body].filter(Boolean).join('\n');
-  if (typeof window !== 'undefined' && typeof window.alert === 'function') {
-    if (message) window.alert(message);
-    else window.alert('Priminimas');
-  } else if (message) {
-    console.info('Reminder:', message);
+  if (!handled) {
+    const message = [entry?.title, entry?.body].filter(Boolean).join('\n');
+    if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+      if (message) window.alert(message);
+      else window.alert('Priminimas');
+    } else if (message) {
+      console.info('Reminder:', message);
+    }
   }
+  focusWindow();
+  setTimeout(() => activateEntry(entry), 0);
 }
 
 export function createReminderManager(options = {}) {
@@ -46,7 +142,23 @@ export function createReminderManager(options = {}) {
           tag: entry.key,
           data: entry.data || {},
         };
-        new Notification(title, options);
+        const notification = new Notification(title, options);
+        const handleClick = () => {
+          try {
+            focusWindow();
+            setTimeout(() => activateEntry(entry), 0);
+            if (typeof notification.close === 'function') {
+              notification.close();
+            }
+          } catch (err) {
+            console.error('Priminimo pranešimo paspaudimo klaida', err);
+          }
+        };
+        if (typeof notification.addEventListener === 'function') {
+          notification.addEventListener('click', handleClick);
+        } else {
+          notification.onclick = handleClick;
+        }
         return;
       } catch (err) {
         console.error('Priminimo pranešimas nepavyko', err);
