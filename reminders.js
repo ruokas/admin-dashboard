@@ -32,8 +32,20 @@ function activateEntry(entry, attempt = 0) {
   if (typeof document === 'undefined') return;
   if (attempt > 5) return;
   const data = entry.data;
-  if (data.type === 'notes') {
-    const notesEl = document.querySelector('.group[data-id="notes"]');
+  if (data.type === 'note') {
+    const noteId = String(data.id || '');
+    let notesEl = null;
+    if (noteId && typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+      notesEl = document.querySelector(`.group[data-id="${CSS.escape(noteId)}"]`);
+    }
+    if (!notesEl && noteId) {
+      notesEl = Array.from(document.querySelectorAll('.group')).find(
+        (el) => el.dataset.id === noteId,
+      );
+    }
+    if (!notesEl) {
+      notesEl = document.querySelector('.group.note-card');
+    }
     if (notesEl) highlightElement(notesEl);
     return;
   }

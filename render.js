@@ -105,14 +105,7 @@ const ro = new ResizeObserver((entries) => {
 
       targets.forEach((el) => {
         applySize(el, baseW, baseH, wSize, hSize);
-        if (el.dataset.id === 'notes') {
-          currentState.notesBox = {
-            width: baseW,
-            height: baseH,
-            wSize,
-            hSize,
-          };
-        } else if (el.dataset.id === 'reminders') {
+        if (el.dataset.id === 'reminders') {
           currentState.remindersCard = {
             ...(currentState.remindersCard || {}),
             width: baseW,
@@ -257,10 +250,6 @@ export function render(state, editing, T, I, handlers, saveFn) {
     const toId = e.currentTarget.dataset.id;
     if (!fromId || fromId === toId) return;
     const ids = currentState.groups.map((g) => g.id);
-    if (currentState.notes) {
-      const pos = Math.max(0, Math.min(currentState.notesPos || 0, ids.length));
-      ids.splice(pos, 0, 'notes');
-    }
     if (currentState.remindersCard?.enabled) {
       const rPos = Math.max(
         0,
@@ -274,12 +263,9 @@ export function render(state, editing, T, I, handlers, saveFn) {
     ids.splice(fromIdx, 1);
     ids.splice(toIdx, 0, fromId);
     const map = new Map(currentState.groups.map((g) => [g.id, g]));
-    currentState.notesPos = ids.indexOf('notes');
-    if (currentState.notesPos < 0) currentState.notesPos = 0;
     currentState.remindersPos = ids.indexOf('reminders');
     if (currentState.remindersPos < 0) currentState.remindersPos = 0;
     currentState.groups = ids
-      .filter((id) => id !== 'notes')
       .filter((id) => id !== 'reminders')
       .map((id) => map.get(id));
     persist();
@@ -291,20 +277,12 @@ export function render(state, editing, T, I, handlers, saveFn) {
   if (state.remindersCard?.enabled) {
     specials.push({ id: 'reminders', pos: state.remindersPos || 0 });
   }
-  if (state.notes) {
-    specials.push({ id: 'notes', pos: state.notesPos || 0 });
-  }
   specials
     .sort((a, b) => a.pos - b.pos)
     .forEach((special) => {
       const pos = Math.max(0, Math.min(special.pos, ids.length));
       ids.splice(pos, 0, special.id);
     });
-  currentState.notesPos = ids.indexOf('notes');
-  if (currentState.notesPos < 0) currentState.notesPos = Math.max(
-    0,
-    Math.min(state.notesPos || 0, ids.length),
-  );
   currentState.remindersPos = ids.indexOf('reminders');
   if (currentState.remindersPos < 0)
     currentState.remindersPos = Math.max(
@@ -313,7 +291,6 @@ export function render(state, editing, T, I, handlers, saveFn) {
     );
   const allGroups = ids
     .map((id) => {
-      if (id === 'notes') return { id: 'notes' };
       if (id === 'reminders') return { id: 'reminders' };
       return groupMap.get(id);
     })
@@ -649,7 +626,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
           const typeSpan = document.createElement('span');
           typeSpan.className = 'reminder-tag';
           const typeLabel =
-            entry.data?.type === 'notes'
+            entry.data?.type === 'note'
               ? T.reminderTypeNotes
               : entry.data?.type === 'item'
                 ? T.reminderTypeItem
@@ -722,19 +699,17 @@ export function render(state, editing, T, I, handlers, saveFn) {
       ro.observe(remGrp);
       return;
     }
-    if (g.id === 'notes') {
+    if (g.type === 'note') {
       const noteGrp = document.createElement('section');
-      noteGrp.className = 'group';
-      noteGrp.dataset.id = 'notes';
+      noteGrp.className = 'group note-card';
+      noteGrp.dataset.id = g.id;
       noteGrp.dataset.resizing = '0';
-      const nWidth =
-        state.notesBox?.width ??
-        SIZE_MAP[state.notesBox?.wSize ?? 'md'].width;
-      const nHeight =
-        state.notesBox?.height ??
-        SIZE_MAP[state.notesBox?.hSize ?? 'md'].height;
-      const nWSize = state.notesBox?.wSize ?? sizeFromWidth(nWidth);
-      const nHSize = state.notesBox?.hSize ?? sizeFromHeight(nHeight);
+      const fallbackW = SIZE_MAP[g.wSize ?? 'md']?.width ?? SIZE_MAP.md.width;
+      const fallbackH = SIZE_MAP[g.hSize ?? 'md']?.height ?? SIZE_MAP.md.height;
+      const nWidth = Number.isFinite(g.width) ? g.width : fallbackW;
+      const nHeight = Number.isFinite(g.height) ? g.height : fallbackH;
+      const nWSize = g.wSize || sizeFromWidth(nWidth);
+      const nHSize = g.hSize || sizeFromHeight(nHeight);
       applySize(noteGrp, nWidth, nHeight, nWSize, nHSize);
       noteGrp.style.resize = editing ? 'both' : 'none';
       if (editing) {
@@ -750,7 +725,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
         });
         noteGrp.draggable = true;
         noteGrp.addEventListener('dragstart', (e) => {
-          e.dataTransfer.setData('text/group', 'notes');
+          e.dataTransfer.setData('text/group', g.id);
           noteGrp.style.opacity = 0.5;
         });
         noteGrp.addEventListener('dragend', () => {
@@ -776,10 +751,12 @@ export function render(state, editing, T, I, handlers, saveFn) {
       });
       const h = document.createElement('div');
       h.className = 'group-header';
+      const dotColor = g.color || '#fef08a';
+      const headerTitle = escapeHtml(g.title || g.name || T.notes);
       h.innerHTML = `
         <div class="group-title">
-          <span class="dot" style="background:#fef08a"></span>
-          <h2>${escapeHtml(state.notesTitle || T.notes)}</h2>
+          <span class="dot" style="background:${dotColor}"></span>
+          <h2>${headerTitle}</h2>
         </div>
         ${
           editing
@@ -792,8 +769,8 @@ export function render(state, editing, T, I, handlers, saveFn) {
       h.addEventListener('click', (e) => {
         const btn = e.target.closest('button');
         if (!btn) return;
-        if (btn.dataset.act === 'edit') handlers.editNotes();
-        if (btn.dataset.act === 'del') handlers.removeNotes();
+        if (btn.dataset.act === 'edit') handlers.notes?.edit?.(g.id);
+        if (btn.dataset.act === 'del') handlers.notes?.remove?.(g.id);
       });
       noteGrp.appendChild(h);
       const itemsWrap = document.createElement('div');
@@ -802,9 +779,11 @@ export function render(state, editing, T, I, handlers, saveFn) {
       itemsScroll.className = 'items-scroll';
       const p = document.createElement('p');
       p.style.whiteSpace = 'pre-wrap';
-      p.style.padding = (state.notesOpts?.padding ?? 8) + 'px';
-      p.style.fontSize = (state.notesOpts?.size ?? 16) + 'px';
-      p.textContent = state.notes;
+      const padding = Number.isFinite(g.padding) ? g.padding : 20;
+      const fontSize = Number.isFinite(g.fontSize) ? g.fontSize : 20;
+      p.style.padding = padding + 'px';
+      p.style.fontSize = fontSize + 'px';
+      p.textContent = g.text || '';
       itemsScroll.appendChild(p);
       itemsWrap.appendChild(itemsScroll);
       noteGrp.appendChild(itemsWrap);

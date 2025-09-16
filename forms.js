@@ -444,8 +444,9 @@ export function notesDialog(
   data = {
     title: '',
     text: '',
-    size: 16,
-    padding: 8,
+    size: 20,
+    padding: 20,
+    color: '#fef08a',
     reminderMinutes: 0,
     reminderAt: null,
   },
@@ -458,6 +459,7 @@ export function notesDialog(
       <label>${T.notes}<br><textarea name="note" rows="8"></textarea></label>
       <label>${T.noteSize}<br><input name="size" type="number" min="10" max="48"></label>
       <label>${T.notePadding}<br><input name="padding" type="number" min="0" max="100"></label>
+      <label>${T.noteColor}<br><input name="color" type="color"></label>
       <label>${T.reminderMode}<br>
         <select name="reminderMode">
           <option value="${REMINDER_NONE}">${T.reminderNone}</option>
@@ -488,8 +490,9 @@ export function notesDialog(
     const cancel = form.querySelector('[data-act="cancel"]');
     form.title.value = data.title || '';
     form.note.value = data.text || '';
-    form.size.value = data.size || 16;
-    form.padding.value = data.padding || 8;
+    form.size.value = data.size || 20;
+    form.padding.value = data.padding || 20;
+    form.color.value = data.color || '#fef08a';
     const hasReminderMinutes =
       typeof data.reminderMinutes === 'number' && data.reminderMinutes > 0;
     const hasReminderAt = Number.isFinite(data.reminderAt);
@@ -528,8 +531,9 @@ export function notesDialog(
       resolve({
         title: form.title.value.trim(),
         text: form.note.value.trim(),
-        size: parseInt(form.size.value, 10) || 16,
-        padding: parseInt(form.padding.value, 10) || 8,
+        size: parseInt(form.size.value, 10) || 20,
+        padding: parseInt(form.padding.value, 10) || 20,
+        color: form.color.value || '#fef08a',
         reminderMinutes,
         reminderMode,
         reminderAt,

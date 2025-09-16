@@ -15,6 +15,7 @@ export const Tlt = {
   noteTitle: 'Pastabų pavadinimas',
   noteSize: 'Šrifto dydis (px)',
   notePadding: 'Paraštės (px)',
+  noteColor: 'Taškelio spalva',
   reminderMinutes: 'Priminimas po (min)',
   reminderMode: 'Priminimo tipas',
   reminderNone: 'Be priminimo',
