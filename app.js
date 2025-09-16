@@ -991,8 +991,9 @@ function applyTheme() {
   document.documentElement.classList.toggle('theme-light', light);
   const label = light ? T.toDark : T.toLight;
   const icon = light ? I.moon : I.sun;
-  themeBtn.innerHTML = `${icon} <span>${label}</span>`;
+  themeBtn.innerHTML = `${icon}`;
   themeBtn.setAttribute('aria-label', label);
+  themeBtn.title = label;
 }
 
 function toggleTheme() {
@@ -1058,8 +1059,10 @@ document.getElementById('fileInput').addEventListener('change', (e) => {
 });
 
 reminders = createReminderManager();
-remindersBtn.innerHTML = `${I.clock} <span>${T.reminders}</span>`;
-remindersBtn.addEventListener('click', openReminders);
+if (remindersBtn) {
+  remindersBtn.innerHTML = `${I.clock} <span>${T.reminders}</span>`;
+  remindersBtn.addEventListener('click', openReminders);
+}
 updateReminderBadge(0);
 syncReminders();
 themeBtn.addEventListener('click', toggleTheme);
