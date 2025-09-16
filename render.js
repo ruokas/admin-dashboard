@@ -643,7 +643,18 @@ export function render(state, editing, T, I, handlers, saveFn) {
                       : I.puzzle
                 }</div>`;
 
-        const metaHtml = `<div class="meta"><div class="title">${escapeHtml(it.title || '(be pavadinimo)')}</div><div class="sub">${escapeHtml(it.note || '')}</div></div>`;
+        const hasReminder = Number.isFinite(it.reminderAt);
+        const reminderLabel = escapeHtml(
+          T.reminderNotificationTitle || 'Priminimas',
+        );
+        const reminderHtml = hasReminder
+          ? `<span class="reminder-flag" role="img" aria-label="${reminderLabel}" title="${reminderLabel}">⏰</span>`
+          : '';
+        const metaHtml = `<div class="meta"><div class="title-row"><div class="title">${escapeHtml(
+          it.title || '(be pavadinimo)',
+        )}</div>${reminderHtml}</div><div class="sub">${escapeHtml(
+          it.note || '',
+        )}</div></div>`;
 
         const actionsHtml = editing
           ? `<div class="actions">

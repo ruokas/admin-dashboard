@@ -351,6 +351,12 @@ a.item {
   color: inherit;
   display: block;
 }
+.item .title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
 .item .meta .title {
   font-weight: 700;
   font-size: 1rem; /* keep size consistent after leaving edit mode */
@@ -358,6 +364,8 @@ a.item {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 }
 .item .meta .sub {
   font-size: 0.875rem; /* match default input size */
@@ -365,6 +373,13 @@ a.item {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.reminder-flag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.875rem;
+  line-height: 1;
+  color: var(--warn);
 }
 .item .actions {
   margin-left: auto;
