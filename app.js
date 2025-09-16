@@ -905,6 +905,15 @@ function importJson(file) {
         throw new Error(T.invalidImport);
       state = data;
       normaliseReminderState();
+      const importedTitle =
+        typeof state.title === 'string' ? state.title.trim() : '';
+      state.title = importedTitle || DEFAULT_TITLE;
+      const importedIcon =
+        typeof state.icon === 'string' ? state.icon.trim() : '';
+      state.icon = importedIcon;
+      pageTitleEl.textContent = state.title || DEFAULT_TITLE;
+      pageIconEl.textContent = state.icon || '';
+      document.title = state.title || DEFAULT_TITLE;
       persistState();
       renderAll();
     } catch (err) {
