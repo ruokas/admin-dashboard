@@ -42,8 +42,8 @@ test('legacy notes duomenys migruojami į note tipo kortelę', () => {
   assert.equal(note.color, '#fef08a');
   assert.equal(note.width, 400);
   assert.equal(note.height, 260);
-  assert.equal(note.reminderMinutes, 5);
-  assert.ok(Number.isFinite(note.reminderAt));
+  assert.ok(!('reminderMinutes' in note));
+  assert.ok(!('reminderAt' in note));
   assert.ok(!('notes' in state));
 
   globalThis.localStorage = originalStorage;

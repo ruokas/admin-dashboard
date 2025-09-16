@@ -25,7 +25,7 @@ Statinis vieno failo HTML projektas, skirtas publikuoti per **GitHub Pages**.
 - Pastabų kortelę galima perkelti tarp grupių drag-and-drop būdu.
 - Galima kurti kelias pastabų korteles, kiekvienai parenkant taškelio spalvą, šrifto dydį ir paraštes.
 - Spalvų meniu turi mygtuką **Atstatyti**, grąžinantį numatytas spalvas.
-- Galima nustatyti priminimus kortelėms ir pastabų blokui (reikalingas naršyklės pranešimų leidimas).
+- Galima nustatyti priminimus įrašams ir per priminimų kortelę (reikalingas naršyklės pranešimų leidimas).
 - Priminimų skydelis leidžia peržiūrėti ir atšaukti aktyvius priminimus.
 - Redagavimo režime galima pridėti priminimų kortelę su vizualiais laikmačiais,
   greitais +5/+10/+15/+30 min. mygtukais ir individualių priminimų sąrašu.

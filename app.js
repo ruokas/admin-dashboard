@@ -228,18 +228,11 @@ function normaliseReminderState() {
   const groups = Array.isArray(state.groups) ? state.groups : [];
   groups.forEach((g) => {
     if (g.type === 'note') {
-      if (!Number.isFinite(g.reminderAt)) {
-        g.reminderAt = null;
-        g.reminderMinutes = 0;
-      } else {
-        g.reminderAt = Math.round(g.reminderAt);
-        g.reminderMinutes = Number.isFinite(g.reminderMinutes) && g.reminderMinutes > 0
-          ? Math.max(0, Math.round(g.reminderMinutes))
-          : 0;
-      }
       if (typeof g.title === 'string') g.name = g.title;
       if (!Number.isFinite(g.fontSize) || g.fontSize <= 0) g.fontSize = 20;
       if (!Number.isFinite(g.padding) || g.padding < 0) g.padding = 20;
+      if ('reminderAt' in g) delete g.reminderAt;
+      if ('reminderMinutes' in g) delete g.reminderMinutes;
     }
     (g.items || []).forEach((it) => {
       const hasReminder = Number.isFinite(it.reminderAt);
@@ -266,27 +259,6 @@ function buildReminderEntries() {
     text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
 
   state.groups.forEach((g) => {
-    if (g.type === 'note' && Number.isFinite(g.reminderAt)) {
-      const noteTitle = clean(g.title || g.name || T.notes) || T.notes;
-      const noteText = clean(g.text || '');
-      const label = clean(T.reminderNoteBody) || T.reminderNoteBody;
-      const bodyParts = [label, noteTitle];
-      if (noteText) bodyParts.push(noteText);
-      const body = truncate(bodyParts.join(' • ')) || T.reminderNoteBody;
-      entries.push({
-        key: `note:${g.id}`,
-        at: g.reminderAt,
-        title: T.reminderNotificationTitle,
-        body,
-        data: { type: 'note', id: g.id },
-        onTrigger: () => {
-          g.reminderAt = null;
-          g.reminderMinutes = 0;
-          persistState();
-          renderAll();
-        },
-      });
-    }
     const groupName = clean(g.name || '');
     (g.items || []).forEach((it) => {
       if (!Number.isFinite(it.reminderAt)) return;
@@ -345,8 +317,8 @@ function clearReminder(key) {
     const id = key.slice(5);
     const note = state.groups.find((g) => g.type === 'note' && g.id === id);
     if (note) {
-      note.reminderAt = null;
-      note.reminderMinutes = 0;
+      delete note.reminderAt;
+      delete note.reminderMinutes;
     }
   } else if (key.startsWith('item:')) {
     const id = key.slice(5);
@@ -374,10 +346,10 @@ function snoozeReminder(key, minutes) {
     const id = key.slice(5);
     const note = state.groups.find((g) => g.type === 'note' && g.id === id);
     if (note) {
-      note.reminderMinutes = minutes;
-      note.reminderAt = newAt;
-      return newAt;
+      delete note.reminderAt;
+      delete note.reminderMinutes;
     }
+    return NaN;
   }
   if (key.startsWith('item:')) {
     const id = key.slice(5);
@@ -761,8 +733,6 @@ async function addNoteCard() {
     size: NOTE_DEFAULT_FONT,
     padding: NOTE_DEFAULT_PADDING,
     color: NOTE_DEFAULT_COLOR,
-    reminderMinutes: 0,
-    reminderAt: null,
   });
   if (res === null) return;
   const dims = SIZE_MAP.md;
@@ -779,22 +749,7 @@ async function addNoteCard() {
     hSize: sizeFromHeight(dims.height),
     fontSize: Number.isFinite(res.size) ? res.size : NOTE_DEFAULT_FONT,
     padding: Number.isFinite(res.padding) ? res.padding : NOTE_DEFAULT_PADDING,
-    reminderMinutes: 0,
-    reminderAt: null,
   };
-  const reminder = parseReminderInput(res);
-  if (reminder.mode === REMINDER_MODE_MINUTES && reminder.reminderMinutes > 0) {
-    note.reminderMinutes = reminder.reminderMinutes;
-    note.reminderAt = Date.now() + reminder.reminderMinutes * 60000;
-    if (reminders) await reminders.ensurePermission();
-  } else if (
-    reminder.mode === REMINDER_MODE_DATETIME &&
-    Number.isFinite(reminder.reminderAt)
-  ) {
-    note.reminderMinutes = 0;
-    note.reminderAt = reminder.reminderAt;
-    if (reminders) await reminders.ensurePermission();
-  }
   state.groups.push(note);
   persistState();
   renderAll();
@@ -809,10 +764,6 @@ async function editNoteCard(noteId) {
     size: Number.isFinite(note.fontSize) ? note.fontSize : NOTE_DEFAULT_FONT,
     padding: Number.isFinite(note.padding) ? note.padding : NOTE_DEFAULT_PADDING,
     color: note.color || NOTE_DEFAULT_COLOR,
-    reminderMinutes: Number.isFinite(note.reminderMinutes)
-      ? Math.max(0, Math.round(note.reminderMinutes))
-      : 0,
-    reminderAt: note.reminderAt,
   });
   if (res === null) return;
   note.title = res.title.trim() || T.notes;
@@ -821,22 +772,8 @@ async function editNoteCard(noteId) {
   note.fontSize = Number.isFinite(res.size) ? res.size : NOTE_DEFAULT_FONT;
   note.padding = Number.isFinite(res.padding) ? res.padding : NOTE_DEFAULT_PADDING;
   note.color = normalizeNoteColor(res.color);
-  const reminder = parseReminderInput(res);
-  if (reminder.mode === REMINDER_MODE_MINUTES && reminder.reminderMinutes > 0) {
-    note.reminderMinutes = reminder.reminderMinutes;
-    note.reminderAt = Date.now() + reminder.reminderMinutes * 60000;
-    if (reminders) await reminders.ensurePermission();
-  } else if (
-    reminder.mode === REMINDER_MODE_DATETIME &&
-    Number.isFinite(reminder.reminderAt)
-  ) {
-    note.reminderMinutes = 0;
-    note.reminderAt = reminder.reminderAt;
-    if (reminders) await reminders.ensurePermission();
-  } else {
-    note.reminderMinutes = 0;
-    note.reminderAt = null;
-  }
+  delete note.reminderMinutes;
+  delete note.reminderAt;
   persistState();
   renderAll();
 }
