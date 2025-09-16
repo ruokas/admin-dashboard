@@ -10,6 +10,14 @@ export function load() {
         g.items?.forEach((it) => {
           if (!('iconUrl' in it)) it.iconUrl = '';
           if (!('icon' in it)) it.icon = '';
+          if (Number.isFinite(it.reminderMinutes) && it.reminderMinutes > 0) {
+            it.reminderMinutes = Math.max(0, Math.round(it.reminderMinutes));
+          } else {
+            delete it.reminderMinutes;
+          }
+          if (!Number.isFinite(it.reminderAt)) {
+            delete it.reminderAt;
+          }
         });
         if (typeof g.width !== 'number' || typeof g.height !== 'number') {
           let width = 360;
@@ -32,6 +40,10 @@ export function load() {
       if (typeof data.notesTitle !== 'string') data.notesTitle = '';
       if (typeof data.title !== 'string') data.title = '';
       if (typeof data.icon !== 'string') data.icon = '';
+      if (!Number.isFinite(data.notesReminderMinutes))
+        data.notesReminderMinutes = 0;
+      else data.notesReminderMinutes = Math.max(0, Math.round(data.notesReminderMinutes));
+      if (!Number.isFinite(data.notesReminderAt)) data.notesReminderAt = null;
       if (
         !data.notesBox ||
         typeof data.notesBox.width !== 'number' ||
@@ -79,6 +91,8 @@ export function seed() {
     notesBox: { width: 360, height: 360, wSize: 'md', hSize: 'md' },
     notesOpts: { size: 16, padding: 8 },
     notesPos: 0,
+    notesReminderMinutes: 0,
+    notesReminderAt: null,
     title: '',
     icon: '',
   };

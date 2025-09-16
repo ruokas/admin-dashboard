@@ -11,6 +11,7 @@ import {
 import { I } from './icons.js';
 import { Tlt } from './i18n.js';
 import { exportJson } from './exporter.js';
+import { createReminderManager } from './reminders.js';
 
 const T = Tlt;
 // Hook future English localisation: fill T.en when translations are ready.
@@ -37,6 +38,9 @@ if (!state.notesBox.hSize) state.notesBox.hSize = sizeFromHeight(state.notesBox.
 if (!('notesPos' in state)) state.notesPos = 0;
 if (!state.title) state.title = DEFAULT_TITLE;
 let editing = false;
+let reminders;
+
+normaliseReminderState();
 
 pageTitleEl.textContent = state.title;
 pageIconEl.textContent = state.icon || '';
@@ -46,12 +50,12 @@ pageTitleEl.addEventListener('input', () => {
   if (!editing) return;
   state.title = pageTitleEl.textContent.trim();
   document.title = state.title;
-  save(state);
+  persistState();
 });
 pageIconEl.addEventListener('input', () => {
   if (!editing) return;
   state.icon = pageIconEl.textContent.trim();
-  save(state);
+  persistState();
 });
 
 const uid = () => crypto.randomUUID().slice(0, 8);
@@ -75,6 +79,101 @@ function parseIframe(html) {
   return { src, height };
 }
 
+function normaliseReminderState() {
+  if (!Number.isFinite(state.notesReminderAt)) {
+    state.notesReminderAt = null;
+    state.notesReminderMinutes = 0;
+  } else {
+    state.notesReminderMinutes = Math.max(
+      0,
+      Math.round(state.notesReminderMinutes || 0),
+    );
+  }
+  const groups = Array.isArray(state.groups) ? state.groups : [];
+  groups.forEach((g) => {
+    (g.items || []).forEach((it) => {
+      const hasReminder = Number.isFinite(it.reminderAt);
+      if (!hasReminder) {
+        delete it.reminderAt;
+        delete it.reminderMinutes;
+        return;
+      }
+      it.reminderAt = Math.round(it.reminderAt);
+      if (Number.isFinite(it.reminderMinutes) && it.reminderMinutes > 0) {
+        it.reminderMinutes = Math.max(0, Math.round(it.reminderMinutes));
+      } else {
+        delete it.reminderMinutes;
+      }
+    });
+  });
+}
+
+function buildReminderEntries() {
+  const entries = [];
+  const clean = (value) =>
+    typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : '';
+  const truncate = (text, limit = 160) =>
+    text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
+
+  if (Number.isFinite(state.notesReminderAt)) {
+    const title = clean(state.notesTitle || T.notes) || T.notes;
+    const text = clean(state.notes || '');
+    const label = clean(T.reminderNoteBody) || T.reminderNoteBody;
+    const bodyParts = [label, title];
+    if (text) bodyParts.push(text);
+    const body = truncate(bodyParts.join(' • ')) || T.reminderNoteBody;
+    entries.push({
+      key: 'notes',
+      at: state.notesReminderAt,
+      title: T.reminderNotificationTitle,
+      body,
+      onTrigger: () => {
+        state.notesReminderAt = null;
+        state.notesReminderMinutes = 0;
+        persistState();
+        renderAll();
+      },
+    });
+  }
+
+  state.groups.forEach((g) => {
+    const groupName = clean(g.name || '');
+    (g.items || []).forEach((it) => {
+      if (!Number.isFinite(it.reminderAt)) return;
+      const prefix = clean(T.reminderItemBody) || T.reminderItemBody;
+      const parts = [prefix, groupName, clean(it.title), clean(it.note)].filter(
+        Boolean,
+      );
+      const body = truncate(parts.join(' • ')) || T.reminderItemBody;
+      entries.push({
+        key: `item:${it.id}`,
+        at: it.reminderAt,
+        title: T.reminderNotificationTitle,
+        body,
+        onTrigger: () => {
+          delete it.reminderAt;
+          delete it.reminderMinutes;
+          persistState();
+          renderAll();
+        },
+      });
+    });
+  });
+
+  return entries;
+}
+
+function syncReminders() {
+  if (!reminders) return;
+  reminders.sync(buildReminderEntries());
+}
+
+function persistState() {
+  normaliseReminderState();
+  save(state);
+  syncReminders();
+}
+
 function renderAll() {
   render(
     state,
@@ -91,7 +190,7 @@ function renderAll() {
       toggleCollapse,
       confirmDialog: (msg) => confirmDlg(T, msg),
     },
-    () => save(state),
+    () => persistState(),
   );
 }
 
@@ -103,7 +202,7 @@ function updateUI() {
     state.title = pageTitleEl.textContent.trim();
     state.icon = pageIconEl.textContent.trim();
     document.title = state.title;
-    save(state);
+    persistState();
   }
 }
 
@@ -120,7 +219,7 @@ async function addGroup() {
     hSize: sizeFromHeight(dims.height),
     items: [],
   });
-  save(state);
+  persistState();
   renderAll();
 }
 
@@ -139,7 +238,7 @@ async function editGroup(gid) {
   Object.assign(g, dims2);
   g.wSize = sizeFromWidth(dims2.width);
   g.hSize = sizeFromHeight(dims2.height);
-  save(state);
+  persistState();
   renderAll();
 }
 
@@ -158,7 +257,7 @@ async function addChart() {
     wSize: sizeFromWidth(cDims.width),
     hSize: sizeFromHeight(cDims.height),
   });
-  save(state);
+  persistState();
   renderAll();
 }
 
@@ -168,12 +267,20 @@ async function editNotes() {
     text: state.notes || '',
     size: state.notesOpts.size,
     padding: state.notesOpts.padding,
+    reminderMinutes: state.notesReminderMinutes || 0,
   });
   if (res === null) return;
   state.notesTitle = res.title || T.notes;
   state.notes = res.text;
   state.notesOpts = { size: res.size, padding: res.padding };
-  save(state);
+  state.notesReminderMinutes = Math.max(0, Math.round(res.reminderMinutes || 0));
+  if (state.notesReminderMinutes > 0) {
+    state.notesReminderAt = Date.now() + state.notesReminderMinutes * 60000;
+    if (reminders) await reminders.ensurePermission();
+  } else {
+    state.notesReminderAt = null;
+  }
+  persistState();
   renderAll();
 }
 
@@ -183,7 +290,9 @@ async function removeNotes() {
   if (!ok) return;
   state.notes = '';
   state.notesTitle = T.notes;
-  save(state);
+  state.notesReminderMinutes = 0;
+  state.notesReminderAt = null;
+  persistState();
   renderAll();
 }
 
@@ -198,7 +307,7 @@ async function editChart(gid) {
   if (parsed.height) {
     g.h = parsed.height + 56;
   }
-  save(state);
+  persistState();
   renderAll();
 }
 
@@ -206,7 +315,7 @@ function toggleCollapse(gid) {
   const g = state.groups.find((x) => x.id === gid);
   if (!g) return;
   g.collapsed = !g.collapsed;
-  save(state);
+  persistState();
   renderAll();
 }
 
@@ -225,16 +334,26 @@ async function addItem(gid) {
     data.url = parsed.src;
     if (parsed.height) data.h = parsed.height;
   }
-  g.items.push({
+  const reminderMinutes =
+    Number.isFinite(data.reminderMinutes) && data.reminderMinutes > 0
+      ? Math.max(0, Math.round(data.reminderMinutes))
+      : 0;
+  const newItem = {
     id: uid(),
     type: data.type,
     title: data.title,
     url: data.url,
     note: data.note,
     icon: data.icon,
-    ...(data.h ? { h: data.h } : {}),
-  });
-  save(state);
+  };
+  if (data.h) newItem.h = data.h;
+  if (reminderMinutes > 0) {
+    newItem.reminderMinutes = reminderMinutes;
+    newItem.reminderAt = Date.now() + reminderMinutes * 60000;
+    if (reminders) await reminders.ensurePermission();
+  }
+  g.items.push(newItem);
+  persistState();
   renderAll();
 }
 
@@ -262,7 +381,19 @@ async function editItem(gid, iid) {
   it.icon = data.icon;
   if (data.h) it.h = data.h;
   else delete it.h;
-  save(state);
+  const reminderMinutes =
+    Number.isFinite(data.reminderMinutes) && data.reminderMinutes > 0
+      ? Math.max(0, Math.round(data.reminderMinutes))
+      : 0;
+  if (reminderMinutes > 0) {
+    it.reminderMinutes = reminderMinutes;
+    it.reminderAt = Date.now() + reminderMinutes * 60000;
+    if (reminders) await reminders.ensurePermission();
+  } else {
+    delete it.reminderMinutes;
+    delete it.reminderAt;
+  }
+  persistState();
   renderAll();
 }
 
@@ -274,7 +405,8 @@ function importJson(file) {
       if (!data || !Array.isArray(data.groups))
         throw new Error(T.invalidImport);
       state = data;
-      save(state);
+      normaliseReminderState();
+      persistState();
       renderAll();
     } catch (err) {
       alert('Importo klaida: ' + err.message);
@@ -318,7 +450,7 @@ function applyColor() {
   document.documentElement.classList.add(`color-${color}`);
 }
 // Google Sheets sinchronizavimas laikinai išjungtas
-// const sheets = sheetsSync(state, syncStatus, () => save(state), renderAll);
+// const sheets = sheetsSync(state, syncStatus, () => persistState(), renderAll);
 
 const addMenuList = document.getElementById('addMenuList');
 const addBtn = document.getElementById('addBtn');
@@ -355,6 +487,9 @@ document.getElementById('fileInput').addEventListener('change', (e) => {
   if (f) importJson(f);
   e.target.value = '';
 });
+
+reminders = createReminderManager();
+syncReminders();
 themeBtn.addEventListener('click', toggleTheme);
 editBtn.addEventListener('click', () => {
   editing = !editing;

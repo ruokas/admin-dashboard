@@ -116,6 +116,7 @@ export function itemFormDialog(T, data = {}) {
         </div>
       </label>
       <label>${T.itemNote}<br><textarea name="note" rows="2"></textarea></label>
+      <label>${T.reminderMinutes}<br><input name="reminder" type="number" min="0" step="1"></label>
       <p class="error" id="itemErr" role="status" aria-live="polite"></p>
       <menu>
         <button type="button" data-act="cancel">${T.cancel}</button>
@@ -135,6 +136,10 @@ export function itemFormDialog(T, data = {}) {
     form.url.value = data.url || '';
     iconInput.value = data.icon || '';
     form.note.value = data.note || '';
+    form.reminder.value =
+      typeof data.reminderMinutes === 'number' && data.reminderMinutes > 0
+        ? data.reminderMinutes
+        : '';
 
     const initBtn = picker.querySelector(
       `button[data-val="${iconInput.value}"]`,
@@ -164,6 +169,9 @@ export function itemFormDialog(T, data = {}) {
       formData.url = formData.url.trim();
       formData.icon = formData.icon.trim();
       formData.note = formData.note.trim();
+      const reminderVal = parseInt(formData.reminder, 10);
+      formData.reminderMinutes = Number.isFinite(reminderVal) && reminderVal > 0 ? reminderVal : 0;
+      delete formData.reminder;
       if (!formData.title || !formData.url) {
         err.textContent = T.required;
         return;
@@ -257,7 +265,7 @@ export function chartFormDialog(T, data = {}) {
 
 export function notesDialog(
   T,
-  data = { title: '', text: '', size: 16, padding: 8 },
+  data = { title: '', text: '', size: 16, padding: 8, reminderMinutes: 0 },
 ) {
   return new Promise((resolve) => {
     const prevFocus = document.activeElement;
@@ -267,6 +275,7 @@ export function notesDialog(
       <label>${T.notes}<br><textarea name="note" rows="8"></textarea></label>
       <label>${T.noteSize}<br><input name="size" type="number" min="10" max="48"></label>
       <label>${T.notePadding}<br><input name="padding" type="number" min="0" max="100"></label>
+      <label>${T.reminderMinutes}<br><input name="reminder" type="number" min="0" step="1"></label>
       <menu>
         <button type="button" data-act="cancel">${T.cancel}</button>
         <button type="submit" class="btn-accent">${T.save}</button>
@@ -281,6 +290,10 @@ export function notesDialog(
     form.note.value = data.text || '';
     form.size.value = data.size || 16;
     form.padding.value = data.padding || 8;
+    form.reminder.value =
+      typeof data.reminderMinutes === 'number' && data.reminderMinutes > 0
+        ? data.reminderMinutes
+        : '';
 
     function cleanup() {
       form.removeEventListener('submit', submit);
@@ -291,11 +304,15 @@ export function notesDialog(
 
     function submit(e) {
       e.preventDefault();
+      const reminderVal = parseInt(form.reminder.value, 10);
+      const reminderMinutes =
+        Number.isFinite(reminderVal) && reminderVal > 0 ? reminderVal : 0;
       resolve({
         title: form.title.value.trim(),
         text: form.note.value.trim(),
         size: parseInt(form.size.value, 10) || 16,
         padding: parseInt(form.padding.value, 10) || 8,
+        reminderMinutes,
       });
       cleanup();
     }

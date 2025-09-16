@@ -24,6 +24,13 @@ Statinis vieno failo HTML projektas, skirtas publikuoti per **GitHub Pages**.
 - Spalvų temą galima keisti paspaudus **Tema** – parinktys išsaugomos `localStorage`.
 - Pastabų kortelę galima perkelti tarp grupių drag-and-drop būdu.
 - Spalvų meniu turi mygtuką **Atstatyti**, grąžinantį numatytas spalvas.
+- Galima nustatyti priminimus kortelėms ir pastabų blokui (reikalingas naršyklės pranešimų leidimas).
+
+## Priminimai ir privatumas
+
+- Pirmą kartą įjungus priminimą naršyklė paprašys leisti rodyti pranešimus (`Notification`).
+- Prieš suteikdami leidimą įsitikinkite, kad įrenginys atitinka skyriuje galiojančias privatumo taisykles – pranešimai gali būti rodomi užrakintame ekrane.
+- Jei leidimo nesuteikiate, sistema vis tiek parodys priminimą naršyklės lange.
 
 ## Dizaino nustatymai
 
