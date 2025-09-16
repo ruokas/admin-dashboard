@@ -24,6 +24,8 @@ export const Tlt = {
   reminderItemBody: 'Patikrinkite įrašą',
   reminders: 'Priminimai',
   noReminders: 'Priminimų nėra',
+  reminderSnooze: 'Atidėti 5 min.',
+  reminderEdit: 'Keisti laiką',
   toDark: 'Perjungti į tamsią temą',
   toLight: 'Perjungti į šviesią temą',
   openAll: 'Atverti visas',

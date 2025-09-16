@@ -23,6 +23,7 @@ const DEFAULT_TITLE = 'Admin skydelis';
 const REMINDER_MODE_NONE = 'none';
 const REMINDER_MODE_DATETIME = 'datetime';
 const REMINDER_MODE_MINUTES = 'minutes';
+const REMINDER_SNOOZE_MINUTES = 5;
 
 const editBtn = document.getElementById('editBtn');
 // const syncStatus = document.getElementById('syncStatus'); // Sheets sync indikatorius (išjungta)
@@ -253,10 +254,75 @@ function clearReminder(key) {
   renderAll();
 }
 
+function snoozeReminder(key, minutes) {
+  const newAt = Date.now() + minutes * 60000;
+  if (key === 'notes') {
+    state.notesReminderMinutes = minutes;
+    state.notesReminderAt = newAt;
+    return newAt;
+  }
+  if (key.startsWith('item:')) {
+    const id = key.slice(5);
+    for (const g of state.groups) {
+      const it = (g.items || []).find((i) => i.id === id);
+      if (it) {
+        it.reminderMinutes = minutes;
+        it.reminderAt = newAt;
+        return newAt;
+      }
+    }
+  }
+  return NaN;
+}
+
+async function editReminder(entry) {
+  if (!entry || !entry.data) return;
+  if (entry.data.type === 'notes') {
+    await editNotes();
+    return;
+  }
+  if (entry.data.type === 'item' && entry.data.gid && entry.data.iid) {
+    await editItem(entry.data.gid, entry.data.iid);
+  }
+}
+
 async function openReminders() {
-  const entries = buildReminderEntries().sort((a, b) => a.at - b.at);
-  await remindersDialog(T, entries, (key) => {
-    clearReminder(key);
+  let entries = buildReminderEntries().sort((a, b) => a.at - b.at);
+  let entryMap = new Map(entries.map((entry) => [entry.key, entry]));
+  await remindersDialog(T, entries, async (action, key) => {
+    if (action === 'remove') {
+      clearReminder(key);
+      entryMap.delete(key);
+      return { removed: true };
+    }
+
+    const entry = entryMap.get(key);
+    if (!entry) return null;
+
+    if (action === 'snooze') {
+      const newAt = snoozeReminder(key, REMINDER_SNOOZE_MINUTES);
+      if (!Number.isFinite(newAt)) return null;
+      entry.at = newAt;
+      persistState();
+      renderAll();
+      syncReminders();
+      return { at: newAt };
+    }
+
+    if (action === 'edit') {
+      await editReminder(entry);
+      entries = buildReminderEntries().sort((a, b) => a.at - b.at);
+      entryMap = new Map(entries.map((item) => [item.key, item]));
+      persistState();
+      syncReminders();
+      const updated = entryMap.get(key);
+      if (updated) {
+        return { at: updated.at };
+      }
+      return { removed: true };
+    }
+
+    return null;
   });
 }
 

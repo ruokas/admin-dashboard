@@ -47,10 +47,12 @@ function formatDateTime(ts) {
   }
 }
 
-export function remindersDialog(T, entries = [], onRemove = () => {}) {
+export function remindersDialog(T, entries = [], onAction = () => {}) {
   return new Promise((resolve) => {
     const prevFocus = document.activeElement;
     const dlg = document.createElement('dialog');
+    const snoozeLabel = T.reminderSnooze || 'Atidėti 5 min.';
+    const editLabel = T.reminderEdit || T.edit || 'Redaguoti';
     const listHtml =
       entries && entries.length
         ? `<ul class="reminders-list">${entries
@@ -60,7 +62,11 @@ export function remindersDialog(T, entries = [], onRemove = () => {}) {
                   e.body || e.title || '',
                 )}</span><time class="time" datetime="${new Date(e.at).toISOString()}">${formatDateTime(
                   e.at,
-                )}</time><button type="button" data-act="remove">${T.remove}</button></li>`,
+                )}</time><div class="actions"><button type="button" data-act="snooze">${escapeHtml(
+                  snoozeLabel,
+                )}</button><button type="button" data-act="edit">${escapeHtml(
+                  editLabel,
+                )}</button><button type="button" data-act="remove">${T.remove}</button></div></li>`,
             )
             .join('')}</ul>`
         : `<p>${T.noReminders}</p>`;
@@ -71,7 +77,7 @@ export function remindersDialog(T, entries = [], onRemove = () => {}) {
     const form = dlg.querySelector('form');
     const closeBtn = form.querySelector('[data-act="close"]');
     function cleanup() {
-      form.removeEventListener('click', handleRemove);
+      form.removeEventListener('click', handleAction);
       closeBtn.removeEventListener('click', close);
       dlg.remove();
       prevFocus?.focus();
@@ -81,20 +87,36 @@ export function remindersDialog(T, entries = [], onRemove = () => {}) {
       dlg.close();
       cleanup();
     }
-    function handleRemove(e) {
-      const btn = e.target.closest('[data-act="remove"]');
+    async function handleAction(e) {
+      const btn = e.target.closest('[data-act]');
       if (!btn) return;
+      const action = btn.dataset.act;
+      if (!action) return;
       const li = btn.closest('li');
       const key = li?.dataset.key;
-      if (key) onRemove(key);
-      li?.remove();
-      if (!form.querySelector('li')) {
-        const p = document.createElement('p');
-        p.textContent = T.noReminders;
-        form.insertBefore(p, form.querySelector('menu'));
+      if (!key) return;
+      const result = await onAction(action, key);
+      const shouldRemove =
+        result?.removed || (action === 'remove' && result !== false);
+      if (shouldRemove) {
+        li?.remove();
+        if (!form.querySelector('li')) {
+          const p = document.createElement('p');
+          p.textContent = T.noReminders;
+          form.insertBefore(p, form.querySelector('menu'));
+        }
+        return;
+      }
+      if (Number.isFinite(result?.at)) {
+        const timeEl = li?.querySelector('time.time');
+        if (timeEl) {
+          const ts = Number(result.at);
+          timeEl.dateTime = new Date(ts).toISOString();
+          timeEl.textContent = formatDateTime(ts);
+        }
       }
     }
-    form.addEventListener('click', handleRemove);
+    form.addEventListener('click', handleAction);
     closeBtn.addEventListener('click', close);
     dlg.addEventListener('cancel', close);
     dlg.showModal();
