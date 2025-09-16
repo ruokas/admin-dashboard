@@ -7,6 +7,7 @@ import {
   chartFormDialog,
   confirmDialog as confirmDlg,
   notesDialog,
+  remindersDialog,
 } from './forms.js';
 import { I } from './icons.js';
 import { Tlt } from './i18n.js';
@@ -28,6 +29,7 @@ const editBtn = document.getElementById('editBtn');
 const searchEl = document.getElementById('q');
 const searchLabelEl = document.getElementById('searchLabel');
 const themeBtn = document.getElementById('themeBtn');
+const remindersBtn = document.getElementById('remindersBtn');
 const pageTitleEl = document.getElementById('pageTitle');
 const pageIconEl = document.getElementById('pageIcon');
 
@@ -37,8 +39,10 @@ if (!('notesOpts' in state)) state.notesOpts = { size: 16, padding: 8 };
 if (!state.notesTitle) state.notesTitle = T.notes;
 if (!('notesBox' in state))
   state.notesBox = { width: 360, height: 360, wSize: 'md', hSize: 'md' };
-if (!state.notesBox.wSize) state.notesBox.wSize = sizeFromWidth(state.notesBox.width);
-if (!state.notesBox.hSize) state.notesBox.hSize = sizeFromHeight(state.notesBox.height);
+if (!state.notesBox.wSize)
+  state.notesBox.wSize = sizeFromWidth(state.notesBox.width);
+if (!state.notesBox.hSize)
+  state.notesBox.hSize = sizeFromHeight(state.notesBox.height);
 if (!('notesPos' in state)) state.notesPos = 0;
 if (!state.title) state.title = DEFAULT_TITLE;
 let editing = false;
@@ -84,7 +88,8 @@ function parseIframe(html) {
 }
 
 function parseReminderInput(data = {}) {
-  const rawMode = typeof data.reminderMode === 'string' ? data.reminderMode : '';
+  const rawMode =
+    typeof data.reminderMode === 'string' ? data.reminderMode : '';
   let mode;
   if (rawMode === REMINDER_MODE_MINUTES || rawMode === REMINDER_MODE_DATETIME) {
     mode = rawMode;
@@ -92,9 +97,15 @@ function parseReminderInput(data = {}) {
     mode = REMINDER_MODE_NONE;
   }
   if (!mode) {
-    if ((typeof data.reminderAt === 'string' && data.reminderAt) || Number.isFinite(data.reminderAt)) {
+    if (
+      (typeof data.reminderAt === 'string' && data.reminderAt) ||
+      Number.isFinite(data.reminderAt)
+    ) {
       mode = REMINDER_MODE_DATETIME;
-    } else if (Number.isFinite(data.reminderMinutes) && data.reminderMinutes > 0) {
+    } else if (
+      Number.isFinite(data.reminderMinutes) &&
+      data.reminderMinutes > 0
+    ) {
       mode = REMINDER_MODE_MINUTES;
     } else {
       mode = REMINDER_MODE_NONE;
@@ -106,7 +117,10 @@ function parseReminderInput(data = {}) {
     const minutesVal = Number.parseInt(data.reminderMinutes, 10);
     if (Number.isFinite(minutesVal) && minutesVal > 0) {
       reminderMinutes = Math.max(0, Math.round(minutesVal));
-    } else if (Number.isFinite(data.reminderMinutes) && data.reminderMinutes > 0) {
+    } else if (
+      Number.isFinite(data.reminderMinutes) &&
+      data.reminderMinutes > 0
+    ) {
       reminderMinutes = Math.max(0, Math.round(data.reminderMinutes));
     }
     if (reminderMinutes <= 0) {
@@ -218,6 +232,32 @@ function buildReminderEntries() {
   });
 
   return entries;
+}
+
+function clearReminder(key) {
+  if (key === 'notes') {
+    state.notesReminderAt = null;
+    state.notesReminderMinutes = 0;
+  } else if (key.startsWith('item:')) {
+    const id = key.slice(5);
+    for (const g of state.groups) {
+      const it = (g.items || []).find((i) => i.id === id);
+      if (it) {
+        delete it.reminderAt;
+        delete it.reminderMinutes;
+        break;
+      }
+    }
+  }
+  persistState();
+  renderAll();
+}
+
+async function openReminders() {
+  const entries = buildReminderEntries().sort((a, b) => a.at - b.at);
+  await remindersDialog(T, entries, (key) => {
+    clearReminder(key);
+  });
 }
 
 function syncReminders() {
@@ -336,7 +376,10 @@ async function editNotes() {
     state.notesReminderMinutes = reminder.reminderMinutes;
     state.notesReminderAt = Date.now() + reminder.reminderMinutes * 60000;
     if (reminders) await reminders.ensurePermission();
-  } else if (reminder.mode === REMINDER_MODE_DATETIME && Number.isFinite(reminder.reminderAt)) {
+  } else if (
+    reminder.mode === REMINDER_MODE_DATETIME &&
+    Number.isFinite(reminder.reminderAt)
+  ) {
     state.notesReminderMinutes = 0;
     state.notesReminderAt = reminder.reminderAt;
     if (reminders) await reminders.ensurePermission();
@@ -412,7 +455,10 @@ async function addItem(gid) {
     newItem.reminderMinutes = reminder.reminderMinutes;
     newItem.reminderAt = Date.now() + reminder.reminderMinutes * 60000;
     if (reminders) await reminders.ensurePermission();
-  } else if (reminder.mode === REMINDER_MODE_DATETIME && Number.isFinite(reminder.reminderAt)) {
+  } else if (
+    reminder.mode === REMINDER_MODE_DATETIME &&
+    Number.isFinite(reminder.reminderAt)
+  ) {
     newItem.reminderAt = reminder.reminderAt;
     if (reminders) await reminders.ensurePermission();
   }
@@ -450,7 +496,10 @@ async function editItem(gid, iid) {
     it.reminderMinutes = reminder.reminderMinutes;
     it.reminderAt = Date.now() + reminder.reminderMinutes * 60000;
     if (reminders) await reminders.ensurePermission();
-  } else if (reminder.mode === REMINDER_MODE_DATETIME && Number.isFinite(reminder.reminderAt)) {
+  } else if (
+    reminder.mode === REMINDER_MODE_DATETIME &&
+    Number.isFinite(reminder.reminderAt)
+  ) {
     delete it.reminderMinutes;
     it.reminderAt = reminder.reminderAt;
     if (reminders) await reminders.ensurePermission();
@@ -555,6 +604,9 @@ document.getElementById('fileInput').addEventListener('change', (e) => {
 
 reminders = createReminderManager();
 syncReminders();
+remindersBtn.innerHTML = `${I.clock} <span>${T.reminders}</span>`;
+remindersBtn.setAttribute('aria-label', T.reminders);
+remindersBtn.addEventListener('click', openReminders);
 themeBtn.addEventListener('click', toggleTheme);
 editBtn.addEventListener('click', () => {
   editing = !editing;

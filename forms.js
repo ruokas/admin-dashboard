@@ -30,6 +30,77 @@ function setupReminderControls(form) {
   modeSelect.addEventListener('change', update);
 }
 
+function escapeHtml(str = '') {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatDateTime(ts) {
+  try {
+    return new Date(ts).toLocaleString('lt-LT').replace(',', '');
+  } catch {
+    return '';
+  }
+}
+
+export function remindersDialog(T, entries = [], onRemove = () => {}) {
+  return new Promise((resolve) => {
+    const prevFocus = document.activeElement;
+    const dlg = document.createElement('dialog');
+    const listHtml =
+      entries && entries.length
+        ? `<ul class="reminders-list">${entries
+            .map(
+              (e) =>
+                `<li data-key="${e.key}"><span class="title">${escapeHtml(
+                  e.body || e.title || '',
+                )}</span><time class="time" datetime="${new Date(e.at).toISOString()}">${formatDateTime(
+                  e.at,
+                )}</time><button type="button" data-act="remove">${T.remove}</button></li>`,
+            )
+            .join('')}</ul>`
+        : `<p>${T.noReminders}</p>`;
+    dlg.innerHTML = `<form method="dialog" id="remindersForm"><h2 id="remindersLabel">${T.reminders}</h2>${listHtml}<menu><button type="button" data-act="close">${T.cancel}</button></menu></form>`;
+    dlg.setAttribute('aria-modal', 'true');
+    dlg.setAttribute('aria-labelledby', 'remindersLabel');
+    document.body.appendChild(dlg);
+    const form = dlg.querySelector('form');
+    const closeBtn = form.querySelector('[data-act="close"]');
+    function cleanup() {
+      form.removeEventListener('click', handleRemove);
+      closeBtn.removeEventListener('click', close);
+      dlg.remove();
+      prevFocus?.focus();
+      resolve();
+    }
+    function close() {
+      dlg.close();
+      cleanup();
+    }
+    function handleRemove(e) {
+      const btn = e.target.closest('[data-act="remove"]');
+      if (!btn) return;
+      const li = btn.closest('li');
+      const key = li?.dataset.key;
+      if (key) onRemove(key);
+      li?.remove();
+      if (!form.querySelector('li')) {
+        const p = document.createElement('p');
+        p.textContent = T.noReminders;
+        form.insertBefore(p, form.querySelector('menu'));
+      }
+    }
+    form.addEventListener('click', handleRemove);
+    closeBtn.addEventListener('click', close);
+    dlg.addEventListener('cancel', close);
+    dlg.showModal();
+  });
+}
+
 export function groupFormDialog(T, data = {}) {
   return new Promise((resolve) => {
     const prevFocus = document.activeElement;
@@ -182,7 +253,9 @@ export function itemFormDialog(T, data = {}) {
     else if (hasReminderMinutes) reminderMode = REMINDER_MINUTES;
     form.reminderMode.value = reminderMode;
     form.reminderMinutes.value = hasReminderMinutes ? data.reminderMinutes : '';
-    form.reminderAt.value = hasReminderAt ? formatDateTimeLocal(data.reminderAt) : '';
+    form.reminderAt.value = hasReminderAt
+      ? formatDateTimeLocal(data.reminderAt)
+      : '';
     setupReminderControls(form);
 
     const initBtn = picker.querySelector(
@@ -217,7 +290,9 @@ export function itemFormDialog(T, data = {}) {
       const minutesVal = parseInt(formData.reminderMinutes, 10);
       formData.reminderMode = reminderMode;
       formData.reminderMinutes =
-        reminderMode === REMINDER_MINUTES && Number.isFinite(minutesVal) && minutesVal > 0
+        reminderMode === REMINDER_MINUTES &&
+        Number.isFinite(minutesVal) &&
+        minutesVal > 0
           ? Math.max(0, Math.round(minutesVal))
           : 0;
       formData.reminderAt =
@@ -365,7 +440,9 @@ export function notesDialog(
     else if (hasReminderMinutes) reminderMode = REMINDER_MINUTES;
     form.reminderMode.value = reminderMode;
     form.reminderMinutes.value = hasReminderMinutes ? data.reminderMinutes : '';
-    form.reminderAt.value = hasReminderAt ? formatDateTimeLocal(data.reminderAt) : '';
+    form.reminderAt.value = hasReminderAt
+      ? formatDateTimeLocal(data.reminderAt)
+      : '';
     setupReminderControls(form);
 
     function cleanup() {
@@ -380,7 +457,9 @@ export function notesDialog(
       const reminderMode = form.reminderMode.value || REMINDER_NONE;
       const reminderVal = parseInt(form.reminderMinutes.value, 10);
       const reminderMinutes =
-        reminderMode === REMINDER_MINUTES && Number.isFinite(reminderVal) && reminderVal > 0
+        reminderMode === REMINDER_MINUTES &&
+        Number.isFinite(reminderVal) &&
+        reminderVal > 0
           ? Math.max(0, Math.round(reminderVal))
           : 0;
       const reminderAt =
