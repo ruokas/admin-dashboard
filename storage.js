@@ -44,15 +44,9 @@ export function load() {
       const legacyTitle = typeof data.notesTitle === 'string' ? data.notesTitle : '';
       const legacyOpts = data.notesOpts || {};
       const legacyBox = data.notesBox || {};
-      const legacyReminderMinutes = Number.isFinite(data.notesReminderMinutes)
-        ? Math.max(0, Math.round(data.notesReminderMinutes))
-        : 0;
-      const legacyReminderAt = sanitizeTimestamp(data.notesReminderAt);
       const migrateLegacy =
         legacyText.trim().length > 0 ||
-        legacyTitle.trim().length > 0 ||
-        legacyReminderMinutes > 0 ||
-        Number.isFinite(legacyReminderAt);
+        legacyTitle.trim().length > 0;
       if (migrateLegacy) {
         let width = Number.isFinite(legacyBox.width) ? legacyBox.width : DEFAULT_CARD_WIDTH;
         let height = Number.isFinite(legacyBox.height) ? legacyBox.height : DEFAULT_CARD_HEIGHT;
@@ -84,8 +78,6 @@ export function load() {
             Number.isFinite(legacyOpts.padding) && legacyOpts.padding >= 0
               ? Math.round(legacyOpts.padding)
               : NOTE_DEFAULT_PADDING,
-          reminderMinutes: legacyReminderMinutes,
-          reminderAt: legacyReminderAt,
         };
         const pos = Math.max(
           0,
@@ -137,11 +129,6 @@ export function load() {
               hSize: g.hSize || sizeFromHeight(height),
               fontSize,
               padding,
-              reminderMinutes:
-                Number.isFinite(g.reminderMinutes) && g.reminderMinutes > 0
-                  ? Math.max(0, Math.round(g.reminderMinutes))
-                  : 0,
-              reminderAt: sanitizeTimestamp(g.reminderAt),
             };
           }
 

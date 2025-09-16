@@ -447,8 +447,6 @@ export function notesDialog(
     size: 20,
     padding: 20,
     color: '#fef08a',
-    reminderMinutes: 0,
-    reminderAt: null,
   },
 ) {
   return new Promise((resolve) => {
@@ -460,24 +458,6 @@ export function notesDialog(
       <label>${T.noteSize}<br><input name="size" type="number" min="10" max="48"></label>
       <label>${T.notePadding}<br><input name="padding" type="number" min="0" max="100"></label>
       <label>${T.noteColor}<br><input name="color" type="color"></label>
-      <label>${T.reminderMode}<br>
-        <select name="reminderMode">
-          <option value="${REMINDER_NONE}">${T.reminderNone}</option>
-          <option value="${REMINDER_DATETIME}">${T.reminderExactTime}</option>
-          <option value="${REMINDER_MINUTES}">${T.reminderAfter}</option>
-        </select>
-      </label>
-      <label data-reminder="${REMINDER_DATETIME}" hidden>${T.reminderExactTime}<br><input name="reminderAt" type="datetime-local"></label>
-      <label data-reminder="${REMINDER_MINUTES}" hidden>
-        ${T.reminderMinutes}<br>
-        <input name="reminderMinutes" type="number" min="0" step="1">
-        <div class="reminder-quick-buttons" data-reminder-quick>
-          <button type="button" data-minutes="5">${T.reminderPlus5}</button>
-          <button type="button" data-minutes="10">${T.reminderPlus10}</button>
-          <button type="button" data-minutes="15">${T.reminderPlus15}</button>
-          <button type="button" data-minutes="30">${T.reminderPlus30}</button>
-        </div>
-      </label>
       <menu>
         <button type="button" data-act="cancel">${T.cancel}</button>
         <button type="submit" class="btn-accent">${T.save}</button>
@@ -493,19 +473,6 @@ export function notesDialog(
     form.size.value = data.size || 20;
     form.padding.value = data.padding || 20;
     form.color.value = data.color || '#fef08a';
-    const hasReminderMinutes =
-      typeof data.reminderMinutes === 'number' && data.reminderMinutes > 0;
-    const hasReminderAt = Number.isFinite(data.reminderAt);
-    let reminderMode = REMINDER_NONE;
-    if (hasReminderAt) reminderMode = REMINDER_DATETIME;
-    else if (hasReminderMinutes) reminderMode = REMINDER_MINUTES;
-    form.reminderMode.value = reminderMode;
-    form.reminderMinutes.value = hasReminderMinutes ? data.reminderMinutes : '';
-    form.reminderAt.value = hasReminderAt
-      ? formatDateTimeLocal(data.reminderAt)
-      : '';
-    setupReminderControls(form);
-    setupReminderQuickButtons(form);
 
     function cleanup() {
       form.removeEventListener('submit', submit);
@@ -516,27 +483,12 @@ export function notesDialog(
 
     function submit(e) {
       e.preventDefault();
-      const reminderMode = form.reminderMode.value || REMINDER_NONE;
-      const reminderVal = parseInt(form.reminderMinutes.value, 10);
-      const reminderMinutes =
-        reminderMode === REMINDER_MINUTES &&
-        Number.isFinite(reminderVal) &&
-        reminderVal > 0
-          ? Math.max(0, Math.round(reminderVal))
-          : 0;
-      const reminderAt =
-        reminderMode === REMINDER_DATETIME && form.reminderAt.value
-          ? form.reminderAt.value
-          : '';
       resolve({
         title: form.title.value.trim(),
         text: form.note.value.trim(),
         size: parseInt(form.size.value, 10) || 20,
         padding: parseInt(form.padding.value, 10) || 20,
         color: form.color.value || '#fef08a',
-        reminderMinutes,
-        reminderMode,
-        reminderAt,
       });
       cleanup();
     }
