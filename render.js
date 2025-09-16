@@ -12,6 +12,72 @@ const GRID = 20;
 // Allow snapping to existing card sizes when within this distance (px)
 const SNAP_THRESHOLD = GRID;
 
+const MIN_SIZE_ADJUSTER = Symbol('minSizeAdjuster');
+
+function setupMinSizeWatcher(cardEl, innerEl) {
+  if (!cardEl || !innerEl || typeof ResizeObserver === 'undefined') return;
+  const adjustMinSize = () => {
+    if (!cardEl.isConnected || !innerEl.isConnected) return;
+    const widthPx = `${Math.ceil(innerEl.scrollWidth)}px`;
+    const heightPx = `${Math.ceil(innerEl.scrollHeight)}px`;
+    if (cardEl.style.minWidth !== widthPx) {
+      cardEl.style.minWidth = widthPx;
+    }
+    if (cardEl.style.minHeight !== heightPx) {
+      cardEl.style.minHeight = heightPx;
+    }
+  };
+
+  const mo = new ResizeObserver(() => adjustMinSize());
+  mo.observe(innerEl);
+  cardEl[MIN_SIZE_ADJUSTER] = adjustMinSize;
+  adjustMinSize();
+
+  let cleaned = false;
+  let removalObserver = null;
+  const cleanup = () => {
+    if (cleaned) return;
+    cleaned = true;
+    mo.disconnect();
+    if (removalObserver) {
+      removalObserver.disconnect();
+      removalObserver = null;
+    }
+    if (cardEl[MIN_SIZE_ADJUSTER] === adjustMinSize) {
+      delete cardEl[MIN_SIZE_ADJUSTER];
+    }
+  };
+
+  const watchParent = (node) => {
+    if (!node || typeof MutationObserver !== 'function') return;
+    if (removalObserver) {
+      removalObserver.disconnect();
+    }
+    removalObserver = new MutationObserver(() => {
+      if (!cardEl.isConnected) {
+        cleanup();
+        return;
+      }
+      if (cardEl.parentNode && cardEl.parentNode !== node) {
+        watchParent(cardEl.parentNode);
+      }
+    });
+    removalObserver.observe(node, { childList: true });
+  };
+
+  if (typeof MutationObserver === 'function') {
+    watchParent(cardEl.parentNode);
+  } else {
+    cardEl.addEventListener(
+      'DOMNodeRemoved',
+      (event) => {
+        if (event.target === cardEl) cleanup();
+      },
+      { once: true },
+    );
+  }
+}
+
 let reminderTicker = null;
 let reminderEntryCache = new Map();
 
@@ -135,6 +201,10 @@ document.addEventListener('mouseup', () => {
     g.dataset.resizing = '0';
     g.style.minWidth = '';
     g.style.minHeight = '';
+    const adjust = g[MIN_SIZE_ADJUSTER];
+    if (typeof adjust === 'function') {
+      adjust();
+    }
   });
   if (resizeDirty) {
     persist();
@@ -696,6 +766,8 @@ export function render(state, editing, T, I, handlers, saveFn) {
 
       remGrp.appendChild(body);
       groupsEl.appendChild(remGrp);
+      const inner = remGrp.querySelector('.group-body');
+      setupMinSizeWatcher(remGrp, inner);
       ro.observe(remGrp);
       return;
     }
@@ -788,6 +860,8 @@ export function render(state, editing, T, I, handlers, saveFn) {
       itemsWrap.appendChild(itemsScroll);
       noteGrp.appendChild(itemsWrap);
       groupsEl.appendChild(noteGrp);
+      const inner = noteGrp.querySelector('.items');
+      setupMinSizeWatcher(noteGrp, inner);
       ro.observe(noteGrp);
       return;
     }
@@ -906,6 +980,8 @@ export function render(state, editing, T, I, handlers, saveFn) {
       grp.appendChild(emb);
       if (g.collapsed) grp.classList.add('collapsed');
       groupsEl.appendChild(grp);
+      const inner = grp.querySelector('.embed');
+      setupMinSizeWatcher(grp, inner);
       ro.observe(grp);
       return;
     }
@@ -1231,6 +1307,8 @@ export function render(state, editing, T, I, handlers, saveFn) {
     grp.appendChild(itemsWrap);
     if (g.collapsed) grp.classList.add('collapsed');
     groupsEl.appendChild(grp);
+    const inner = grp.querySelector('.items');
+    setupMinSizeWatcher(grp, inner);
     ro.observe(grp);
   });
 
