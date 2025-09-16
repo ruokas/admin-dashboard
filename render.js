@@ -12,6 +12,50 @@ const GRID = 20;
 // Allow snapping to existing card sizes when within this distance (px)
 const SNAP_THRESHOLD = GRID;
 
+let reminderTicker = null;
+let reminderEntryCache = new Map();
+
+function formatRelativeTime(ms) {
+  if (!Number.isFinite(ms)) return '';
+  const clamped = Math.max(0, ms);
+  if (clamped < 60000) {
+    const seconds = Math.round(clamped / 1000);
+    return `${seconds}s`;
+  }
+  const totalMinutes = Math.round(clamped / 60000);
+  if (totalMinutes < 60) return `${totalMinutes} min`;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return minutes ? `${hours} val ${minutes} min` : `${hours} val`;
+}
+
+function formatClockLabel(ms) {
+  if (!Number.isFinite(ms)) return '00:00';
+  const clamped = Math.max(0, ms);
+  const totalSeconds = Math.floor(clamped / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes >= 60) {
+    const hours = Math.floor(minutes / 60);
+    const remMinutes = minutes % 60;
+    return `${hours}h${remMinutes.toString().padStart(2, '0')}`;
+  }
+  return `${minutes.toString().padStart(2, '0')}:${seconds
+    .toString()
+    .padStart(2, '0')}`;
+}
+
+function formatDueLabel(ts) {
+  try {
+    return new Date(ts).toLocaleString('lt-LT', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return '';
+  }
+}
+
 function applySize(el, width, height, wSize = sizeFromWidth(width), hSize = sizeFromHeight(height)) {
   el.style.width = width + 'px';
   el.style.height = height + 'px';
@@ -63,6 +107,14 @@ const ro = new ResizeObserver((entries) => {
         applySize(el, baseW, baseH, wSize, hSize);
         if (el.dataset.id === 'notes') {
           currentState.notesBox = {
+            width: baseW,
+            height: baseH,
+            wSize,
+            hSize,
+          };
+        } else if (el.dataset.id === 'reminders') {
+          currentState.remindersCard = {
+            ...(currentState.remindersCard || {}),
             width: baseW,
             height: baseH,
             wSize,
@@ -191,6 +243,11 @@ export function render(state, editing, T, I, handlers, saveFn) {
 
   ro.disconnect();
   selectedGroups = [];
+  if (reminderTicker) {
+    clearInterval(reminderTicker);
+    reminderTicker = null;
+  }
+  reminderEntryCache = new Map();
 
   const q = (searchEl.value || '').toLowerCase().trim();
   groupsEl.innerHTML = '';
@@ -204,6 +261,13 @@ export function render(state, editing, T, I, handlers, saveFn) {
       const pos = Math.max(0, Math.min(currentState.notesPos || 0, ids.length));
       ids.splice(pos, 0, 'notes');
     }
+    if (currentState.remindersCard?.enabled) {
+      const rPos = Math.max(
+        0,
+        Math.min(currentState.remindersPos || 0, ids.length),
+      );
+      ids.splice(rPos, 0, 'reminders');
+    }
     const fromIdx = ids.indexOf(fromId);
     const toIdx = ids.indexOf(toId);
     if (fromIdx === -1 || toIdx === -1) return;
@@ -212,18 +276,452 @@ export function render(state, editing, T, I, handlers, saveFn) {
     const map = new Map(currentState.groups.map((g) => [g.id, g]));
     currentState.notesPos = ids.indexOf('notes');
     if (currentState.notesPos < 0) currentState.notesPos = 0;
+    currentState.remindersPos = ids.indexOf('reminders');
+    if (currentState.remindersPos < 0) currentState.remindersPos = 0;
     currentState.groups = ids
       .filter((id) => id !== 'notes')
+      .filter((id) => id !== 'reminders')
       .map((id) => map.get(id));
     persist();
     render(currentState, editing, T, I, handlers, persist);
   }
-  const allGroups = [...state.groups];
-  if (state.notes) {
-    const pos = Math.max(0, Math.min(state.notesPos || 0, allGroups.length));
-    allGroups.splice(pos, 0, { id: 'notes' });
+  const groupMap = new Map(state.groups.map((g) => [g.id, g]));
+  const ids = state.groups.map((g) => g.id);
+  const specials = [];
+  if (state.remindersCard?.enabled) {
+    specials.push({ id: 'reminders', pos: state.remindersPos || 0 });
   }
+  if (state.notes) {
+    specials.push({ id: 'notes', pos: state.notesPos || 0 });
+  }
+  specials
+    .sort((a, b) => a.pos - b.pos)
+    .forEach((special) => {
+      const pos = Math.max(0, Math.min(special.pos, ids.length));
+      ids.splice(pos, 0, special.id);
+    });
+  currentState.notesPos = ids.indexOf('notes');
+  if (currentState.notesPos < 0) currentState.notesPos = Math.max(
+    0,
+    Math.min(state.notesPos || 0, ids.length),
+  );
+  currentState.remindersPos = ids.indexOf('reminders');
+  if (currentState.remindersPos < 0)
+    currentState.remindersPos = Math.max(
+      0,
+      Math.min(state.remindersPos || 0, ids.length),
+    );
+  const allGroups = ids
+    .map((id) => {
+      if (id === 'notes') return { id: 'notes' };
+      if (id === 'reminders') return { id: 'reminders' };
+      return groupMap.get(id);
+    })
+    .filter(Boolean);
   allGroups.forEach((g) => {
+    if (g.id === 'reminders') {
+      const reminderHandlers = handlers.reminders || {};
+      const cardState = state.remindersCard || {};
+      const remGrp = document.createElement('section');
+      remGrp.className = 'group reminders-card';
+      remGrp.dataset.id = 'reminders';
+      remGrp.dataset.resizing = '0';
+      const rWidth =
+        cardState.width ?? SIZE_MAP[cardState.wSize || 'md']?.width ?? 360;
+      const rHeight =
+        cardState.height ?? SIZE_MAP[cardState.hSize || 'md']?.height ?? 360;
+      const rWSize = cardState.wSize || sizeFromWidth(rWidth);
+      const rHSize = cardState.hSize || sizeFromHeight(rHeight);
+      applySize(remGrp, rWidth, rHeight, rWSize, rHSize);
+      remGrp.style.resize = editing ? 'both' : 'none';
+      if (editing) {
+        remGrp.addEventListener('mousedown', (e) => {
+          const rect = remGrp.getBoundingClientRect();
+          const withinHandle =
+            e.clientX >= rect.right - 20 && e.clientY >= rect.bottom - 20;
+          if (withinHandle) {
+            remGrp.dataset.resizing = '1';
+            remGrp.style.minWidth = remGrp.scrollWidth + 'px';
+            remGrp.style.minHeight = remGrp.scrollHeight + 'px';
+          }
+        });
+        remGrp.draggable = true;
+        remGrp.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData('text/group', 'reminders');
+          remGrp.style.opacity = 0.5;
+        });
+        remGrp.addEventListener('dragend', () => {
+          remGrp.style.opacity = 1;
+        });
+        remGrp.addEventListener('dragover', (e) => {
+          e.preventDefault();
+        });
+        remGrp.addEventListener('drop', handleDrop);
+      } else {
+        remGrp.draggable = false;
+      }
+      remGrp.addEventListener('click', (e) => {
+        if (!e.shiftKey) return;
+        if (e.target.closest('button')) return;
+        e.preventDefault();
+        const idx = selectedGroups.indexOf(remGrp);
+        if (idx === -1) {
+          selectedGroups.push(remGrp);
+          remGrp.classList.add('selected');
+        } else {
+          selectedGroups.splice(idx, 1);
+          remGrp.classList.remove('selected');
+        }
+      });
+      const header = document.createElement('div');
+      header.className = 'group-header';
+      const titleText = (cardState.title || '').trim() ||
+        T.remindersCardTitle ||
+        T.reminders;
+      header.innerHTML = `
+        <div class="group-title">
+          <span class="dot" style="background:#38bdf8"></span>
+          <h2 data-reminders-title>${escapeHtml(titleText)}</h2>
+        </div>
+        ${
+          editing
+            ? `<div class="group-actions">
+          <button type="button" title="${escapeHtml(T.remove)}" aria-label="${escapeHtml(T.remove)}" data-act="remove">${I.trash}</button>
+        </div>`
+            : ''
+        }
+      `;
+      const titleEl = header.querySelector('[data-reminders-title]');
+      if (titleEl) {
+        titleEl.contentEditable = editing;
+        titleEl.addEventListener('keydown', (ev) => {
+          if (ev.key === 'Enter') {
+            ev.preventDefault();
+            titleEl.blur();
+          }
+        });
+        titleEl.addEventListener('blur', () => {
+          if (!editing) return;
+          if (reminderHandlers.setTitle) {
+            reminderHandlers.setTitle(titleEl.textContent || '');
+          }
+        });
+      }
+      header.addEventListener('click', (ev) => {
+        const btn = ev.target.closest('button[data-act]');
+        if (!btn) return;
+        if (btn.dataset.act === 'remove') {
+          if (handlers.confirmDialog) {
+            handlers
+              .confirmDialog(T.reminderCardRemove)
+              .then((ok) => ok && reminderHandlers.removeCard?.());
+          } else {
+            reminderHandlers.removeCard?.();
+          }
+        }
+      });
+      remGrp.appendChild(header);
+
+      const body = document.createElement('div');
+      body.className = 'reminders-card-body';
+
+      const controlsWrap = document.createElement('div');
+      controlsWrap.className = 'reminder-controls';
+
+      const quickSection = document.createElement('section');
+      quickSection.className = 'reminder-quick-start';
+      const quickText = document.createElement('div');
+      quickText.className = 'reminder-quick-text';
+      quickText.innerHTML = `
+        <h3>${escapeHtml(T.reminderQuickTitle)}</h3>
+        <p>${escapeHtml(T.reminderQuickDescription)}</p>
+      `;
+      quickSection.appendChild(quickText);
+      const quickButtons = document.createElement('div');
+      quickButtons.className = 'reminder-quick-buttons';
+      quickButtons.setAttribute('data-reminder-quick-start', '1');
+      const quickPresets = (() => {
+        if (typeof reminderHandlers.quickPresets === 'function') {
+          const res = reminderHandlers.quickPresets();
+          if (Array.isArray(res)) return res;
+        }
+        return [5, 10, 15, 30];
+      })();
+      const quickLabels = {
+        5: T.reminderPlus5,
+        10: T.reminderPlus10,
+        15: T.reminderPlus15,
+        30: T.reminderPlus30,
+      };
+      quickPresets
+        .filter((min) => Number.isFinite(min) && min > 0)
+        .forEach((min) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.dataset.minutes = String(min);
+          const titleLabel = (T.reminderTimerPattern || 'Laikmatis {min} min.').replace(
+            '{min}',
+            min,
+          );
+          const quickLabel = quickLabels[min] || `+${min} min`;
+          btn.title = titleLabel;
+          btn.innerHTML = `${I.clock} ${escapeHtml(quickLabel)}`;
+          quickButtons.appendChild(btn);
+        });
+      if (!quickButtons.childElementCount) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.dataset.minutes = '5';
+        btn.title = T.reminderPlus5;
+        btn.innerHTML = `${I.clock} ${escapeHtml(T.reminderPlus5)}`;
+        quickButtons.appendChild(btn);
+      }
+      quickSection.appendChild(quickButtons);
+      controlsWrap.appendChild(quickSection);
+
+      const form = document.createElement('form');
+      form.className = 'reminder-form';
+      form.setAttribute('data-reminder-form', '1');
+      form.innerHTML = `
+        <label>
+          <span>${escapeHtml(T.reminderName)}</span>
+          <input name="title" placeholder="${escapeHtml(
+            T.reminderNamePH || ''
+          )}" autocomplete="off">
+        </label>
+        <label>
+          <span>${escapeHtml(T.reminderMode)}</span>
+          <select name="reminderMode">
+            <option value="minutes">${escapeHtml(T.reminderAfter)}</option>
+            <option value="datetime">${escapeHtml(T.reminderExactTime)}</option>
+          </select>
+        </label>
+        <div class="reminder-form-section" data-reminder-section="minutes">
+          <label>
+            <span>${escapeHtml(T.reminderMinutes)}</span>
+            <input name="reminderMinutes" type="number" min="1" step="1">
+          </label>
+          <div class="reminder-quick-fill" data-reminder-quick-fill></div>
+        </div>
+        <div class="reminder-form-section" data-reminder-section="datetime">
+          <label>
+            <span>${escapeHtml(T.reminderExactTime)}</span>
+            <input name="reminderAt" type="datetime-local">
+          </label>
+        </div>
+        <div class="reminder-form-actions">
+          <button type="submit" class="btn-accent" data-reminder-submit>${escapeHtml(
+            T.reminderCreate
+          )}</button>
+          <button type="button" data-reminder-cancel hidden>${escapeHtml(
+            T.reminderCancelEdit
+          )}</button>
+        </div>
+        <p class="error" data-reminder-error aria-live="polite"></p>
+      `;
+      const quickFill = form.querySelector('[data-reminder-quick-fill]');
+      quickPresets
+        .filter((min) => Number.isFinite(min) && min > 0)
+        .forEach((min) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.dataset.minutes = String(min);
+          btn.textContent = quickLabels[min] || `+${min} min`;
+          quickFill?.appendChild(btn);
+        });
+      const formState = reminderHandlers.formState
+        ? reminderHandlers.formState()
+        : { editingId: null, values: null, error: '' };
+      const values = formState?.values || {};
+      form.title.value = values.title || '';
+      form.reminderMode.value = values.reminderMode || 'minutes';
+      form.reminderMinutes.value = values.reminderMinutes || '';
+      form.reminderAt.value = values.reminderAt || '';
+      const errorEl = form.querySelector('[data-reminder-error]');
+      if (errorEl) errorEl.textContent = formState.error || '';
+      const submitBtn = form.querySelector('[data-reminder-submit]');
+      const cancelBtn = form.querySelector('[data-reminder-cancel]');
+      if (formState.editingId) {
+        if (submitBtn) submitBtn.textContent = T.reminderUpdate;
+        if (cancelBtn) cancelBtn.hidden = false;
+        form.classList.add('is-editing');
+      } else {
+        if (submitBtn) submitBtn.textContent = T.reminderCreate;
+        if (cancelBtn) cancelBtn.hidden = true;
+        form.classList.remove('is-editing');
+      }
+      const updateMode = () => {
+        const mode = form.reminderMode.value || 'minutes';
+        form
+          .querySelectorAll('[data-reminder-section]')
+          .forEach((section) => {
+            section.hidden = section.dataset.reminderSection !== mode;
+          });
+      };
+      updateMode();
+      form.reminderMode.addEventListener('change', updateMode);
+      quickFill?.addEventListener('click', (event) => {
+        const btn = event.target.closest('button[data-minutes]');
+        if (!btn) return;
+        form.reminderMode.value = 'minutes';
+        form.reminderMinutes.value = btn.dataset.minutes || '';
+        updateMode();
+      });
+      quickButtons.addEventListener('click', (event) => {
+        const btn = event.target.closest('button[data-minutes]');
+        if (!btn) return;
+        const minutes = parseInt(btn.dataset.minutes || '', 10);
+        if (Number.isFinite(minutes) && reminderHandlers.quick) {
+          reminderHandlers.quick(minutes);
+        }
+      });
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        if (typeof reminderHandlers.submit === 'function') {
+          const payload = Object.fromEntries(new FormData(form));
+          payload.reminderMode = payload.reminderMode || 'minutes';
+          reminderHandlers.submit(payload);
+        }
+      });
+      cancelBtn?.addEventListener('click', () => {
+        reminderHandlers.cancelEdit?.();
+      });
+      controlsWrap.appendChild(form);
+
+      body.appendChild(controlsWrap);
+
+      const listSection = document.createElement('section');
+      listSection.className = 'reminder-list-section';
+      listSection.innerHTML = `
+        <h3>${escapeHtml(T.remindersUpcoming)}</h3>
+        <div class="reminder-empty" data-reminder-empty>${escapeHtml(
+          T.noReminders,
+        )}</div>
+        <ul class="reminder-items" data-reminder-list></ul>
+      `;
+      const listEl = listSection.querySelector('[data-reminder-list]');
+      const emptyEl = listSection.querySelector('[data-reminder-empty]');
+      const snoozeMinutes = reminderHandlers.snoozeMinutes || 5;
+      const updateReminders = () => {
+        const entries = reminderHandlers.entries
+          ? reminderHandlers.entries()
+          : [];
+        const sorted = Array.isArray(entries)
+          ? [...entries].sort((a, b) => a.at - b.at)
+          : [];
+        reminderEntryCache = new Map(sorted.map((entry) => [entry.key, entry]));
+        if (!listEl) return;
+        listEl.innerHTML = '';
+        if (!sorted.length) {
+          if (emptyEl) emptyEl.hidden = false;
+          return;
+        }
+        if (emptyEl) emptyEl.hidden = true;
+        sorted.forEach((entry) => {
+          const li = document.createElement('li');
+          li.dataset.key = entry.key;
+          const remaining = Number.isFinite(entry.at)
+            ? entry.at - Date.now()
+            : NaN;
+          const duration = Number.isFinite(entry.duration)
+            ? entry.duration
+            : null;
+          const ratio = duration
+            ? Math.max(0, Math.min(1, 1 - remaining / duration))
+            : 0;
+          li.classList.toggle('overdue', Number.isFinite(remaining) && remaining <= 0);
+          const progress = document.createElement('div');
+          progress.className = 'reminder-progress';
+          progress.style.setProperty('--ratio', String(ratio));
+          progress.innerHTML = `<span>${escapeHtml(
+            formatClockLabel(remaining),
+          )}</span>`;
+          li.appendChild(progress);
+          const info = document.createElement('div');
+          info.className = 'reminder-info';
+          const titleRow = document.createElement('div');
+          titleRow.className = 'reminder-title';
+          titleRow.textContent =
+            entry.body || entry.title || T.reminderNotificationTitle;
+          info.appendChild(titleRow);
+          const meta = document.createElement('div');
+          meta.className = 'reminder-meta';
+          const typeSpan = document.createElement('span');
+          typeSpan.className = 'reminder-tag';
+          const typeLabel =
+            entry.data?.type === 'notes'
+              ? T.reminderTypeNotes
+              : entry.data?.type === 'item'
+                ? T.reminderTypeItem
+                : T.reminderTypeCustom;
+          typeSpan.textContent = typeLabel;
+          meta.appendChild(typeSpan);
+          const dueSpan = document.createElement('span');
+          dueSpan.className = 'reminder-due';
+          dueSpan.textContent = `${T.reminderDue}: ${formatDueLabel(entry.at)}`;
+          meta.appendChild(dueSpan);
+          const leftSpan = document.createElement('span');
+          leftSpan.className = 'reminder-left';
+          leftSpan.textContent = `${T.reminderLeft}: ${formatRelativeTime(
+            remaining,
+          )}`;
+          meta.appendChild(leftSpan);
+          info.appendChild(meta);
+          li.appendChild(info);
+          const actions = document.createElement('div');
+          actions.className = 'reminder-actions';
+          const snoozeBtn = document.createElement('button');
+          snoozeBtn.type = 'button';
+          snoozeBtn.dataset.action = 'snooze';
+          snoozeBtn.title = T.reminderSnoozeShort || T.reminderSnooze;
+          snoozeBtn.innerHTML = `${I.clock}`;
+          actions.appendChild(snoozeBtn);
+          const editBtn = document.createElement('button');
+          editBtn.type = 'button';
+          editBtn.dataset.action = 'edit';
+          editBtn.title = T.reminderEditInline || T.reminderEdit;
+          editBtn.innerHTML = `${I.pencil}`;
+          actions.appendChild(editBtn);
+          const removeBtn = document.createElement('button');
+          removeBtn.type = 'button';
+          removeBtn.dataset.action = 'remove';
+          removeBtn.title = T.reminderRemove || T.remove;
+          removeBtn.classList.add('btn-danger');
+          removeBtn.innerHTML = `${I.trash}`;
+          actions.appendChild(removeBtn);
+          li.appendChild(actions);
+          listEl.appendChild(li);
+        });
+      };
+      updateReminders();
+      if (reminderTicker) {
+        clearInterval(reminderTicker);
+      }
+      reminderTicker = setInterval(updateReminders, 1000);
+      listEl?.addEventListener('click', (event) => {
+        const btn = event.target.closest('button[data-action]');
+        if (!btn) return;
+        const item = btn.closest('li');
+        if (!item) return;
+        const key = item.dataset.key;
+        if (!key) return;
+        const action = btn.dataset.action;
+        if (action === 'remove') {
+          reminderHandlers.clear?.(key);
+        } else if (action === 'snooze') {
+          reminderHandlers.snooze?.(key, snoozeMinutes);
+        } else if (action === 'edit') {
+          const entry = reminderEntryCache.get(key);
+          if (entry) reminderHandlers.edit?.(entry);
+        }
+      });
+      body.appendChild(listSection);
+
+      remGrp.appendChild(body);
+      groupsEl.appendChild(remGrp);
+      ro.observe(remGrp);
+      return;
+    }
     if (g.id === 'notes') {
       const noteGrp = document.createElement('section');
       noteGrp.className = 'group';
@@ -762,7 +1260,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
   statsEl.textContent = `${totalGroups} grupės • ${totalItems} įrašai`;
 }
 
-export function updateEditingUI(editing, T, I, renderFn) {
+export function updateEditingUI(editing, state, T, I, renderFn) {
   const editBtn = document.getElementById('editBtn');
   document.body.classList.toggle('editing', editing);
   editBtn.innerHTML = editing
@@ -776,10 +1274,19 @@ export function updateEditingUI(editing, T, I, renderFn) {
   const addGroup = document.getElementById('addGroup');
   const addChart = document.getElementById('addChart');
   const addNote = document.getElementById('addNote');
+  const addReminder = document.getElementById('addRemindersCard');
   if (addBtn) addBtn.innerHTML = `${I.plus} <span>${T.add}</span>`;
   if (addGroup) addGroup.innerHTML = `${I.plus} ${T.addGroup}`;
   if (addChart) addChart.innerHTML = `${I.chart} ${T.addChart}`;
   if (addNote) addNote.innerHTML = `${I.plus} ${T.addNote}`;
+  if (addReminder) {
+    addReminder.innerHTML = `${I.clock} ${T.addRemindersCard}`;
+    if (!editing) addReminder.style.display = 'none';
+    else
+      addReminder.style.display = state.remindersCard?.enabled
+        ? 'none'
+        : 'block';
+  }
   renderFn();
 }
 

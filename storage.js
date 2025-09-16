@@ -82,6 +82,54 @@ export function load() {
       )
         data.notesOpts = { size: 16, padding: 8 };
       if (typeof data.notesPos !== 'number') data.notesPos = 0;
+      if (!Array.isArray(data.customReminders)) data.customReminders = [];
+      else
+        data.customReminders = data.customReminders
+          .filter((entry) => Number.isFinite(entry?.at))
+          .map((entry) => ({
+            id:
+              typeof entry.id === 'string' && entry.id
+                ? entry.id
+                : typeof crypto !== 'undefined' && crypto.randomUUID
+                  ? crypto.randomUUID()
+                  : `custom-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+            title: typeof entry.title === 'string' ? entry.title : '',
+            at: Math.round(entry.at),
+            minutes:
+              Number.isFinite(entry.minutes) && entry.minutes > 0
+                ? Math.max(0, Math.round(entry.minutes))
+                : null,
+            createdAt: Number.isFinite(entry.createdAt)
+              ? Math.round(entry.createdAt)
+              : Date.now(),
+          }));
+      if (
+        !data.remindersCard ||
+        typeof data.remindersCard.width !== 'number' ||
+        typeof data.remindersCard.height !== 'number'
+      ) {
+        const width = 360;
+        const height = 360;
+        data.remindersCard = {
+          enabled: false,
+          title: '',
+          width,
+          height,
+          wSize: sizeFromWidth(width),
+          hSize: sizeFromHeight(height),
+        };
+      } else {
+        data.remindersCard.enabled = Boolean(data.remindersCard.enabled);
+        data.remindersCard.title =
+          typeof data.remindersCard.title === 'string'
+            ? data.remindersCard.title
+            : '';
+        data.remindersCard.wSize =
+          data.remindersCard.wSize || sizeFromWidth(data.remindersCard.width);
+        data.remindersCard.hSize =
+          data.remindersCard.hSize || sizeFromHeight(data.remindersCard.height);
+      }
+      if (typeof data.remindersPos !== 'number') data.remindersPos = 0;
     }
     return data;
   } catch (e) {
@@ -103,6 +151,16 @@ export function seed() {
     notesPos: 0,
     notesReminderMinutes: 0,
     notesReminderAt: null,
+    remindersCard: {
+      enabled: false,
+      title: '',
+      width: 360,
+      height: 360,
+      wSize: 'md',
+      hSize: 'md',
+    },
+    remindersPos: 0,
+    customReminders: [],
     title: '',
     icon: '',
   };
