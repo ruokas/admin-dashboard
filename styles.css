@@ -414,20 +414,21 @@ a.item {
 .reminders-card-body {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 12px;
+  gap: 12px;
+  padding: 10px;
   flex: 1;
 }
 
 .reminder-controls {
   display: grid;
-  gap: 16px;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  align-items: start;
 }
 
 @media (min-width: 768px) {
   .reminder-controls {
-    grid-template-columns: 1fr 1fr;
-    align-items: start;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   }
 }
 
@@ -437,35 +438,73 @@ a.item {
   background: var(--card);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 12px;
-  padding: 12px;
+  padding: 10px;
   box-shadow: var(--shadow);
+}
+
+.reminder-quick-start {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.reminder-quick-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+@media (min-width: 768px) {
+  .reminder-quick-text {
+    max-width: 260px;
+  }
 }
 
 .reminder-quick-text h3 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 0.95rem;
 }
 
 .reminder-quick-text p {
-  margin: 4px 0 12px;
+  margin: 0;
   color: var(--subtext);
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
 }
 
 .reminder-quick-buttons,
 .reminder-quick-fill {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
+  align-items: center;
+}
+
+.reminder-quick-fill {
+  justify-content: flex-start;
 }
 
 .reminder-quick-buttons button,
 .reminder-quick-fill button {
-  padding: 6px 10px;
+  padding: 4px 8px;
   border-radius: 8px;
   background: var(--muted);
   border: 1px solid transparent;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.reminder-quick-buttons button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.reminder-quick-fill button {
+  font-size: 0.75rem;
 }
 
 .reminder-quick-buttons button:hover,
@@ -474,21 +513,35 @@ a.item {
   color: var(--btn-accent-text);
 }
 
+.reminder-quick-buttons {
+  flex: 1 1 160px;
+  justify-content: flex-start;
+}
+
+@media (min-width: 768px) {
+  .reminder-quick-buttons {
+    justify-content: flex-end;
+  }
+}
+
 .reminder-form {
   display: grid;
-  gap: 12px;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  align-items: end;
 }
 
 .reminder-form label {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   font-size: 0.875rem;
+  min-width: 0;
 }
 
 .reminder-form input,
 .reminder-form select {
-  padding: 8px;
+  padding: 6px 8px;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: var(--panel);
@@ -503,20 +556,24 @@ a.item {
 .reminder-form-section {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
+  min-width: 0;
 }
 
 .reminder-form-actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
+  justify-content: flex-start;
+  grid-column: 1 / -1;
 }
 
 .reminder-form .error {
   margin: 0;
   min-height: 1em;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   color: var(--danger);
+  grid-column: 1 / -1;
 }
 
 .reminder-form.is-editing {
@@ -526,7 +583,7 @@ a.item {
 .reminder-list-section {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .reminder-list-section h3 {
@@ -544,19 +601,19 @@ a.item {
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 12px;
-  max-height: 260px;
+  gap: 8px;
+  max-height: 220px;
   overflow-y: auto;
 }
 
 .reminder-items li {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   align-items: center;
   background: var(--panel);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 12px;
-  padding: 10px 12px;
+  border-radius: 10px;
+  padding: 8px 10px;
   box-shadow: var(--shadow);
 }
 
@@ -569,8 +626,8 @@ a.item {
 }
 
 .reminder-progress {
-  width: 56px;
-  height: 56px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   background:
     conic-gradient(
@@ -581,7 +638,7 @@ a.item {
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   color: var(--text);
   flex-shrink: 0;
 }
@@ -603,12 +660,12 @@ a.item {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 
 .reminder-title {
   font-weight: 600;
-  font-size: 1rem;
+  font-size: 0.95rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -617,25 +674,28 @@ a.item {
 .reminder-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  font-size: 0.75rem;
+  gap: 6px;
+  font-size: 0.7rem;
   color: var(--subtext);
 }
 
 .reminder-tag {
   background: rgba(255, 255, 255, 0.08);
   border-radius: 999px;
-  padding: 2px 8px;
+  padding: 2px 6px;
 }
 
 .reminder-actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
 .reminder-actions button {
-  padding: 6px 8px;
-  border-radius: 8px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .reminders-list {
