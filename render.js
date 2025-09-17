@@ -1,4 +1,5 @@
 import { SIZE_MAP, sizeFromWidth, sizeFromHeight } from './sizes.js';
+import { countGroupItems } from './stats.js';
 
 let currentState;
 let persist;
@@ -1317,7 +1318,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
   });
 
   const totalGroups = state.groups.length;
-  const totalItems = state.groups.reduce((sum, g) => sum + g.items.length, 0);
+  const totalItems = countGroupItems(state.groups);
   statsEl.textContent = `${totalGroups} grupės • ${totalItems} įrašai`;
 }
 
