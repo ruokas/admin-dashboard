@@ -511,11 +511,11 @@ export function render(state, editing, T, I, handlers, saveFn) {
       quickSection.className = 'reminder-quick-start';
       const quickDetails = document.createElement('details');
       quickDetails.className = 'reminder-quick-details';
-      quickDetails.open = cardState.showQuick !== false;
+      quickDetails.open = cardState.showQuick === true;
       const quickSummary = document.createElement('summary');
       quickSummary.className = 'reminder-quick-summary';
       quickSummary.textContent =
-        T.reminderQuickTitle || 'Greiti laikmačiai';
+        T.reminderQuickTitle || 'Greiti laikmačiai (išskleiskite)';
       quickDetails.appendChild(quickSummary);
       const quickText = document.createElement('div');
       quickText.className = 'reminder-quick-text';

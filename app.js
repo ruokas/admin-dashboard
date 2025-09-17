@@ -205,7 +205,7 @@ function normaliseReminderState() {
       height: SIZE_MAP.md.height,
       wSize: 'md',
       hSize: 'md',
-      showQuick: true,
+      showQuick: false,
     };
   } else {
     const fallbackWidth = SIZE_MAP[state.remindersCard.wSize || 'md']?.width || 360;
@@ -224,7 +224,7 @@ function normaliseReminderState() {
         ? state.remindersCard.title
         : '';
     state.remindersCard.enabled = Boolean(state.remindersCard.enabled);
-    state.remindersCard.showQuick = state.remindersCard.showQuick !== false;
+    state.remindersCard.showQuick = state.remindersCard.showQuick === true;
   }
   if (typeof state.remindersPos !== 'number') state.remindersPos = 0;
   const groups = Array.isArray(state.groups) ? state.groups : [];
@@ -537,7 +537,7 @@ function addRemindersCard() {
       height: SIZE_MAP.md.height,
       wSize: 'md',
       hSize: 'md',
-      showQuick: true,
+      showQuick: false,
     };
   } else {
     state.remindersCard.enabled = true;

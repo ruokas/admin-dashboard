@@ -35,7 +35,7 @@ export const Tlt = {
   reminderCreate: 'Pridėti',
   reminderUpdate: 'Išsaugoti priminimą',
   reminderCancelEdit: 'Atšaukti',
-  reminderQuickTitle: 'Greiti laikmačiai',
+  reminderQuickTitle: 'Greiti laikmačiai (išskleiskite santrauką)',
   reminderQuickDescription: 'Pradėti laikmatį vienu paspaudimu',
   remindersUpcoming: 'Aktyvūs priminimai',
   reminderTypeNotes: 'Pastabų kortelė',
