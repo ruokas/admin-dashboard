@@ -29,7 +29,20 @@ function setupMinSizeWatcher(cardEl, innerEl) {
     }
   };
 
-  const mo = new ResizeObserver(() => adjustMinSize());
+  let frameId = null;
+  const scheduleAdjust = () => {
+    if (typeof requestAnimationFrame !== 'function') {
+      adjustMinSize();
+      return;
+    }
+    if (frameId != null) return;
+    frameId = requestAnimationFrame(() => {
+      frameId = null;
+      adjustMinSize();
+    });
+  };
+
+  const mo = new ResizeObserver(() => scheduleAdjust());
   mo.observe(innerEl);
   cardEl[MIN_SIZE_ADJUSTER] = adjustMinSize;
   adjustMinSize();
@@ -39,6 +52,10 @@ function setupMinSizeWatcher(cardEl, innerEl) {
   const cleanup = () => {
     if (cleaned) return;
     cleaned = true;
+    if (frameId != null && typeof cancelAnimationFrame === 'function') {
+      cancelAnimationFrame(frameId);
+      frameId = null;
+    }
     mo.disconnect();
     if (removalObserver) {
       removalObserver.disconnect();
