@@ -180,6 +180,14 @@ function parseReminderInput(data = {}) {
   return { mode, reminderMinutes, reminderAt };
 }
 
+function hasReminderPayload(data = {}) {
+  return (
+    Object.prototype.hasOwnProperty.call(data, 'reminderMode') ||
+    Object.prototype.hasOwnProperty.call(data, 'reminderMinutes') ||
+    Object.prototype.hasOwnProperty.call(data, 'reminderAt')
+  );
+}
+
 function normaliseReminderState() {
   if (!Array.isArray(state.customReminders)) state.customReminders = [];
   else
@@ -838,17 +846,19 @@ async function addItem(gid) {
     icon: data.icon,
   };
   if (data.h) newItem.h = data.h;
-  const reminder = parseReminderInput(data);
-  if (reminder.mode === REMINDER_MODE_MINUTES && reminder.reminderMinutes > 0) {
-    newItem.reminderMinutes = reminder.reminderMinutes;
-    newItem.reminderAt = Date.now() + reminder.reminderMinutes * 60000;
-    if (reminders) await reminders.ensurePermission();
-  } else if (
-    reminder.mode === REMINDER_MODE_DATETIME &&
-    Number.isFinite(reminder.reminderAt)
-  ) {
-    newItem.reminderAt = reminder.reminderAt;
-    if (reminders) await reminders.ensurePermission();
+  if (hasReminderPayload(data)) {
+    const reminder = parseReminderInput(data);
+    if (reminder.mode === REMINDER_MODE_MINUTES && reminder.reminderMinutes > 0) {
+      newItem.reminderMinutes = reminder.reminderMinutes;
+      newItem.reminderAt = Date.now() + reminder.reminderMinutes * 60000;
+      if (reminders) await reminders.ensurePermission();
+    } else if (
+      reminder.mode === REMINDER_MODE_DATETIME &&
+      Number.isFinite(reminder.reminderAt)
+    ) {
+      newItem.reminderAt = reminder.reminderAt;
+      if (reminders) await reminders.ensurePermission();
+    }
   }
   g.items.push(newItem);
   persistState();
@@ -879,21 +889,23 @@ async function editItem(gid, iid) {
   it.icon = data.icon;
   if (data.h) it.h = data.h;
   else delete it.h;
-  const reminder = parseReminderInput(data);
-  if (reminder.mode === REMINDER_MODE_MINUTES && reminder.reminderMinutes > 0) {
-    it.reminderMinutes = reminder.reminderMinutes;
-    it.reminderAt = Date.now() + reminder.reminderMinutes * 60000;
-    if (reminders) await reminders.ensurePermission();
-  } else if (
-    reminder.mode === REMINDER_MODE_DATETIME &&
-    Number.isFinite(reminder.reminderAt)
-  ) {
-    delete it.reminderMinutes;
-    it.reminderAt = reminder.reminderAt;
-    if (reminders) await reminders.ensurePermission();
-  } else {
-    delete it.reminderMinutes;
-    delete it.reminderAt;
+  if (hasReminderPayload(data)) {
+    const reminder = parseReminderInput(data);
+    if (reminder.mode === REMINDER_MODE_MINUTES && reminder.reminderMinutes > 0) {
+      it.reminderMinutes = reminder.reminderMinutes;
+      it.reminderAt = Date.now() + reminder.reminderMinutes * 60000;
+      if (reminders) await reminders.ensurePermission();
+    } else if (
+      reminder.mode === REMINDER_MODE_DATETIME &&
+      Number.isFinite(reminder.reminderAt)
+    ) {
+      delete it.reminderMinutes;
+      it.reminderAt = reminder.reminderAt;
+      if (reminders) await reminders.ensurePermission();
+    } else {
+      delete it.reminderMinutes;
+      delete it.reminderAt;
+    }
   }
   persistState();
   renderAll();

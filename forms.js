@@ -1,52 +1,5 @@
 import { I } from './icons.js';
 
-const REMINDER_NONE = 'none';
-const REMINDER_DATETIME = 'datetime';
-const REMINDER_MINUTES = 'minutes';
-
-function formatDateTimeLocal(timestamp) {
-  if (!Number.isFinite(timestamp)) return '';
-  const date = new Date(timestamp);
-  const pad = (val) => String(val).padStart(2, '0');
-  const year = date.getFullYear();
-  const month = pad(date.getMonth() + 1);
-  const day = pad(date.getDate());
-  const hours = pad(date.getHours());
-  const minutes = pad(date.getMinutes());
-  return `${year}-${month}-${day}T${hours}:${minutes}`;
-}
-
-function setupReminderControls(form) {
-  const modeSelect = form.querySelector('[name="reminderMode"]');
-  if (!modeSelect) return;
-  const sections = form.querySelectorAll('[data-reminder]');
-  const update = () => {
-    const mode = modeSelect.value || REMINDER_NONE;
-    sections.forEach((section) => {
-      section.hidden = section.dataset.reminder !== mode;
-    });
-  };
-  update();
-  modeSelect.addEventListener('change', update);
-}
-
-function setupReminderQuickButtons(form) {
-  const minutesSection = form.querySelector('[data-reminder="minutes"]');
-  if (!minutesSection) return;
-  const input = form.reminderMinutes;
-  if (!input) return;
-  const quickContainer = minutesSection.querySelector('[data-reminder-quick]');
-  if (!quickContainer) return;
-  quickContainer.addEventListener('click', (event) => {
-    const button = event.target.closest('button[data-minutes]');
-    if (!button || !quickContainer.contains(button)) return;
-    const minutes = parseInt(button.dataset.minutes, 10);
-    if (!Number.isFinite(minutes)) return;
-    form.reminderMinutes.value = String(minutes);
-    input.dispatchEvent(new Event('change', { bubbles: true }));
-  });
-}
-
 function escapeHtml(str = '') {
   return str
     .replace(/&/g, '&amp;')
@@ -256,24 +209,6 @@ export function itemFormDialog(T, data = {}) {
         </div>
       </label>
       <label>${T.itemNote}<br><textarea name="note" rows="2"></textarea></label>
-      <label>${T.reminderMode}<br>
-        <select name="reminderMode">
-          <option value="${REMINDER_NONE}">${T.reminderNone}</option>
-          <option value="${REMINDER_DATETIME}">${T.reminderExactTime}</option>
-          <option value="${REMINDER_MINUTES}">${T.reminderAfter}</option>
-        </select>
-      </label>
-      <label data-reminder="${REMINDER_DATETIME}" hidden>${T.reminderExactTime}<br><input name="reminderAt" type="datetime-local"></label>
-      <label data-reminder="${REMINDER_MINUTES}" hidden>
-        ${T.reminderMinutes}<br>
-        <input name="reminderMinutes" type="number" min="0" step="1">
-        <div class="reminder-quick-buttons" data-reminder-quick>
-          <button type="button" data-minutes="5">${T.reminderPlus5}</button>
-          <button type="button" data-minutes="10">${T.reminderPlus10}</button>
-          <button type="button" data-minutes="15">${T.reminderPlus15}</button>
-          <button type="button" data-minutes="30">${T.reminderPlus30}</button>
-        </div>
-      </label>
       <p class="error" id="itemErr" role="status" aria-live="polite"></p>
       <menu>
         <button type="button" data-act="cancel">${T.cancel}</button>
@@ -293,19 +228,6 @@ export function itemFormDialog(T, data = {}) {
     form.url.value = data.url || '';
     iconInput.value = data.icon || '';
     form.note.value = data.note || '';
-    const hasReminderMinutes =
-      typeof data.reminderMinutes === 'number' && data.reminderMinutes > 0;
-    const hasReminderAt = Number.isFinite(data.reminderAt);
-    let reminderMode = REMINDER_NONE;
-    if (hasReminderAt) reminderMode = REMINDER_DATETIME;
-    else if (hasReminderMinutes) reminderMode = REMINDER_MINUTES;
-    form.reminderMode.value = reminderMode;
-    form.reminderMinutes.value = hasReminderMinutes ? data.reminderMinutes : '';
-    form.reminderAt.value = hasReminderAt
-      ? formatDateTimeLocal(data.reminderAt)
-      : '';
-    setupReminderControls(form);
-    setupReminderQuickButtons(form);
 
     const initBtn = picker.querySelector(
       `button[data-val="${iconInput.value}"]`,
@@ -335,19 +257,6 @@ export function itemFormDialog(T, data = {}) {
       formData.url = formData.url.trim();
       formData.icon = formData.icon.trim();
       formData.note = formData.note.trim();
-      const reminderMode = formData.reminderMode || REMINDER_NONE;
-      const minutesVal = parseInt(formData.reminderMinutes, 10);
-      formData.reminderMode = reminderMode;
-      formData.reminderMinutes =
-        reminderMode === REMINDER_MINUTES &&
-        Number.isFinite(minutesVal) &&
-        minutesVal > 0
-          ? Math.max(0, Math.round(minutesVal))
-          : 0;
-      formData.reminderAt =
-        reminderMode === REMINDER_DATETIME && formData.reminderAt
-          ? formData.reminderAt
-          : '';
       if (!formData.title || !formData.url) {
         err.textContent = T.required;
         return;
