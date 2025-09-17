@@ -379,7 +379,10 @@ export function render(state, editing, T, I, handlers, saveFn) {
   allGroups.forEach((g) => {
     if (g.id === 'reminders') {
       const reminderHandlers = handlers.reminders || {};
-      const cardState = state.remindersCard || {};
+      const cardState =
+        (typeof reminderHandlers.cardState === 'function'
+          ? reminderHandlers.cardState()
+          : state.remindersCard) || {};
       const remGrp = document.createElement('section');
       remGrp.className = 'group reminders-card';
       remGrp.dataset.id = 'reminders';
@@ -489,16 +492,25 @@ export function render(state, editing, T, I, handlers, saveFn) {
 
       const quickSection = document.createElement('section');
       quickSection.className = 'reminder-quick-start';
+      const quickDetails = document.createElement('details');
+      quickDetails.className = 'reminder-quick-details';
+      quickDetails.open = cardState.showQuick !== false;
+      const quickSummary = document.createElement('summary');
+      quickSummary.className = 'reminder-quick-summary';
+      quickSummary.textContent =
+        T.reminderQuickTitle || 'Greiti laikmačiai';
+      quickDetails.appendChild(quickSummary);
       const quickText = document.createElement('div');
       quickText.className = 'reminder-quick-text';
       quickText.innerHTML = `
-        <h3>${escapeHtml(T.reminderQuickTitle)}</h3>
         <p>${escapeHtml(T.reminderQuickDescription)}</p>
       `;
-      quickSection.appendChild(quickText);
+      quickDetails.appendChild(quickText);
       const quickButtons = document.createElement('div');
       quickButtons.className = 'reminder-quick-buttons';
       quickButtons.setAttribute('data-reminder-quick-start', '1');
+      quickDetails.appendChild(quickButtons);
+      quickSection.appendChild(quickDetails);
       const quickPresets = (() => {
         if (typeof reminderHandlers.quickPresets === 'function') {
           const res = reminderHandlers.quickPresets();
@@ -535,8 +547,16 @@ export function render(state, editing, T, I, handlers, saveFn) {
         btn.innerHTML = `${I.clock} ${escapeHtml(T.reminderPlus5)}`;
         quickButtons.appendChild(btn);
       }
-      quickSection.appendChild(quickButtons);
       controlsWrap.appendChild(quickSection);
+      quickDetails.addEventListener('toggle', () => {
+        if (!cardState || typeof cardState !== 'object') return;
+        const nextState = Boolean(quickDetails.open);
+        if (cardState.showQuick === nextState) return;
+        cardState.showQuick = nextState;
+        if (typeof persist === 'function') {
+          persist();
+        }
+      });
 
       const form = document.createElement('form');
       form.className = 'reminder-form';

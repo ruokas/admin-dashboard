@@ -208,6 +208,7 @@ export function load() {
           height,
           wSize: sizeFromWidth(width),
           hSize: sizeFromHeight(height),
+          showQuick: true,
         };
       } else {
         data.remindersCard.enabled = Boolean(data.remindersCard.enabled);
@@ -219,6 +220,7 @@ export function load() {
           data.remindersCard.wSize || sizeFromWidth(data.remindersCard.width);
         data.remindersCard.hSize =
           data.remindersCard.hSize || sizeFromHeight(data.remindersCard.height);
+        data.remindersCard.showQuick = data.remindersCard.showQuick !== false;
       }
       if (typeof data.remindersPos !== 'number') data.remindersPos = 0;
     }
@@ -242,6 +244,7 @@ export function seed() {
       height: DEFAULT_CARD_HEIGHT,
       wSize: sizeFromWidth(DEFAULT_CARD_WIDTH),
       hSize: sizeFromHeight(DEFAULT_CARD_HEIGHT),
+      showQuick: true,
     },
     remindersPos: 0,
     customReminders: [],
