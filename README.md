@@ -42,7 +42,7 @@ Grupių kortelių matmenys nustatomi per `style` atributus ir saugomi naršyklė
 (`group.width`, `group.height`, `notesBox.width`, `notesBox.height`).
 Numatyti matmenys – 360×360 px.
 
-Pastabų kortelės pagal nutylėjimą naudoja 20 px šriftą ir 20 px paraštes.
+Pastabų kortelės pagal nutylėjimą naudoja 20 px šriftą ir 20 px paraštes. Jei reikia nuimti paraštes visiškai, įveskite reikšmę „0“ – ji bus išsaugota ir rodoma kortelėje.
 
 ## Smoke test
 
