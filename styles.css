@@ -630,11 +630,28 @@ a.item {
     flex-shrink: 0;
   }
 
+.reminder-items li.overdue .reminder-progress {
+  background:
+    conic-gradient(
+      var(--danger) calc(var(--ratio, 0) * 360deg),
+      rgba(255, 255, 255, 0.08) 0
+    );
+  color: var(--btn-danger-text);
+}
+
 .theme-light .reminder-progress {
   background:
     conic-gradient(
       var(--accent) calc(var(--ratio, 0) * 360deg),
       rgba(0, 0, 0, 0.06) 0
+    );
+}
+
+.theme-light .reminder-items li.overdue .reminder-progress {
+  background:
+    conic-gradient(
+      var(--danger) calc(var(--ratio, 0) * 360deg),
+      rgba(0, 0, 0, 0.08) 0
     );
 }
 
