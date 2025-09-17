@@ -597,9 +597,22 @@ a.item {
   .reminder-form-actions {
     display: flex;
     gap: 4px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     justify-content: flex-start;
+    align-items: center;
     grid-column: 1 / -1;
+  }
+
+  .reminder-form-actions > button {
+    padding: 6px 10px;
+    font-size: 0.75rem;
+    line-height: 1.1;
+    white-space: nowrap;
+  }
+
+  .reminder-form-actions > button .icon {
+    width: 14px;
+    height: 14px;
   }
 
   .reminder-form .error {

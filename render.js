@@ -589,12 +589,12 @@ export function render(state, editing, T, I, handlers, saveFn) {
           </label>
         </div>
         <div class="reminder-form-actions">
-          <button type="submit" class="btn-accent" data-reminder-submit>${escapeHtml(
-            T.reminderCreate
-          )}</button>
-          <button type="button" data-reminder-cancel hidden>${escapeHtml(
-            T.reminderCancelEdit
-          )}</button>
+          <button type="submit" class="btn-accent" data-reminder-submit>
+            ${I.plus} <span>${escapeHtml(T.reminderCreate)}</span>
+          </button>
+          <button type="button" data-reminder-cancel hidden>
+            ${I.close} <span>${escapeHtml(T.reminderCancelEdit)}</span>
+          </button>
         </div>
         <p class="error" data-reminder-error aria-live="polite"></p>
       `;
@@ -620,12 +620,20 @@ export function render(state, editing, T, I, handlers, saveFn) {
       if (errorEl) errorEl.textContent = formState.error || '';
       const submitBtn = form.querySelector('[data-reminder-submit]');
       const cancelBtn = form.querySelector('[data-reminder-cancel]');
+      const createLabel = `${I.plus} <span>${escapeHtml(T.reminderCreate)}</span>`;
+      const updateLabel = `${I.check} <span>${escapeHtml(T.reminderUpdate)}</span>`;
+      const cancelLabel = `${I.close} <span>${escapeHtml(
+        T.reminderCancelEdit,
+      )}</span>`;
+      if (cancelBtn) {
+        cancelBtn.innerHTML = cancelLabel;
+      }
       if (formState.editingId) {
-        if (submitBtn) submitBtn.textContent = T.reminderUpdate;
+        if (submitBtn) submitBtn.innerHTML = updateLabel;
         if (cancelBtn) cancelBtn.hidden = false;
         form.classList.add('is-editing');
       } else {
-        if (submitBtn) submitBtn.textContent = T.reminderCreate;
+        if (submitBtn) submitBtn.innerHTML = createLabel;
         if (cancelBtn) cancelBtn.hidden = true;
         form.classList.remove('is-editing');
       }
