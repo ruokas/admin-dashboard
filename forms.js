@@ -470,8 +470,10 @@ export function notesDialog(
     const cancel = form.querySelector('[data-act="cancel"]');
     form.title.value = data.title || '';
     form.note.value = data.text || '';
-    form.size.value = data.size || 20;
-    form.padding.value = data.padding || 20;
+    const initSize = Number.parseInt(data.size, 10);
+    const initPadding = Number.parseInt(data.padding, 10);
+    form.size.value = Number.isFinite(initSize) ? initSize : 20;
+    form.padding.value = Number.isFinite(initPadding) ? initPadding : 20;
     form.color.value = data.color || '#fef08a';
 
     function cleanup() {
@@ -483,11 +485,13 @@ export function notesDialog(
 
     function submit(e) {
       e.preventDefault();
+      const sizeVal = Number.parseInt(form.size.value, 10);
+      const paddingVal = Number.parseInt(form.padding.value, 10);
       resolve({
         title: form.title.value.trim(),
         text: form.note.value.trim(),
-        size: parseInt(form.size.value, 10) || 20,
-        padding: parseInt(form.padding.value, 10) || 20,
+        size: Number.isFinite(sizeVal) ? sizeVal : 20,
+        padding: Number.isFinite(paddingVal) ? paddingVal : 20,
         color: form.color.value || '#fef08a',
       });
       cleanup();
