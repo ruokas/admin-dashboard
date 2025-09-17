@@ -170,6 +170,37 @@ function schedulePersist() {
   }, 200);
 }
 
+const pendingResize = new Map();
+let resizeRaf = null;
+
+function processPendingResize() {
+  if (!pendingResize.size) return;
+  const entries = Array.from(pendingResize.entries());
+  pendingResize.clear();
+  for (const [el, { baseW, baseH, wSize, hSize }] of entries) {
+    if (!el || !el.isConnected) continue;
+    applySize(el, baseW, baseH, wSize, hSize);
+    if (el.dataset.id === 'reminders') {
+      currentState.remindersCard = {
+        ...(currentState.remindersCard || {}),
+        width: baseW,
+        height: baseH,
+        wSize,
+        hSize,
+      };
+    } else {
+      const sg = currentState.groups.find((x) => x.id === el.dataset.id);
+      if (sg) {
+        sg.width = baseW;
+        sg.height = baseH;
+        sg.wSize = wSize;
+        sg.hSize = hSize;
+        delete sg.size;
+      }
+    }
+  }
+}
+
 const ro = new ResizeObserver((entries) => {
   for (const entry of entries) {
     if (entry.target.dataset.resizing === '1') {
@@ -197,34 +228,38 @@ const ro = new ResizeObserver((entries) => {
         ? selectedGroups
         : [entry.target];
 
+      let hasPending = false;
       targets.forEach((el) => {
-        applySize(el, baseW, baseH, wSize, hSize);
-        if (el.dataset.id === 'reminders') {
-          currentState.remindersCard = {
-            ...(currentState.remindersCard || {}),
-            width: baseW,
-            height: baseH,
-            wSize,
-            hSize,
-          };
-        } else {
-          const sg = currentState.groups.find((x) => x.id === el.dataset.id);
-          if (sg) {
-            sg.width = baseW;
-            sg.height = baseH;
-            sg.wSize = wSize;
-            sg.hSize = hSize;
-            delete sg.size;
-          }
-        }
+        pendingResize.set(el, { baseW, baseH, wSize, hSize });
+        hasPending = true;
       });
-      resizeDirty = true;
-      schedulePersist();
+      if (hasPending) {
+        resizeDirty = true;
+        schedulePersist();
+      }
+    }
+  }
+  if (pendingResize.size) {
+    if (typeof requestAnimationFrame === 'function') {
+      if (resizeRaf === null) {
+        resizeRaf = requestAnimationFrame(() => {
+          resizeRaf = null;
+          processPendingResize();
+        });
+      }
+    } else {
+      processPendingResize();
     }
   }
 });
 
 document.addEventListener('mouseup', () => {
+  if (typeof cancelAnimationFrame === 'function' && resizeRaf !== null) {
+    cancelAnimationFrame(resizeRaf);
+    resizeRaf = null;
+  }
+  processPendingResize();
+  pendingResize.clear();
   document.querySelectorAll('.group').forEach((g) => {
     g.dataset.resizing = '0';
     g.style.minWidth = '';
@@ -333,6 +368,11 @@ export function render(state, editing, T, I, handlers, saveFn) {
   const searchEl = document.getElementById('q');
 
   ro.disconnect();
+  pendingResize.clear();
+  if (typeof cancelAnimationFrame === 'function' && resizeRaf !== null) {
+    cancelAnimationFrame(resizeRaf);
+  }
+  resizeRaf = null;
   selectedGroups = [];
   if (reminderTicker) {
     clearInterval(reminderTicker);
