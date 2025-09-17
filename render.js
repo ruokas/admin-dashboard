@@ -84,32 +84,42 @@ let reminderEntryCache = new Map();
 
 function formatRelativeTime(ms) {
   if (!Number.isFinite(ms)) return '';
-  const clamped = Math.max(0, ms);
-  if (clamped < 60000) {
-    const seconds = Math.round(clamped / 1000);
-    return `${seconds}s`;
+  const isNegative = ms < 0;
+  const absMs = Math.abs(ms);
+  if (absMs < 60000) {
+    const seconds = Math.round(absMs / 1000);
+    return `${isNegative ? '-' : ''}${seconds}s`;
   }
-  const totalMinutes = Math.round(clamped / 60000);
-  if (totalMinutes < 60) return `${totalMinutes} min`;
+  const totalMinutes = Math.round(absMs / 60000);
+  if (totalMinutes < 60) {
+    return `${isNegative ? '-' : ''}${totalMinutes} min`;
+  }
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
-  return minutes ? `${hours} val ${minutes} min` : `${hours} val`;
+  const label = minutes
+    ? `${hours} val ${minutes} min`
+    : `${hours} val`;
+  return isNegative ? `-${label}` : label;
 }
 
 function formatClockLabel(ms) {
   if (!Number.isFinite(ms)) return '00:00';
-  const clamped = Math.max(0, ms);
-  const totalSeconds = Math.floor(clamped / 1000);
+  const isNegative = ms < 0;
+  const absMs = Math.abs(ms);
+  const totalSeconds = Math.floor(absMs / 1000);
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
+  let baseLabel;
   if (minutes >= 60) {
     const hours = Math.floor(minutes / 60);
     const remMinutes = minutes % 60;
-    return `${hours}h${remMinutes.toString().padStart(2, '0')}`;
+    baseLabel = `${hours}h${remMinutes.toString().padStart(2, '0')}`;
+  } else {
+    baseLabel = `${minutes.toString().padStart(2, '0')}:${seconds
+      .toString()
+      .padStart(2, '0')}`;
   }
-  return `${minutes.toString().padStart(2, '0')}:${seconds
-    .toString()
-    .padStart(2, '0')}`;
+  return isNegative ? `-${baseLabel}` : baseLabel;
 }
 
 function formatDueLabel(ts) {
@@ -675,16 +685,29 @@ export function render(state, editing, T, I, handlers, saveFn) {
           const duration = Number.isFinite(entry.duration)
             ? entry.duration
             : null;
-          const ratio = duration
+          const isOverdue = Number.isFinite(remaining) && remaining <= 0;
+          let ratio = duration
             ? Math.max(0, Math.min(1, 1 - remaining / duration))
             : 0;
-          li.classList.toggle('overdue', Number.isFinite(remaining) && remaining <= 0);
+          if (isOverdue) {
+            ratio = 1;
+          }
+          li.classList.toggle('overdue', isOverdue);
           const progress = document.createElement('div');
           progress.className = 'reminder-progress';
           progress.style.setProperty('--ratio', String(ratio));
-          progress.innerHTML = `<span>${escapeHtml(
-            formatClockLabel(remaining),
-          )}</span>`;
+          if (isOverdue) {
+            progress.dataset.state = 'overdue';
+          } else {
+            delete progress.dataset.state;
+          }
+          const clockLabel = formatClockLabel(remaining);
+          const relativeLabel = formatRelativeTime(remaining);
+          const statusLabel = isOverdue
+            ? T.reminderOverdueAria || T.reminderOverdue || T.reminderLeft
+            : T.reminderLeft;
+          progress.setAttribute('aria-label', `${statusLabel}: ${relativeLabel}`);
+          progress.innerHTML = `<span>${escapeHtml(clockLabel)}</span>`;
           li.appendChild(progress);
           const info = document.createElement('div');
           info.className = 'reminder-info';

@@ -43,6 +43,8 @@ export const Tlt = {
   reminderTypeCustom: 'Individualus priminimas',
   reminderDue: 'Laikas',
   reminderLeft: 'Liko',
+  reminderOverdue: 'Pavėluota',
+  reminderOverdueAria: 'Priminimas pavėluotas',
   reminderRemove: 'Atšaukti',
   reminderSnoozeShort: 'Atidėti',
   reminderEditInline: 'Keisti',
