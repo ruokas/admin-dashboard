@@ -15,18 +15,91 @@ const SNAP_THRESHOLD = GRID;
 
 const MIN_SIZE_ADJUSTER = Symbol('minSizeAdjuster');
 
+function findCardInnerElement(cardEl) {
+  if (!cardEl) return null;
+  const preferred = ['group-body', 'items', 'embed'];
+  for (const child of cardEl.children) {
+    if (!child || !child.classList) continue;
+    for (const cls of preferred) {
+      if (child.classList.contains(cls)) {
+        return child;
+      }
+    }
+  }
+  return cardEl.firstElementChild || null;
+}
+
+function measureIntrinsicContentSize(cardEl, innerEl = findCardInnerElement(cardEl)) {
+  if (!cardEl || !innerEl) {
+    return { width: 0, height: 0 };
+  }
+
+  const prevCard = {
+    width: cardEl.style.width,
+    minWidth: cardEl.style.minWidth,
+    height: cardEl.style.height,
+    minHeight: cardEl.style.minHeight,
+  };
+  const prevInner = {
+    width: innerEl.style.width,
+    minWidth: innerEl.style.minWidth,
+    height: innerEl.style.height,
+    minHeight: innerEl.style.minHeight,
+  };
+
+  cardEl.style.width = 'max-content';
+  cardEl.style.minWidth = '';
+  cardEl.style.height = 'auto';
+  cardEl.style.minHeight = '';
+  innerEl.style.width = 'max-content';
+  innerEl.style.minWidth = '';
+  innerEl.style.height = 'max-content';
+  innerEl.style.minHeight = '';
+
+  // Force layout while constraints are lifted to capture natural size.
+  const innerRect = innerEl.getBoundingClientRect();
+  const cardRect = cardEl.getBoundingClientRect();
+  const innerWidth = Math.max(innerRect.width, innerEl.scrollWidth);
+  const innerHeight = Math.max(innerRect.height, innerEl.scrollHeight);
+  const widthExtra = Math.max(0, cardRect.width - innerRect.width);
+  const heightExtra = Math.max(0, cardRect.height - innerRect.height);
+
+  let width = Math.max(innerWidth + widthExtra, cardRect.width);
+  let height = Math.max(innerHeight + heightExtra, cardRect.height);
+
+  width = Number.isFinite(width) ? Math.ceil(width) : 0;
+  height = Number.isFinite(height) ? Math.ceil(height) : 0;
+
+  cardEl.style.width = prevCard.width;
+  cardEl.style.minWidth = prevCard.minWidth;
+  cardEl.style.height = prevCard.height;
+  cardEl.style.minHeight = prevCard.minHeight;
+  innerEl.style.width = prevInner.width;
+  innerEl.style.minWidth = prevInner.minWidth;
+  innerEl.style.height = prevInner.height;
+  innerEl.style.minHeight = prevInner.minHeight;
+
+  return { width, height };
+}
+
+function applyIntrinsicMinSize(cardEl, innerEl = findCardInnerElement(cardEl)) {
+  const { width, height } = measureIntrinsicContentSize(cardEl, innerEl);
+  const widthPx = width > 0 ? `${width}px` : '';
+  const heightPx = height > 0 ? `${height}px` : '';
+  if (cardEl.style.minWidth !== widthPx) {
+    cardEl.style.minWidth = widthPx;
+  }
+  if (cardEl.style.minHeight !== heightPx) {
+    cardEl.style.minHeight = heightPx;
+  }
+  return { width, height };
+}
+
 function setupMinSizeWatcher(cardEl, innerEl) {
   if (!cardEl || !innerEl || typeof ResizeObserver === 'undefined') return;
   const adjustMinSize = () => {
     if (!cardEl.isConnected || !innerEl.isConnected) return;
-    const widthPx = `${Math.ceil(innerEl.scrollWidth)}px`;
-    const heightPx = `${Math.ceil(innerEl.scrollHeight)}px`;
-    if (cardEl.style.minWidth !== widthPx) {
-      cardEl.style.minWidth = widthPx;
-    }
-    if (cardEl.style.minHeight !== heightPx) {
-      cardEl.style.minHeight = heightPx;
-    }
+    applyIntrinsicMinSize(cardEl, innerEl);
   };
 
   let frameId = null;
@@ -460,8 +533,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
             e.clientX >= rect.right - 20 && e.clientY >= rect.bottom - 20;
           if (withinHandle) {
             remGrp.dataset.resizing = '1';
-            remGrp.style.minWidth = remGrp.scrollWidth + 'px';
-            remGrp.style.minHeight = remGrp.scrollHeight + 'px';
+            applyIntrinsicMinSize(remGrp);
           }
         });
         remGrp.draggable = true;
@@ -902,8 +974,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
             e.clientX >= rect.right - 20 && e.clientY >= rect.bottom - 20;
           if (withinHandle) {
             noteGrp.dataset.resizing = '1';
-            noteGrp.style.minWidth = noteGrp.scrollWidth + 'px';
-            noteGrp.style.minHeight = noteGrp.scrollHeight + 'px';
+            applyIntrinsicMinSize(noteGrp);
           }
         });
         noteGrp.draggable = true;
@@ -997,8 +1068,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
             e.clientX >= rect.right - 20 && e.clientY >= rect.bottom - 20;
           if (withinHandle) {
             grp.dataset.resizing = '1';
-            grp.style.minWidth = grp.scrollWidth + 'px';
-            grp.style.minHeight = grp.scrollHeight + 'px';
+            applyIntrinsicMinSize(grp);
           }
         });
         grp.draggable = true;
@@ -1117,8 +1187,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
           e.clientX >= rect.right - 20 && e.clientY >= rect.bottom - 20;
         if (withinHandle) {
           grp.dataset.resizing = '1';
-          grp.style.minWidth = grp.scrollWidth + 'px';
-          grp.style.minHeight = grp.scrollHeight + 'px';
+          applyIntrinsicMinSize(grp);
         }
       });
       grp.draggable = true;
