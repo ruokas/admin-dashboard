@@ -998,13 +998,14 @@ textarea::placeholder {
 
   .controls {
     width: 100%;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
     align-items: stretch;
-    gap: 8px;
+    gap: 6px;
   }
 
   .controls > * {
-    width: 100%;
+    width: auto;
   }
 
   .controls button,
@@ -1019,6 +1020,23 @@ textarea::placeholder {
   .search input {
     width: 100%;
     min-width: 0;
+  }
+
+  #editBtn,
+  #themeBtn {
+    align-self: stretch;
+  }
+
+  #themeBtn {
+    justify-self: end;
+  }
+
+  .controls > *:not(.search):not(#editBtn):not(#themeBtn) {
+    grid-column: 1 / -1;
+  }
+
+  #syncStatus {
+    justify-self: start;
   }
 
   #addMenu {
