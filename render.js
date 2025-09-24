@@ -14,6 +14,7 @@ const GRID = 20;
 const SNAP_THRESHOLD = GRID;
 
 const MIN_SIZE_ADJUSTER = Symbol('minSizeAdjuster');
+const RESIZE_HANDLE_SIZE = 20;
 
 function findCardInnerElement(cardEl) {
   if (!cardEl) return null;
@@ -93,6 +94,25 @@ function applyIntrinsicMinSize(cardEl, innerEl = findCardInnerElement(cardEl)) {
     cardEl.style.minHeight = heightPx;
   }
   return { width, height };
+}
+
+function isWithinResizeHandle(cardEl, event) {
+  if (!cardEl || !event) return false;
+  const rect = cardEl.getBoundingClientRect();
+  return (
+    event.clientX >= rect.right - RESIZE_HANDLE_SIZE &&
+    event.clientY >= rect.bottom - RESIZE_HANDLE_SIZE
+  );
+}
+
+function beginCardResize(cardEl) {
+  if (!cardEl) return;
+  cardEl.dataset.resizing = '1';
+  cardEl.draggable = false;
+  applyIntrinsicMinSize(cardEl);
+  if (cardEl.dataset?.id) {
+    resizingElements.add(cardEl.dataset.id);
+  }
 }
 
 function setupMinSizeWatcher(cardEl, innerEl) {
@@ -230,121 +250,86 @@ function applySize(el, width, height, wSize = sizeFromWidth(width), hSize = size
   el.classList.add(`w-${wSize}`, `h-${hSize}`);
 }
 
-// Debounce state persistence while resizing
-let resizeDirty = false;
-let resizeTimeout;
-function schedulePersist() {
-  clearTimeout(resizeTimeout);
-  resizeTimeout = setTimeout(() => {
-    if (resizeDirty) {
-      persist();
-      resizeDirty = false;
-    }
-  }, 200);
-}
+const resizingElements = new Set();
 
-const pendingResize = new Map();
-let resizeRaf = null;
-
-function processPendingResize() {
-  if (!pendingResize.size) return;
-  const entries = Array.from(pendingResize.entries());
-  pendingResize.clear();
-  for (const [el, { baseW, baseH, wSize, hSize }] of entries) {
-    if (!el || !el.isConnected) continue;
-    applySize(el, baseW, baseH, wSize, hSize);
-    if (el.dataset.id === 'reminders') {
-      currentState.remindersCard = {
-        ...(currentState.remindersCard || {}),
-        width: baseW,
-        height: baseH,
-        wSize,
-        hSize,
-      };
-    } else {
-      const sg = currentState.groups.find((x) => x.id === el.dataset.id);
-      if (sg) {
-        sg.width = baseW;
-        sg.height = baseH;
-        sg.wSize = wSize;
-        sg.hSize = hSize;
-        delete sg.size;
-      }
-    }
+function applyResizeForElement(el, width, height, wSize, hSize) {
+  applySize(el, width, height, wSize, hSize);
+  if (el.dataset.id === 'reminders') {
+    const prev = currentState.remindersCard || {};
+    const changed =
+      prev.width !== width || prev.height !== height || prev.wSize !== wSize || prev.hSize !== hSize;
+    currentState.remindersCard = {
+      ...prev,
+      width,
+      height,
+      wSize,
+      hSize,
+    };
+    return changed;
   }
+  const sg = currentState.groups.find((x) => x.id === el.dataset.id);
+  if (!sg) return false;
+  const changed =
+    sg.width !== width || sg.height !== height || sg.wSize !== wSize || sg.hSize !== hSize;
+  sg.width = width;
+  sg.height = height;
+  sg.wSize = wSize;
+  sg.hSize = hSize;
+  delete sg.size;
+  return changed;
 }
 
-const ro = new ResizeObserver((entries) => {
-  for (const entry of entries) {
-    if (entry.target.dataset.resizing === '1') {
-      // Snap to grid first
-      let baseW = Math.round(entry.contentRect.width / GRID) * GRID;
-      let baseH = Math.round(entry.contentRect.height / GRID) * GRID;
-
-      // Snap to widths/heights of other cards if close enough
-      const groups = Array.from(document.querySelectorAll('.group')).filter(
-        (g) => g !== entry.target,
-      );
-      for (const g of groups) {
-        const rect = g.getBoundingClientRect();
-        if (Math.abs(baseW - Math.round(rect.width)) <= SNAP_THRESHOLD) {
-          baseW = Math.round(rect.width);
+function applyPendingResizes() {
+  if (!resizingElements.size) return false;
+  const allGroups = Array.from(document.querySelectorAll('.group'));
+  let changed = false;
+  const processed = new Set();
+  resizingElements.forEach((id) => {
+    if (!id || processed.has(id)) return;
+    processed.add(id);
+    const baseEl = allGroups.find((g) => g.dataset.id === id);
+    if (!baseEl) return;
+    const rect = baseEl.getBoundingClientRect();
+    let baseW = Math.round(rect.width / GRID) * GRID;
+    let baseH = Math.round(rect.height / GRID) * GRID;
+    allGroups
+      .filter((g) => g !== baseEl)
+      .forEach((g) => {
+        const gRect = g.getBoundingClientRect();
+        if (Math.abs(baseW - Math.round(gRect.width)) <= SNAP_THRESHOLD) {
+          baseW = Math.round(gRect.width);
         }
-        if (Math.abs(baseH - Math.round(rect.height)) <= SNAP_THRESHOLD) {
-          baseH = Math.round(rect.height);
+        if (Math.abs(baseH - Math.round(gRect.height)) <= SNAP_THRESHOLD) {
+          baseH = Math.round(gRect.height);
         }
-      }
-      const wSize = sizeFromWidth(baseW);
-      const hSize = sizeFromHeight(baseH);
-
-      const targets = selectedGroups.includes(entry.target)
-        ? selectedGroups
-        : [entry.target];
-
-      let hasPending = false;
-      targets.forEach((el) => {
-        pendingResize.set(el, { baseW, baseH, wSize, hSize });
-        hasPending = true;
       });
-      if (hasPending) {
-        resizeDirty = true;
-        schedulePersist();
-      }
-    }
-  }
-  if (pendingResize.size) {
-    if (typeof requestAnimationFrame === 'function') {
-      if (resizeRaf === null) {
-        resizeRaf = requestAnimationFrame(() => {
-          resizeRaf = null;
-          processPendingResize();
-        });
-      }
-    } else {
-      processPendingResize();
-    }
-  }
-});
+    const wSize = sizeFromWidth(baseW);
+    const hSize = sizeFromHeight(baseH);
+    const targets = selectedGroups.includes(baseEl) ? selectedGroups : [baseEl];
+    targets.forEach((target) => {
+      const didChange = applyResizeForElement(target, baseW, baseH, wSize, hSize);
+      if (didChange) changed = true;
+    });
+  });
+  resizingElements.clear();
+  return changed;
+}
 
 document.addEventListener('mouseup', () => {
-  if (typeof cancelAnimationFrame === 'function' && resizeRaf !== null) {
-    cancelAnimationFrame(resizeRaf);
-    resizeRaf = null;
-  }
-  processPendingResize();
-  pendingResize.clear();
+  const changed = applyPendingResizes();
+  const allowDrag = document.body.classList.contains('editing');
   document.querySelectorAll('.group').forEach((g) => {
     g.dataset.resizing = '0';
     g.style.minWidth = '';
     g.style.minHeight = '';
+    g.draggable = allowDrag;
     const adjust = g[MIN_SIZE_ADJUSTER];
     if (typeof adjust === 'function') {
       adjust();
     }
   });
-  if (resizeDirty) {
+  if (changed) {
     persist();
-    resizeDirty = false;
   }
 });
 
@@ -440,12 +425,6 @@ export function render(state, editing, T, I, handlers, saveFn) {
   const statsEl = document.getElementById('stats');
   const searchEl = document.getElementById('q');
 
-  ro.disconnect();
-  pendingResize.clear();
-  if (typeof cancelAnimationFrame === 'function' && resizeRaf !== null) {
-    cancelAnimationFrame(resizeRaf);
-  }
-  resizeRaf = null;
   selectedGroups = [];
   if (reminderTicker) {
     clearInterval(reminderTicker);
@@ -528,16 +507,16 @@ export function render(state, editing, T, I, handlers, saveFn) {
       remGrp.style.overflow = editing ? 'auto' : 'visible';
       if (editing) {
         remGrp.addEventListener('mousedown', (e) => {
-          const rect = remGrp.getBoundingClientRect();
-          const withinHandle =
-            e.clientX >= rect.right - 20 && e.clientY >= rect.bottom - 20;
-          if (withinHandle) {
-            remGrp.dataset.resizing = '1';
-            applyIntrinsicMinSize(remGrp);
+          if (isWithinResizeHandle(remGrp, e)) {
+            beginCardResize(remGrp);
           }
         });
         remGrp.draggable = true;
         remGrp.addEventListener('dragstart', (e) => {
+          if (remGrp.dataset.resizing === '1') {
+            e.preventDefault();
+            return;
+          }
           e.dataTransfer.setData('text/group', 'reminders');
           remGrp.style.opacity = 0.5;
         });
@@ -950,7 +929,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
       groupsEl.appendChild(remGrp);
       const inner = remGrp.querySelector('.group-body');
       setupMinSizeWatcher(remGrp, inner);
-      ro.observe(remGrp);
+      
       return;
     }
     if (g.type === 'note') {
@@ -969,16 +948,16 @@ export function render(state, editing, T, I, handlers, saveFn) {
       noteGrp.style.overflow = editing ? 'auto' : 'visible';
       if (editing) {
         noteGrp.addEventListener('mousedown', (e) => {
-          const rect = noteGrp.getBoundingClientRect();
-          const withinHandle =
-            e.clientX >= rect.right - 20 && e.clientY >= rect.bottom - 20;
-          if (withinHandle) {
-            noteGrp.dataset.resizing = '1';
-            applyIntrinsicMinSize(noteGrp);
+          if (isWithinResizeHandle(noteGrp, e)) {
+            beginCardResize(noteGrp);
           }
         });
         noteGrp.draggable = true;
         noteGrp.addEventListener('dragstart', (e) => {
+          if (noteGrp.dataset.resizing === '1') {
+            e.preventDefault();
+            return;
+          }
           e.dataTransfer.setData('text/group', g.id);
           noteGrp.style.opacity = 0.5;
         });
@@ -1044,7 +1023,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
       groupsEl.appendChild(noteGrp);
       const inner = noteGrp.querySelector('.items');
       setupMinSizeWatcher(noteGrp, inner);
-      ro.observe(noteGrp);
+      
       return;
     }
     if (g.type === 'chart') {
@@ -1061,21 +1040,21 @@ export function render(state, editing, T, I, handlers, saveFn) {
       applySize(grp, gWidth, gHeight, gWSize, gHSize);
       grp.style.resize = editing ? 'both' : 'none';
       grp.style.overflow = editing ? 'auto' : 'visible';
-      if (editing) {
-        grp.addEventListener('mousedown', (e) => {
-          const rect = grp.getBoundingClientRect();
-          const withinHandle =
-            e.clientX >= rect.right - 20 && e.clientY >= rect.bottom - 20;
-          if (withinHandle) {
-            grp.dataset.resizing = '1';
-            applyIntrinsicMinSize(grp);
-          }
-        });
-        grp.draggable = true;
-        grp.addEventListener('dragstart', (e) => {
-          e.dataTransfer.setData('text/group', g.id);
-          grp.style.opacity = 0.5;
-        });
+    if (editing) {
+      grp.addEventListener('mousedown', (e) => {
+        if (isWithinResizeHandle(grp, e)) {
+          beginCardResize(grp);
+        }
+      });
+      grp.draggable = true;
+      grp.addEventListener('dragstart', (e) => {
+        if (grp.dataset.resizing === '1') {
+          e.preventDefault();
+          return;
+        }
+        e.dataTransfer.setData('text/group', g.id);
+        grp.style.opacity = 0.5;
+      });
         grp.addEventListener('dragend', () => {
           grp.style.opacity = 1;
         });
@@ -1164,7 +1143,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
       groupsEl.appendChild(grp);
       const inner = grp.querySelector('.embed');
       setupMinSizeWatcher(grp, inner);
-      ro.observe(grp);
+      
       return;
     }
     const grp = document.createElement('section');
@@ -1182,16 +1161,16 @@ export function render(state, editing, T, I, handlers, saveFn) {
     grp.style.overflow = editing ? 'auto' : 'visible';
     if (editing) {
       grp.addEventListener('mousedown', (e) => {
-        const rect = grp.getBoundingClientRect();
-        const withinHandle =
-          e.clientX >= rect.right - 20 && e.clientY >= rect.bottom - 20;
-        if (withinHandle) {
-          grp.dataset.resizing = '1';
-          applyIntrinsicMinSize(grp);
+        if (isWithinResizeHandle(grp, e)) {
+          beginCardResize(grp);
         }
       });
       grp.draggable = true;
       grp.addEventListener('dragstart', (e) => {
+        if (grp.dataset.resizing === '1') {
+          e.preventDefault();
+          return;
+        }
         e.dataTransfer.setData('text/group', g.id);
         grp.style.opacity = 0.5;
       });
@@ -1491,7 +1470,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
     groupsEl.appendChild(grp);
     const inner = grp.querySelector('.items');
     setupMinSizeWatcher(grp, inner);
-    ro.observe(grp);
+    
   });
 
   const totalGroups = state.groups.length;
