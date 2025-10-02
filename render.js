@@ -16,6 +16,14 @@ const SNAP_THRESHOLD = GRID;
 const MIN_SIZE_ADJUSTER = Symbol('minSizeAdjuster');
 const RESIZE_HANDLE_SIZE = 20;
 
+function prefersReducedMotion() {
+  return (
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
+}
+
 function findCardInnerElement(cardEl) {
   if (!cardEl) return null;
   const preferred = ['group-body', 'items', 'embed'];
@@ -496,6 +504,67 @@ export function render(state, editing, T, I, handlers, saveFn) {
   const groupsEl = document.getElementById('groups');
   const statsEl = document.getElementById('stats');
   const searchEl = document.getElementById('q');
+  const reduceMotion = prefersReducedMotion();
+  const previousGroupRects = new Map();
+  const previousItemRects = new Map();
+  if (groupsEl) {
+    groupsEl.querySelectorAll('.group[data-id]').forEach((el) => {
+      if (!el.dataset?.id) return;
+      const rect = el.getBoundingClientRect();
+      previousGroupRects.set(el.dataset.id, {
+        top: rect.top,
+        left: rect.left,
+        width: rect.width,
+        height: rect.height,
+      });
+    });
+    groupsEl.querySelectorAll('.item[data-gid][data-iid]').forEach((el) => {
+      const gid = el.dataset?.gid;
+      const iid = el.dataset?.iid;
+      if (!gid || !iid) return;
+      const rect = el.getBoundingClientRect();
+      previousItemRects.set(`${gid}::${iid}`, {
+        top: rect.top,
+        left: rect.left,
+        width: rect.width,
+        height: rect.height,
+      });
+    });
+  }
+
+  const runEnterAnimation = (el) => {
+    if (!el || reduceMotion) return;
+    let resolved = false;
+    let fallbackId = null;
+    const cleanup = () => {
+      if (resolved) return;
+      resolved = true;
+      el.removeEventListener('animationend', handleEnd);
+      if (
+        fallbackId != null &&
+        typeof window !== 'undefined' &&
+        typeof window.clearTimeout === 'function'
+      ) {
+        window.clearTimeout(fallbackId);
+      }
+      if (el.dataset.anim === 'enter') {
+        el.removeAttribute('data-anim');
+      }
+    };
+    const handleEnd = (event) => {
+      if (event?.target !== el) return;
+      cleanup();
+    };
+    el.dataset.anim = 'enter';
+    void el.offsetWidth;
+    el.addEventListener('animationend', handleEnd);
+    if (
+      typeof window !== 'undefined' &&
+      typeof window.setTimeout === 'function'
+    ) {
+      fallbackId = window.setTimeout(() => cleanup(), 400);
+    }
+  };
 
   selectedGroups = [];
   if (reminderTicker) {
@@ -1183,11 +1252,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
         if (act === 'edit') return handlers.editChart(g.id);
         if (act === 'del') {
           handlers.confirmDialog(T.confirmDelChart).then((ok) => {
-            if (ok) {
-              state.groups = state.groups.filter((x) => x.id !== g.id);
-              persist();
-              render(state, editing, T, I, handlers, saveFn);
-            }
+            if (ok) handlers.removeGroup?.(g.id);
           });
           return;
         }
@@ -1306,11 +1371,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
       if (act === 'edit') return handlers.editGroup(g.id);
       if (act === 'del') {
         handlers.confirmDialog(T.confirmDelGroup).then((ok) => {
-          if (ok) {
-            state.groups = state.groups.filter((x) => x.id !== g.id);
-            persist();
-            render(state, editing, T, I, handlers, saveFn);
-          }
+          if (ok) handlers.removeGroup?.(g.id);
         });
         return;
       }
@@ -1506,11 +1567,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
                 if (action === 'edit') return handlers.editItem(g.id, it.id);
                 if (action === 'del') {
                   handlers.confirmDialog(T.confirmDelItem).then((ok) => {
-                    if (ok) {
-                      g.items = g.items.filter((x) => x.id !== it.id);
-                      persist();
-                      render(state, editing, T, I, handlers, saveFn);
-                    }
+                    if (ok) handlers.removeItem?.(g.id, it.id);
                   });
                   return;
                 }
@@ -1546,8 +1603,73 @@ export function render(state, editing, T, I, handlers, saveFn) {
     groupsEl.appendChild(grp);
     const inner = grp.querySelector('.items');
     setupMinSizeWatcher(grp, inner);
-    
+
   });
+
+  const applyLayoutAnimations = () => {
+    if (!groupsEl) return;
+    const groupEls = Array.from(groupsEl.querySelectorAll('.group[data-id]'));
+    groupEls.forEach((el) => {
+      const id = el.dataset?.id;
+      if (!id) return;
+      const previous = previousGroupRects.get(id);
+      if (
+        previous &&
+        !reduceMotion &&
+        typeof el.animate === 'function'
+      ) {
+        const current = el.getBoundingClientRect();
+        const width = current.width || 1;
+        const height = current.height || 1;
+        if (!width || !height) return;
+        const deltaX = previous.left - current.left;
+        const deltaY = previous.top - current.top;
+        const scaleX = previous.width / width;
+        const scaleY = previous.height / height;
+        if (
+          Math.abs(deltaX) > 0.5 ||
+          Math.abs(deltaY) > 0.5 ||
+          Math.abs(scaleX - 1) > 0.01 ||
+          Math.abs(scaleY - 1) > 0.01
+        ) {
+          el.animate(
+            [
+              {
+                transformOrigin: 'top left',
+                transform: `translate(${deltaX}px, ${deltaY}px) scale(${scaleX}, ${scaleY})`,
+              },
+              {
+                transformOrigin: 'top left',
+                transform: 'translate(0, 0) scale(1, 1)',
+              },
+            ],
+            {
+              duration: 200,
+              easing: 'ease-out',
+            },
+          );
+        }
+      } else if (!previous) {
+        runEnterAnimation(el);
+      }
+    });
+
+    const itemEls = Array.from(
+      groupsEl.querySelectorAll('.item[data-gid][data-iid]'),
+    );
+    itemEls.forEach((el) => {
+      const key = `${el.dataset?.gid || ''}::${el.dataset?.iid || ''}`;
+      if (!previousItemRects.has(key)) {
+        runEnterAnimation(el);
+      }
+    });
+  };
+
+  if (!reduceMotion && typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(() => applyLayoutAnimations());
+  } else {
+    applyLayoutAnimations();
+  }
 
   const totalGroups = state.groups.length;
   const totalItems = countGroupItems(state.groups);

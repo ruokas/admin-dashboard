@@ -100,6 +100,65 @@ pageIconEl.addEventListener('input', () => {
 
 const uid = () => crypto.randomUUID().slice(0, 8);
 
+function prefersReducedMotion() {
+  return (
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
+}
+
+function findGroupElementById(id) {
+  return Array.from(document.querySelectorAll('.group')).find(
+    (el) => el.dataset?.id === id,
+  );
+}
+
+function findItemElement(gid, iid) {
+  return Array.from(
+    document.querySelectorAll('.item[data-gid][data-iid]'),
+  ).find((el) => el.dataset?.gid === gid && el.dataset?.iid === iid);
+}
+
+function animateLeaveElement(el) {
+  if (!el || prefersReducedMotion()) {
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    let done = false;
+    let fallbackId = null;
+    const cleanup = () => {
+      if (done) return;
+      done = true;
+      el.removeEventListener('animationend', handleEnd);
+      if (
+        fallbackId != null &&
+        typeof window !== 'undefined' &&
+        typeof window.clearTimeout === 'function'
+      ) {
+        window.clearTimeout(fallbackId);
+      }
+      if (el.dataset.anim === 'leave') {
+        el.removeAttribute('data-anim');
+      }
+      resolve();
+    };
+    const handleEnd = (event) => {
+      if (event?.target !== el) return;
+      cleanup();
+    };
+    el.dataset.anim = 'leave';
+    void el.offsetWidth;
+    el.addEventListener('animationend', handleEnd);
+    if (
+      typeof window !== 'undefined' &&
+      typeof window.setTimeout === 'function'
+    ) {
+      fallbackId = window.setTimeout(() => cleanup(), 400);
+    }
+  });
+}
+
 function parseIframe(html) {
   const raw = typeof html === 'string' ? html.trim() : '';
   if (!raw) return { src: '', height: undefined };
@@ -565,8 +624,10 @@ function addRemindersCard() {
   focusReminderCard();
 }
 
-function removeRemindersCard() {
+async function removeRemindersCard() {
   if (!state.remindersCard) return;
+  const el = findGroupElementById('reminders');
+  await animateLeaveElement(el);
   state.remindersCard.enabled = false;
   resetReminderFormState();
   persistState();
@@ -638,6 +699,8 @@ function renderAll() {
       editGroup,
       editItem,
       editChart,
+      removeGroup: (id) => removeGroup(id),
+      removeItem: (gid, iid) => removeItem(gid, iid),
       notes: {
         edit: (id) => editNoteCard(id),
         remove: (id) => removeNoteCard(id),
@@ -800,6 +863,8 @@ async function removeNoteCard(noteId) {
   if (!note) return;
   const ok = await confirmDlg(T, T.confirmDelNotes);
   if (!ok) return;
+  const el = findGroupElementById(noteId);
+  await animateLeaveElement(el);
   state.groups = state.groups.filter((g) => g.id !== noteId);
   persistState();
   renderAll();
@@ -824,6 +889,16 @@ function toggleCollapse(gid) {
   const g = state.groups.find((x) => x.id === gid);
   if (!g) return;
   g.collapsed = !g.collapsed;
+  persistState();
+  renderAll();
+}
+
+async function removeGroup(gid) {
+  const index = state.groups.findIndex((g) => g.id === gid);
+  if (index === -1) return;
+  const el = findGroupElementById(gid);
+  await animateLeaveElement(el);
+  state.groups.splice(index, 1);
   persistState();
   renderAll();
 }
@@ -913,6 +988,18 @@ async function editItem(gid, iid) {
       delete it.reminderAt;
     }
   }
+  persistState();
+  renderAll();
+}
+
+async function removeItem(gid, iid) {
+  const g = state.groups.find((x) => x.id === gid);
+  if (!g) return;
+  const idx = g.items.findIndex((x) => x.id === iid);
+  if (idx === -1) return;
+  const el = findItemElement(gid, iid);
+  await animateLeaveElement(el);
+  g.items.splice(idx, 1);
   persistState();
   renderAll();
 }
