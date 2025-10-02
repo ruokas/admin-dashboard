@@ -71,8 +71,26 @@ const searchEl = document.getElementById('q');
 const searchLabelEl = document.getElementById('searchLabel');
 const themeBtn = document.getElementById('themeBtn');
 const remindersBtn = document.getElementById('remindersBtn');
+const addRemindersBtn = document.getElementById('addRemindersCard');
 const pageTitleEl = document.getElementById('pageTitle');
 const pageIconEl = document.getElementById('pageIcon');
+const addMenu = document.getElementById('addMenu');
+const addMenuList = document.getElementById('addMenuList');
+const addBtn = document.getElementById('addBtn');
+const addMenuBackdrop = addMenu?.querySelector('[data-menu-backdrop]') ?? null;
+
+if (addMenu && !addMenu.dataset.open) {
+  addMenu.dataset.open = '0';
+}
+if (addBtn) {
+  if (!addBtn.hasAttribute('aria-controls')) {
+    addBtn.setAttribute('aria-controls', 'addMenuList');
+  }
+  if (!addBtn.hasAttribute('aria-haspopup')) {
+    addBtn.setAttribute('aria-haspopup', 'true');
+  }
+  addBtn.setAttribute('aria-expanded', addMenu?.dataset.open === '1' ? 'true' : 'false');
+}
 
 let state = load() || seed();
 if (!Array.isArray(state.groups)) state.groups = [];
@@ -736,6 +754,9 @@ function renderAll() {
 }
 
 function updateUI() {
+  if (!editing && isMenuOpen()) {
+    setMenuOpen(false, { restoreFocus: false });
+  }
   updateEditingUI(editing, state, T, I, renderAll);
   pageTitleEl.contentEditable = editing;
   pageIconEl.contentEditable = editing;
@@ -1069,34 +1090,98 @@ function applyColor() {
 // Google Sheets sinchronizavimas laikinai išjungtas
 // const sheets = sheetsSync(state, syncStatus, () => persistState(), renderAll);
 
-const addMenuList = document.getElementById('addMenuList');
-const addBtn = document.getElementById('addBtn');
-function hideAddMenu() {
-  addMenuList.style.display = 'none';
+let lastFocusedBeforeMenu = null;
+
+function isMenuOpen() {
+  return addMenu?.dataset.open === '1';
 }
-addBtn.addEventListener('click', () => {
-  addMenuList.style.display =
-    addMenuList.style.display === 'flex' ? 'none' : 'flex';
+
+function setMenuOpen(open, options = {}) {
+  if (!addMenu) return;
+  const { restoreFocus = true } = options;
+  const currentlyOpen = isMenuOpen();
+  if (open === currentlyOpen) return;
+
+  addMenu.dataset.open = open ? '1' : '0';
+  if (addBtn) {
+    addBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+
+  if (open) {
+    lastFocusedBeforeMenu =
+      document.activeElement instanceof HTMLElement ? document.activeElement : addBtn;
+
+    if (addMenuList) {
+      const focusTarget = addMenuList.querySelector('button:not([disabled])');
+      if (focusTarget instanceof HTMLElement) {
+        const focusFn = () => focusTarget.focus();
+        if (
+          typeof window !== 'undefined' &&
+          typeof window.requestAnimationFrame === 'function'
+        ) {
+          window.requestAnimationFrame(focusFn);
+        } else {
+          focusFn();
+        }
+      }
+    }
+
+    document.addEventListener('keydown', handleMenuKeydown);
+  } else {
+    document.removeEventListener('keydown', handleMenuKeydown);
+    if (restoreFocus) {
+      const focusTarget =
+        lastFocusedBeforeMenu instanceof HTMLElement ? lastFocusedBeforeMenu : addBtn;
+      if (focusTarget && typeof focusTarget.focus === 'function') {
+        focusTarget.focus();
+      }
+    }
+    lastFocusedBeforeMenu = null;
+  }
+}
+
+function handleMenuKeydown(event) {
+  if (!isMenuOpen()) return;
+  if (event.key === 'Escape' || event.key === 'Esc') {
+    event.preventDefault();
+    setMenuOpen(false);
+  }
+}
+
+if (addBtn && addMenu) {
+  addBtn.addEventListener('click', () => {
+    setMenuOpen(!isMenuOpen());
+  });
+}
+
+if (addMenuBackdrop) {
+  addMenuBackdrop.addEventListener('click', () => setMenuOpen(false));
+}
+
+document.addEventListener('click', (event) => {
+  if (!addMenu || !isMenuOpen()) return;
+  if (!addMenu.contains(event.target)) {
+    setMenuOpen(false);
+  }
 });
-document.addEventListener('click', (e) => {
-  if (!document.getElementById('addMenu').contains(e.target)) hideAddMenu();
+
+[
+  ['addGroup', () => addGroup()],
+  ['addChart', () => addChart()],
+  ['addNote', () => addNoteCard()],
+].forEach(([id, handler]) => {
+  const el = document.getElementById(id);
+  if (el) {
+    el.addEventListener('click', () => {
+      setMenuOpen(false, { restoreFocus: false });
+      handler();
+    });
+  }
 });
-document.getElementById('addGroup').addEventListener('click', () => {
-  hideAddMenu();
-  addGroup();
-});
-document.getElementById('addChart').addEventListener('click', () => {
-  hideAddMenu();
-  addChart();
-});
-document.getElementById('addNote').addEventListener('click', () => {
-  hideAddMenu();
-  addNoteCard();
-});
-const addRemindersBtn = document.getElementById('addRemindersCard');
+
 if (addRemindersBtn) {
   addRemindersBtn.addEventListener('click', () => {
-    hideAddMenu();
+    setMenuOpen(false, { restoreFocus: false });
     addRemindersCard();
   });
 }
