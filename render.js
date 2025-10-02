@@ -105,11 +105,37 @@ function isWithinResizeHandle(cardEl, event) {
   );
 }
 
-function beginCardResize(cardEl) {
+let activeResize = null;
+
+function beginCardResize(cardEl, event) {
   if (!cardEl) return;
   cardEl.dataset.resizing = '1';
   cardEl.draggable = false;
-  applyIntrinsicMinSize(cardEl);
+  const intrinsicSize = applyIntrinsicMinSize(cardEl);
+  const rect = cardEl.getBoundingClientRect();
+  const computed =
+    typeof window !== 'undefined' && cardEl instanceof HTMLElement
+      ? window.getComputedStyle(cardEl)
+      : null;
+  const minWidthCandidates = [
+    Number.parseFloat(cardEl.style.minWidth),
+    Number.isFinite(intrinsicSize?.width) ? intrinsicSize.width : NaN,
+    computed ? Number.parseFloat(computed.minWidth) : NaN,
+  ].filter((val) => Number.isFinite(val) && val > 0);
+  const minHeightCandidates = [
+    Number.parseFloat(cardEl.style.minHeight),
+    Number.isFinite(intrinsicSize?.height) ? intrinsicSize.height : NaN,
+    computed ? Number.parseFloat(computed.minHeight) : NaN,
+  ].filter((val) => Number.isFinite(val) && val > 0);
+  activeResize = {
+    el: cardEl,
+    startX: event?.clientX ?? rect.right,
+    startY: event?.clientY ?? rect.bottom,
+    startWidth: rect.width,
+    startHeight: rect.height,
+    minWidth: minWidthCandidates.length ? Math.max(...minWidthCandidates) : 0,
+    minHeight: minHeightCandidates.length ? Math.max(...minHeightCandidates) : 0,
+  };
   if (cardEl.dataset?.id) {
     resizingElements.add(cardEl.dataset.id);
   }
@@ -337,6 +363,29 @@ function applyPendingResizes() {
   return changed;
 }
 
+document.addEventListener('mousemove', (event) => {
+  if (!activeResize || !activeResize.el) return;
+  const { el, startX, startY, startWidth, startHeight, minWidth, minHeight } =
+    activeResize;
+  if (el.dataset.resizing !== '1') {
+    activeResize = null;
+    return;
+  }
+  const deltaX = event.clientX - startX;
+  const deltaY = event.clientY - startY;
+  let nextWidth = startWidth + deltaX;
+  let nextHeight = startHeight + deltaY;
+  if (Number.isFinite(minWidth)) nextWidth = Math.max(minWidth, nextWidth);
+  if (Number.isFinite(minHeight)) nextHeight = Math.max(minHeight, nextHeight);
+  if (Number.isFinite(nextWidth)) {
+    el.style.width = `${Math.max(0, Math.round(nextWidth))}px`;
+  }
+  if (Number.isFinite(nextHeight)) {
+    el.style.height = `${Math.max(0, Math.round(nextHeight))}px`;
+  }
+  event.preventDefault();
+});
+
 document.addEventListener('mouseup', () => {
   const changed = applyPendingResizes();
   const allowDrag = document.body.classList.contains('editing');
@@ -350,6 +399,7 @@ document.addEventListener('mouseup', () => {
       adjust();
     }
   });
+  activeResize = null;
   if (changed) {
     persist();
   }
@@ -530,7 +580,8 @@ export function render(state, editing, T, I, handlers, saveFn) {
       if (editing) {
         remGrp.addEventListener('mousedown', (e) => {
           if (isWithinResizeHandle(remGrp, e)) {
-            beginCardResize(remGrp);
+            e.preventDefault();
+            beginCardResize(remGrp, e);
           }
         });
         remGrp.draggable = true;
@@ -971,7 +1022,8 @@ export function render(state, editing, T, I, handlers, saveFn) {
       if (editing) {
         noteGrp.addEventListener('mousedown', (e) => {
           if (isWithinResizeHandle(noteGrp, e)) {
-            beginCardResize(noteGrp);
+            e.preventDefault();
+            beginCardResize(noteGrp, e);
           }
         });
         noteGrp.draggable = true;
@@ -1065,7 +1117,8 @@ export function render(state, editing, T, I, handlers, saveFn) {
     if (editing) {
       grp.addEventListener('mousedown', (e) => {
         if (isWithinResizeHandle(grp, e)) {
-          beginCardResize(grp);
+          e.preventDefault();
+          beginCardResize(grp, e);
         }
       });
       grp.draggable = true;
@@ -1184,7 +1237,8 @@ export function render(state, editing, T, I, handlers, saveFn) {
     if (editing) {
       grp.addEventListener('mousedown', (e) => {
         if (isWithinResizeHandle(grp, e)) {
-          beginCardResize(grp);
+          e.preventDefault();
+          beginCardResize(grp, e);
         }
       });
       grp.draggable = true;
