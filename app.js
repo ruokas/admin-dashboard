@@ -209,12 +209,13 @@ function normaliseReminderState() {
     state.remindersCard = {
       enabled: false,
       title: '',
-      width: SIZE_MAP.md.width,
-      height: SIZE_MAP.md.height,
       wSize: 'md',
       hSize: 'md',
       showQuick: false,
     };
+    const dims = SIZE_MAP.md || {};
+    state.remindersCard.width = Number.isFinite(dims.width) ? dims.width : 360;
+    state.remindersCard.height = Number.isFinite(dims.height) ? dims.height : 360;
   } else {
     const fallbackWidth = SIZE_MAP[state.remindersCard.wSize || 'md']?.width || 360;
     const fallbackHeight =
@@ -227,6 +228,10 @@ function normaliseReminderState() {
       state.remindersCard.wSize || sizeFromWidth(state.remindersCard.width);
     state.remindersCard.hSize =
       state.remindersCard.hSize || sizeFromHeight(state.remindersCard.height);
+    state.remindersCard.width =
+      SIZE_MAP[state.remindersCard.wSize]?.width ?? fallbackWidth;
+    state.remindersCard.height =
+      SIZE_MAP[state.remindersCard.hSize]?.height ?? fallbackHeight;
     state.remindersCard.title =
       typeof state.remindersCard.title === 'string'
         ? state.remindersCard.title
@@ -541,12 +546,13 @@ function addRemindersCard() {
     state.remindersCard = {
       enabled: true,
       title: '',
-      width: SIZE_MAP.md.width,
-      height: SIZE_MAP.md.height,
       wSize: 'md',
       hSize: 'md',
       showQuick: false,
     };
+    const dims = SIZE_MAP.md || {};
+    state.remindersCard.width = Number.isFinite(dims.width) ? dims.width : 360;
+    state.remindersCard.height = Number.isFinite(dims.height) ? dims.height : 360;
   } else {
     state.remindersCard.enabled = true;
   }

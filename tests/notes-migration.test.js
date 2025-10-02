@@ -40,8 +40,8 @@ test('legacy notes duomenys migruojami į note tipo kortelę', () => {
   assert.equal(note.fontSize, 18);
   assert.equal(note.padding, 12);
   assert.equal(note.color, '#fef08a');
-  assert.equal(note.width, 400);
-  assert.equal(note.height, 260);
+  assert.equal(note.width, 360);
+  assert.equal(note.height, 360);
   assert.ok(!('reminderMinutes' in note));
   assert.ok(!('reminderAt' in note));
   assert.ok(!('notes' in state));

@@ -244,8 +244,23 @@ function formatDueLabel(ts) {
 }
 
 function applySize(el, width, height, wSize = sizeFromWidth(width), hSize = sizeFromHeight(height)) {
-  el.style.width = width + 'px';
-  el.style.height = height + 'px';
+  const widthPreset = SIZE_MAP[wSize]?.width;
+  const heightPreset = SIZE_MAP[hSize]?.height;
+  const finalWidth = Number.isFinite(widthPreset) ? widthPreset : width;
+  const finalHeight = Number.isFinite(heightPreset) ? heightPreset : height;
+
+  if (Number.isFinite(finalWidth)) {
+    el.style.width = `${finalWidth}px`;
+  } else {
+    el.style.removeProperty('width');
+  }
+
+  if (Number.isFinite(finalHeight)) {
+    el.style.height = `${finalHeight}px`;
+  } else {
+    el.style.removeProperty('height');
+  }
+
   el.classList.remove('w-sm', 'w-md', 'w-lg', 'h-sm', 'h-md', 'h-lg');
   el.classList.add(`w-${wSize}`, `h-${hSize}`);
 }
@@ -253,15 +268,20 @@ function applySize(el, width, height, wSize = sizeFromWidth(width), hSize = size
 const resizingElements = new Set();
 
 function applyResizeForElement(el, width, height, wSize, hSize) {
-  applySize(el, width, height, wSize, hSize);
+  const widthPreset = SIZE_MAP[wSize]?.width;
+  const heightPreset = SIZE_MAP[hSize]?.height;
+  const finalWidth = Number.isFinite(widthPreset) ? widthPreset : width;
+  const finalHeight = Number.isFinite(heightPreset) ? heightPreset : height;
+
+  applySize(el, finalWidth, finalHeight, wSize, hSize);
   if (el.dataset.id === 'reminders') {
     const prev = currentState.remindersCard || {};
     const changed =
-      prev.width !== width || prev.height !== height || prev.wSize !== wSize || prev.hSize !== hSize;
+      prev.width !== finalWidth || prev.height !== finalHeight || prev.wSize !== wSize || prev.hSize !== hSize;
     currentState.remindersCard = {
       ...prev,
-      width,
-      height,
+      width: finalWidth,
+      height: finalHeight,
       wSize,
       hSize,
     };
@@ -270,9 +290,9 @@ function applyResizeForElement(el, width, height, wSize, hSize) {
   const sg = currentState.groups.find((x) => x.id === el.dataset.id);
   if (!sg) return false;
   const changed =
-    sg.width !== width || sg.height !== height || sg.wSize !== wSize || sg.hSize !== hSize;
-  sg.width = width;
-  sg.height = height;
+    sg.width !== finalWidth || sg.height !== finalHeight || sg.wSize !== wSize || sg.hSize !== hSize;
+  sg.width = finalWidth;
+  sg.height = finalHeight;
   sg.wSize = wSize;
   sg.hSize = hSize;
   delete sg.size;
@@ -305,9 +325,11 @@ function applyPendingResizes() {
       });
     const wSize = sizeFromWidth(baseW);
     const hSize = sizeFromHeight(baseH);
+    const finalWidth = Number.isFinite(SIZE_MAP[wSize]?.width) ? SIZE_MAP[wSize].width : baseW;
+    const finalHeight = Number.isFinite(SIZE_MAP[hSize]?.height) ? SIZE_MAP[hSize].height : baseH;
     const targets = selectedGroups.includes(baseEl) ? selectedGroups : [baseEl];
     targets.forEach((target) => {
-      const didChange = applyResizeForElement(target, baseW, baseH, wSize, hSize);
+      const didChange = applyResizeForElement(target, finalWidth, finalHeight, wSize, hSize);
       if (didChange) changed = true;
     });
   });
