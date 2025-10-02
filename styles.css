@@ -1083,6 +1083,48 @@ textarea::placeholder {
   }
 }
 
+@keyframes card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes card-leave {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+}
+
+.group[data-anim='enter'],
+.item[data-anim='enter'] {
+  animation: card-enter 200ms ease-out forwards;
+}
+
+.group[data-anim='leave'],
+.item[data-anim='leave'] {
+  pointer-events: none;
+  animation: card-leave 200ms ease-in forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .group[data-anim],
+  .item[data-anim] {
+    animation: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+  }
+}
+
 @media (max-width: 480px) {
   button,
   .btn {
