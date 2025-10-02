@@ -1,4 +1,4 @@
-import { sizeFromWidth, sizeFromHeight } from './sizes.js';
+import { SIZE_MAP, sizeFromWidth, sizeFromHeight } from './sizes.js';
 
 const STORAGE_KEY = 'ed_dashboard_lt_v1';
 const NOTE_DEFAULT_COLOR = '#fef08a';
@@ -34,6 +34,17 @@ function sanitizeTimestamp(value) {
   return null;
 }
 
+function normalizeDimensionPair(width, height, wSize, hSize) {
+  const widthPreset = SIZE_MAP[wSize]?.width;
+  const heightPreset = SIZE_MAP[hSize]?.height;
+  const finalWidth = Number.isFinite(widthPreset) ? widthPreset : width;
+  const finalHeight = Number.isFinite(heightPreset) ? heightPreset : height;
+  return {
+    width: Number.isFinite(finalWidth) ? Math.round(finalWidth) : undefined,
+    height: Number.isFinite(finalHeight) ? Math.round(finalHeight) : undefined,
+  };
+}
+
 export function load() {
   try {
     const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '');
@@ -59,6 +70,14 @@ export function load() {
             height = 480;
           }
         }
+        const wSize = legacyBox.wSize || sizeFromWidth(width);
+        const hSize = legacyBox.hSize || sizeFromHeight(height);
+        const { width: widthSnap, height: heightSnap } = normalizeDimensionPair(
+          width,
+          height,
+          wSize,
+          hSize,
+        );
         const note = {
           id: makeId(),
           type: 'note',
@@ -66,10 +85,10 @@ export function load() {
           name: legacyTitle || 'Pastabos',
           text: legacyText,
           color: NOTE_DEFAULT_COLOR,
-          width,
-          height,
-          wSize: sizeFromWidth(width),
-          hSize: sizeFromHeight(height),
+          width: widthSnap,
+          height: heightSnap,
+          wSize,
+          hSize,
           fontSize:
             Number.isFinite(legacyOpts.size) && legacyOpts.size > 0
               ? Math.round(legacyOpts.size)
@@ -101,6 +120,17 @@ export function load() {
             }
           }
 
+          const wSize = g.wSize || sizeFromWidth(width);
+          const hSize = g.hSize || sizeFromHeight(height);
+          const { width: widthSnap, height: heightSnap } = normalizeDimensionPair(
+            width,
+            height,
+            wSize,
+            hSize,
+          );
+          width = Number.isFinite(widthSnap) ? widthSnap : width;
+          height = Number.isFinite(heightSnap) ? heightSnap : height;
+
           if (g.type === 'note') {
             const title =
               typeof g.title === 'string' && g.title.trim()
@@ -125,8 +155,8 @@ export function load() {
               color: sanitizeColor(g.color),
               width,
               height,
-              wSize: g.wSize || sizeFromWidth(width),
-              hSize: g.hSize || sizeFromHeight(height),
+              wSize,
+              hSize,
               fontSize,
               padding,
             };
@@ -136,8 +166,8 @@ export function load() {
           group.id = typeof g.id === 'string' && g.id ? g.id : makeId('group');
           group.width = width;
           group.height = height;
-          group.wSize = g.wSize || sizeFromWidth(group.width);
-          group.hSize = g.hSize || sizeFromHeight(group.height);
+          group.wSize = wSize;
+          group.hSize = hSize;
           delete group.size;
           if (!Array.isArray(group.items)) group.items = [];
           group.items = group.items.map((it) => {
@@ -201,13 +231,21 @@ export function load() {
       ) {
         const width = DEFAULT_CARD_WIDTH;
         const height = DEFAULT_CARD_HEIGHT;
+        const wSize = sizeFromWidth(width);
+        const hSize = sizeFromHeight(height);
+        const { width: widthSnap, height: heightSnap } = normalizeDimensionPair(
+          width,
+          height,
+          wSize,
+          hSize,
+        );
         data.remindersCard = {
           enabled: false,
           title: '',
-          width,
-          height,
-          wSize: sizeFromWidth(width),
-          hSize: sizeFromHeight(height),
+          width: widthSnap,
+          height: heightSnap,
+          wSize,
+          hSize,
           showQuick: false,
         };
       } else {
@@ -216,10 +254,20 @@ export function load() {
           typeof data.remindersCard.title === 'string'
             ? data.remindersCard.title
             : '';
-        data.remindersCard.wSize =
+        const wSize =
           data.remindersCard.wSize || sizeFromWidth(data.remindersCard.width);
-        data.remindersCard.hSize =
+        const hSize =
           data.remindersCard.hSize || sizeFromHeight(data.remindersCard.height);
+        const dims = normalizeDimensionPair(
+          data.remindersCard.width,
+          data.remindersCard.height,
+          wSize,
+          hSize,
+        );
+        data.remindersCard.width = dims.width;
+        data.remindersCard.height = dims.height;
+        data.remindersCard.wSize = wSize;
+        data.remindersCard.hSize = hSize;
         data.remindersCard.showQuick = data.remindersCard.showQuick === true;
       }
       if (typeof data.remindersPos !== 'number') data.remindersPos = 0;
@@ -235,15 +283,23 @@ export function save(state) {
 }
 
 export function seed() {
+  const defaultWSize = sizeFromWidth(DEFAULT_CARD_WIDTH);
+  const defaultHSize = sizeFromHeight(DEFAULT_CARD_HEIGHT);
+  const defaultDims = normalizeDimensionPair(
+    DEFAULT_CARD_WIDTH,
+    DEFAULT_CARD_HEIGHT,
+    defaultWSize,
+    defaultHSize,
+  );
   const data = {
     groups: [],
     remindersCard: {
       enabled: false,
       title: '',
-      width: DEFAULT_CARD_WIDTH,
-      height: DEFAULT_CARD_HEIGHT,
-      wSize: sizeFromWidth(DEFAULT_CARD_WIDTH),
-      hSize: sizeFromHeight(DEFAULT_CARD_HEIGHT),
+      width: defaultDims.width,
+      height: defaultDims.height,
+      wSize: defaultWSize,
+      hSize: defaultHSize,
       showQuick: false,
     },
     remindersPos: 0,
