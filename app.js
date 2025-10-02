@@ -27,6 +27,9 @@ const REMINDER_QUICK_MINUTES = [5, 10, 15, 30];
 const NOTE_DEFAULT_COLOR = '#fef08a';
 const NOTE_DEFAULT_FONT = 20;
 const NOTE_DEFAULT_PADDING = 20;
+const KPI_DEFAULT_COLOR = '#0ea5e9';
+const TREND_DEFAULT_COLOR = '#f97316';
+const OKR_DEFAULT_COLOR = '#10b981';
 
 const reminderFormDefaults = {
   editingId: null,
@@ -63,6 +66,325 @@ function normalizeNoteColor(value) {
     return trimmed;
   }
   return NOTE_DEFAULT_COLOR;
+}
+
+function normalizeColor(value, fallback) {
+  if (typeof value !== 'string') return fallback;
+  const trimmed = value.trim();
+  if (/^#([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(trimmed)) {
+    return trimmed;
+  }
+  return fallback;
+}
+
+function parseNumberInput(raw) {
+  if (typeof raw !== 'string') return null;
+  const normalized = raw.replace(',', '.').trim();
+  if (!normalized) return null;
+  const num = Number.parseFloat(normalized);
+  return Number.isFinite(num) ? num : null;
+}
+
+function clampNumber(value, min, max) {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(max, Math.max(min, value));
+}
+
+function focusFirstField(dlg) {
+  const first = dlg.querySelector(
+    'input, select, textarea, button, [href], [tabindex]:not([tabindex="-1"])',
+  );
+  first?.focus();
+}
+
+function createMetricDialog({
+  title,
+  fields,
+  defaults = {},
+}) {
+  return new Promise((resolve) => {
+    const prevFocus = document.activeElement;
+    const dlg = document.createElement('dialog');
+    dlg.innerHTML = `<form method="dialog" class="metric-form">
+      <h2>${title}</h2>
+      ${fields}
+      <p class="error" data-error aria-live="polite"></p>
+      <menu>
+        <button type="button" data-act="cancel">${T.cancel}</button>
+        <button type="submit" class="btn-accent">${T.save}</button>
+      </menu>
+    </form>`;
+    dlg.setAttribute('aria-modal', 'true');
+    document.body.appendChild(dlg);
+    const form = dlg.querySelector('form');
+    const cancel = form.querySelector('[data-act="cancel"]');
+    const errorEl = form.querySelector('[data-error]');
+
+    Object.entries(defaults).forEach(([key, value]) => {
+      if (form[key] === undefined) return;
+      if (form[key].type === 'checkbox') {
+        form[key].checked = Boolean(value);
+      } else {
+        form[key].value = value ?? '';
+      }
+    });
+
+    function cleanup() {
+      form.removeEventListener('submit', onSubmit);
+      cancel.removeEventListener('click', onCancel);
+      dlg.removeEventListener('cancel', onCancel);
+      dlg.remove();
+      prevFocus?.focus();
+    }
+
+    function onCancel() {
+      cleanup();
+      resolve(null);
+    }
+
+    function onSubmit(e) {
+      e.preventDefault();
+      errorEl.textContent = '';
+      resolve({ form, errorEl, cleanup });
+    }
+
+    form.addEventListener('submit', onSubmit);
+    cancel.addEventListener('click', onCancel);
+    dlg.addEventListener('cancel', onCancel);
+    dlg.showModal();
+    focusFirstField(dlg);
+  });
+}
+
+async function openKpiDialog(data = {}) {
+  const result = await createMetricDialog({
+    title: 'KPI kortelė',
+    defaults: {
+      cardTitle: data.cardTitle || data.name || data.metricName || '',
+      metricName: data.metricName || data.name || '',
+      currentValue: data.currentLabel || data.currentValue || '',
+      targetValue: data.targetLabel || data.targetValue || '',
+      unit: data.unit || '',
+      dataSource: data.dataSource || '',
+      color: data.color || KPI_DEFAULT_COLOR,
+    },
+    fields: `
+      <label>
+        <span>Kortelės pavadinimas</span>
+        <input name="cardTitle" placeholder="KPI" autocomplete="off" required>
+      </label>
+      <label>
+        <span>Rodiklio pavadinimas</span>
+        <input name="metricName" placeholder="Pavyzdys: Pacientų aptarnavimo laikas" autocomplete="off" required>
+      </label>
+      <label>
+        <span>Dabartinė reikšmė</span>
+        <input name="currentValue" placeholder="Pvz. 42" autocomplete="off">
+      </label>
+      <label>
+        <span>Tikslas</span>
+        <input name="targetValue" placeholder="Pvz. 60" autocomplete="off">
+      </label>
+      <label>
+        <span>Vienetas</span>
+        <input name="unit" placeholder="min., % ir pan." autocomplete="off">
+      </label>
+      <label>
+        <span>Duomenų šaltinis / pastaba</span>
+        <input name="dataSource" placeholder="Pvz. HIS, rankinis įvedimas" autocomplete="off">
+      </label>
+      <label>
+        <span>Spalva</span>
+        <input name="color" type="color" value="${data.color || KPI_DEFAULT_COLOR}">
+      </label>
+    `,
+  });
+  if (!result) return null;
+  const { form, cleanup } = result;
+  const cardTitle = form.cardTitle.value.trim() || 'KPI';
+  const metricName = form.metricName.value.trim() || cardTitle;
+  const currentRaw = form.currentValue.value.trim();
+  const targetRaw = form.targetValue.value.trim();
+  const currentValue = parseNumberInput(currentRaw);
+  const targetValue = parseNumberInput(targetRaw);
+  const unit = form.unit.value.trim();
+  const dataSource = form.dataSource.value.trim();
+  const color = normalizeColor(form.color.value, KPI_DEFAULT_COLOR);
+  cleanup();
+  return {
+    cardTitle,
+    metricName,
+    currentLabel: currentRaw,
+    targetLabel: targetRaw,
+    currentValue,
+    targetValue,
+    unit,
+    dataSource,
+    color,
+  };
+}
+
+async function openTrendDialog(data = {}) {
+  const result = await createMetricDialog({
+    title: 'Trendo kortelė',
+    defaults: {
+      cardTitle: data.cardTitle || data.name || data.metricName || '',
+      metricName: data.metricName || data.name || '',
+      currentValue: data.currentLabel || data.currentValue || '',
+      changeValue: data.changeLabel || data.changeValue || '',
+      period: data.period || '',
+      dataSource: data.dataSource || '',
+      direction: data.direction || 'up',
+      color: data.color || TREND_DEFAULT_COLOR,
+    },
+    fields: `
+      <label>
+        <span>Kortelės pavadinimas</span>
+        <input name="cardTitle" placeholder="Trend" autocomplete="off" required>
+      </label>
+      <label>
+        <span>Rodiklio pavadinimas</span>
+        <input name="metricName" placeholder="Pvz. Pacientų srautas" autocomplete="off" required>
+      </label>
+      <label>
+        <span>Dabartinė reikšmė</span>
+        <input name="currentValue" placeholder="Pvz. 120" autocomplete="off">
+      </label>
+      <label>
+        <span>Pokytis</span>
+        <input name="changeValue" placeholder="Pvz. +12" autocomplete="off">
+      </label>
+      <label>
+        <span>Laikotarpis</span>
+        <input name="period" placeholder="Savaitė, mėnuo ir pan." autocomplete="off">
+      </label>
+      <label>
+        <span>Kryptis</span>
+        <select name="direction">
+          <option value="up">Auga</option>
+          <option value="down">Mažėja</option>
+          <option value="flat">Stabili</option>
+        </select>
+      </label>
+      <label>
+        <span>Duomenų šaltinis / pastaba</span>
+        <input name="dataSource" placeholder="Pvz. Rankinis, SIS" autocomplete="off">
+      </label>
+      <label>
+        <span>Spalva</span>
+        <input name="color" type="color" value="${data.color || TREND_DEFAULT_COLOR}">
+      </label>
+    `,
+  });
+  if (!result) return null;
+  const { form, cleanup } = result;
+  const cardTitle = form.cardTitle.value.trim() || 'Trend';
+  const metricName = form.metricName.value.trim() || cardTitle;
+  const currentRaw = form.currentValue.value.trim();
+  const changeRaw = form.changeValue.value.trim();
+  const currentValue = parseNumberInput(currentRaw);
+  const changeValue = parseNumberInput(changeRaw);
+  const period = form.period.value.trim();
+  const direction = form.direction.value;
+  const dataSource = form.dataSource.value.trim();
+  const color = normalizeColor(form.color.value, TREND_DEFAULT_COLOR);
+  cleanup();
+  return {
+    cardTitle,
+    metricName,
+    currentLabel: currentRaw,
+    currentValue,
+    changeLabel: changeRaw,
+    changeValue,
+    period,
+    direction,
+    dataSource,
+    color,
+  };
+}
+
+async function openOkrDialog(data = {}) {
+  const result = await createMetricDialog({
+    title: 'OKR kortelė',
+    defaults: {
+      cardTitle: data.cardTitle || data.name || '',
+      objective: data.objective || '',
+      keyResults: Array.isArray(data.keyResults)
+        ? data.keyResults.join('\n')
+        : data.keyResults || '',
+      progress: Number.isFinite(data.progress) ? String(data.progress) : '',
+      owner: data.owner || '',
+      dataSource: data.dataSource || '',
+      status: data.status || 'onTrack',
+      color: data.color || OKR_DEFAULT_COLOR,
+    },
+    fields: `
+      <label>
+        <span>Kortelės pavadinimas</span>
+        <input name="cardTitle" placeholder="OKR" autocomplete="off" required>
+      </label>
+      <label>
+        <span>Objektyvas</span>
+        <textarea name="objective" rows="3" placeholder="Ką siekiame pasiekti?"></textarea>
+      </label>
+      <label>
+        <span>Pagrindiniai rezultatai (vienas eilutėje)</span>
+        <textarea name="keyResults" rows="4" placeholder="1) ...&#10;2) ..."></textarea>
+      </label>
+      <label>
+        <span>Progresas (%)</span>
+        <input name="progress" type="number" min="0" max="100" step="1" placeholder="0-100">
+      </label>
+      <label>
+        <span>Statusas</span>
+        <select name="status">
+          <option value="onTrack">Pagal planą</option>
+          <option value="atRisk">Rizika</option>
+          <option value="offTrack">Vėluoja</option>
+        </select>
+      </label>
+      <label>
+        <span>Atsakingas</span>
+        <input name="owner" placeholder="Vardas, komanda" autocomplete="off">
+      </label>
+      <label>
+        <span>Duomenų šaltinis / pastaba</span>
+        <input name="dataSource" placeholder="Pvz. SUS, rankinis" autocomplete="off">
+      </label>
+      <label>
+        <span>Spalva</span>
+        <input name="color" type="color" value="${data.color || OKR_DEFAULT_COLOR}">
+      </label>
+    `,
+  });
+  if (!result) return null;
+  const { form, cleanup } = result;
+  const cardTitle = form.cardTitle.value.trim() || 'OKR';
+  const objective = form.objective.value.trim();
+  const keyResults = form.keyResults.value
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const progressRaw = form.progress.value.trim();
+  const progressValue = parseNumberInput(progressRaw);
+  const progress = Number.isFinite(progressValue)
+    ? clampNumber(progressValue, 0, 100)
+    : null;
+  const owner = form.owner.value.trim();
+  const dataSource = form.dataSource.value.trim();
+  const status = form.status.value;
+  const color = normalizeColor(form.color.value, OKR_DEFAULT_COLOR);
+  cleanup();
+  return {
+    cardTitle,
+    objective,
+    keyResults,
+    progress,
+    owner,
+    dataSource,
+    status,
+    color,
+  };
 }
 
 const editBtn = document.getElementById('editBtn');
@@ -638,6 +960,20 @@ function renderAll() {
       editGroup,
       editItem,
       editChart,
+      metrics: {
+        kpi: {
+          edit: (id) => editKpiCard(id),
+          remove: (id) => removeMetricCard(id, 'kpi'),
+        },
+        trend: {
+          edit: (id) => editTrendCard(id),
+          remove: (id) => removeMetricCard(id, 'trend'),
+        },
+        okr: {
+          edit: (id) => editOkrCard(id),
+          remove: (id) => removeMetricCard(id, 'okr'),
+        },
+      },
       notes: {
         edit: (id) => editNoteCard(id),
         remove: (id) => removeNoteCard(id),
@@ -801,6 +1137,153 @@ async function removeNoteCard(noteId) {
   const ok = await confirmDlg(T, T.confirmDelNotes);
   if (!ok) return;
   state.groups = state.groups.filter((g) => g.id !== noteId);
+  persistState();
+  renderAll();
+}
+
+function findMetricById(type, id) {
+  return state.groups.find((g) => g.type === type && g.id === id);
+}
+
+async function addKpiCard() {
+  const res = await openKpiDialog();
+  if (!res) return;
+  const dims = SIZE_MAP.md;
+  state.groups.push({
+    id: uid(),
+    type: 'kpi',
+    name: res.cardTitle,
+    cardTitle: res.cardTitle,
+    metricName: res.metricName,
+    currentLabel: res.currentLabel,
+    targetLabel: res.targetLabel,
+    currentValue: res.currentValue,
+    targetValue: res.targetValue,
+    unit: res.unit,
+    dataSource: res.dataSource,
+    color: res.color,
+    width: dims.width,
+    height: dims.height,
+    wSize: sizeFromWidth(dims.width),
+    hSize: sizeFromHeight(dims.height),
+  });
+  persistState();
+  renderAll();
+}
+
+async function editKpiCard(id) {
+  const card = findMetricById('kpi', id);
+  if (!card) return;
+  const res = await openKpiDialog(card);
+  if (!res) return;
+  card.name = res.cardTitle;
+  card.cardTitle = res.cardTitle;
+  card.metricName = res.metricName;
+  card.currentLabel = res.currentLabel;
+  card.targetLabel = res.targetLabel;
+  card.currentValue = res.currentValue;
+  card.targetValue = res.targetValue;
+  card.unit = res.unit;
+  card.dataSource = res.dataSource;
+  card.color = res.color;
+  persistState();
+  renderAll();
+}
+
+async function addTrendCard() {
+  const res = await openTrendDialog();
+  if (!res) return;
+  const dims = SIZE_MAP.md;
+  state.groups.push({
+    id: uid(),
+    type: 'trend',
+    name: res.cardTitle,
+    cardTitle: res.cardTitle,
+    metricName: res.metricName,
+    currentLabel: res.currentLabel,
+    currentValue: res.currentValue,
+    changeLabel: res.changeLabel,
+    changeValue: res.changeValue,
+    period: res.period,
+    direction: res.direction,
+    dataSource: res.dataSource,
+    color: res.color,
+    width: dims.width,
+    height: dims.height,
+    wSize: sizeFromWidth(dims.width),
+    hSize: sizeFromHeight(dims.height),
+  });
+  persistState();
+  renderAll();
+}
+
+async function editTrendCard(id) {
+  const card = findMetricById('trend', id);
+  if (!card) return;
+  const res = await openTrendDialog(card);
+  if (!res) return;
+  card.name = res.cardTitle;
+  card.cardTitle = res.cardTitle;
+  card.metricName = res.metricName;
+  card.currentLabel = res.currentLabel;
+  card.currentValue = res.currentValue;
+  card.changeLabel = res.changeLabel;
+  card.changeValue = res.changeValue;
+  card.period = res.period;
+  card.direction = res.direction;
+  card.dataSource = res.dataSource;
+  card.color = res.color;
+  persistState();
+  renderAll();
+}
+
+async function addOkrCard() {
+  const res = await openOkrDialog();
+  if (!res) return;
+  const dims = SIZE_MAP.md;
+  state.groups.push({
+    id: uid(),
+    type: 'okr',
+    name: res.cardTitle,
+    cardTitle: res.cardTitle,
+    objective: res.objective,
+    keyResults: res.keyResults,
+    progress: Number.isFinite(res.progress) ? res.progress : null,
+    owner: res.owner,
+    dataSource: res.dataSource,
+    status: res.status,
+    color: res.color,
+    width: dims.width,
+    height: dims.height,
+    wSize: sizeFromWidth(dims.width),
+    hSize: sizeFromHeight(dims.height),
+  });
+  persistState();
+  renderAll();
+}
+
+async function editOkrCard(id) {
+  const card = findMetricById('okr', id);
+  if (!card) return;
+  const res = await openOkrDialog(card);
+  if (!res) return;
+  card.name = res.cardTitle;
+  card.cardTitle = res.cardTitle;
+  card.objective = res.objective;
+  card.keyResults = res.keyResults;
+  card.progress = Number.isFinite(res.progress) ? res.progress : null;
+  card.owner = res.owner;
+  card.dataSource = res.dataSource;
+  card.status = res.status;
+  card.color = res.color;
+  persistState();
+  renderAll();
+}
+
+function removeMetricCard(id, type) {
+  const idx = state.groups.findIndex((g) => g.id === id && g.type === type);
+  if (idx === -1) return;
+  state.groups.splice(idx, 1);
   persistState();
   renderAll();
 }
@@ -1006,6 +1489,27 @@ document.getElementById('addNote').addEventListener('click', () => {
   hideAddMenu();
   addNoteCard();
 });
+const addKpiBtn = document.getElementById('addKpiCard');
+if (addKpiBtn) {
+  addKpiBtn.addEventListener('click', () => {
+    hideAddMenu();
+    addKpiCard();
+  });
+}
+const addTrendBtn = document.getElementById('addTrendCard');
+if (addTrendBtn) {
+  addTrendBtn.addEventListener('click', () => {
+    hideAddMenu();
+    addTrendCard();
+  });
+}
+const addOkrBtn = document.getElementById('addOkrCard');
+if (addOkrBtn) {
+  addOkrBtn.addEventListener('click', () => {
+    hideAddMenu();
+    addOkrCard();
+  });
+}
 const addRemindersBtn = document.getElementById('addRemindersCard');
 if (addRemindersBtn) {
   addRemindersBtn.addEventListener('click', () => {

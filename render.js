@@ -506,6 +506,74 @@ export function render(state, editing, T, I, handlers, saveFn) {
 
   const q = (searchEl.value || '').toLowerCase().trim();
   groupsEl.innerHTML = '';
+  const numberFormatter = new Intl.NumberFormat('lt-LT', {
+    maximumFractionDigits: 2,
+  });
+
+  function formatMetricValue(value, unit, fallback = '—') {
+    if (Number.isFinite(value)) {
+      const formatted = numberFormatter.format(value);
+      return unit ? `${formatted} ${unit}` : formatted;
+    }
+    if (fallback) return fallback;
+    return unit ? `0 ${unit}` : '0';
+  }
+
+  function createCardContainer(g, className = 'group') {
+    const section = document.createElement('section');
+    section.className = className;
+    section.dataset.id = g.id;
+    section.dataset.resizing = '0';
+    const fallbackW = SIZE_MAP[g.wSize ?? 'md']?.width ?? SIZE_MAP.md.width;
+    const fallbackH = SIZE_MAP[g.hSize ?? 'md']?.height ?? SIZE_MAP.md.height;
+    const width = Number.isFinite(g.width) ? g.width : fallbackW;
+    const height = Number.isFinite(g.height) ? g.height : fallbackH;
+    const wSize = g.wSize || sizeFromWidth(width);
+    const hSize = g.hSize || sizeFromHeight(height);
+    applySize(section, width, height, wSize, hSize);
+    section.style.resize = editing ? 'both' : 'none';
+    section.style.overflow = editing ? 'auto' : 'visible';
+    if (editing) {
+      section.addEventListener('mousedown', (e) => {
+        if (isWithinResizeHandle(section, e)) {
+          e.preventDefault();
+          beginCardResize(section, e);
+        }
+      });
+      section.draggable = true;
+      section.addEventListener('dragstart', (e) => {
+        if (section.dataset.resizing === '1') {
+          e.preventDefault();
+          return;
+        }
+        e.dataTransfer.setData('text/group', g.id);
+        section.style.opacity = 0.5;
+      });
+      section.addEventListener('dragend', () => {
+        section.style.opacity = 1;
+      });
+      section.addEventListener('dragover', (e) => {
+        e.preventDefault();
+      });
+      section.addEventListener('drop', handleDrop);
+    }
+    section.addEventListener('click', (e) => {
+      if (!e.shiftKey) return;
+      if (e.target.closest('button')) return;
+      e.preventDefault();
+      const idx = selectedGroups.indexOf(section);
+      if (idx === -1) {
+        selectedGroups.push(section);
+        section.classList.add('selected');
+      } else {
+        selectedGroups.splice(idx, 1);
+        section.classList.remove('selected');
+      }
+    });
+    return section;
+  }
+
+  const metricsHandlers = handlers.metrics || {};
   function handleDrop(e) {
     e.preventDefault();
     const fromId = e.dataTransfer.getData('text/group');
@@ -1003,6 +1071,336 @@ export function render(state, editing, T, I, handlers, saveFn) {
       const inner = remGrp.querySelector('.group-body');
       setupMinSizeWatcher(remGrp, inner);
       
+      return;
+    }
+    if (g.type === 'kpi') {
+      const accentColor = g.color || '#0ea5e9';
+      const kpiGrp = createCardContainer(g, 'group metric-card metric-kpi');
+      const kpiHandlers = metricsHandlers.kpi || {};
+      const header = document.createElement('div');
+      header.className = 'group-header';
+      header.innerHTML = `
+        <div class="group-title">
+          <span class="dot" style="background:${accentColor}"></span>
+          <h2>${escapeHtml(g.name || g.metricName || 'KPI')}</h2>
+        </div>
+        ${
+          editing
+            ? `<div class="group-actions">
+          <button type="button" title="${T.edit}" aria-label="${T.edit}" data-act="edit">${I.pencil}</button>
+          <button type="button" class="btn-danger" title="${T.deleteGroup}" aria-label="${T.deleteGroup}" data-act="del">${I.trash}</button>
+        </div>`
+            : ''
+        }`;
+      header.addEventListener('click', (e) => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        if (btn.dataset.act === 'edit') {
+          kpiHandlers.edit?.(g.id);
+        }
+        if (btn.dataset.act === 'del') {
+          handlers.confirmDialog(T.confirmDelGroup).then((ok) => {
+            if (ok) kpiHandlers.remove?.(g.id);
+          });
+        }
+      });
+      kpiGrp.appendChild(header);
+      const body = document.createElement('div');
+      body.className = 'metric-body';
+      body.style.display = 'flex';
+      body.style.flexDirection = 'column';
+      body.style.gap = '12px';
+      body.style.padding = '16px';
+      const metricLabel = document.createElement('div');
+      metricLabel.textContent = g.metricName || g.name || 'KPI';
+      metricLabel.style.fontSize = '18px';
+      metricLabel.style.fontWeight = '500';
+      metricLabel.style.color = 'var(--subtext)';
+      body.appendChild(metricLabel);
+      const valueText = Number.isFinite(g.currentValue)
+        ? formatMetricValue(g.currentValue, g.unit)
+        : g.currentLabel || formatMetricValue(null, g.unit);
+      const valueEl = document.createElement('div');
+      valueEl.className = 'metric-value';
+      valueEl.textContent = valueText;
+      valueEl.style.fontSize = 'clamp(32px, 5vw, 48px)';
+      valueEl.style.fontWeight = '700';
+      valueEl.style.lineHeight = '1';
+      body.appendChild(valueEl);
+      if (Number.isFinite(g.targetValue) && g.targetValue !== 0) {
+        const ratio = Math.max(
+          0,
+          Math.min(1, Number(g.currentValue || 0) / Number(g.targetValue)),
+        );
+        const progressWrap = document.createElement('div');
+        progressWrap.style.height = '10px';
+        progressWrap.style.background = 'var(--muted)';
+        progressWrap.style.borderRadius = '999px';
+        progressWrap.style.overflow = 'hidden';
+        progressWrap.setAttribute('role', 'progressbar');
+        progressWrap.setAttribute('aria-valuemin', '0');
+        progressWrap.setAttribute('aria-valuemax', String(g.targetValue));
+        progressWrap.setAttribute('aria-valuenow', String(g.currentValue ?? 0));
+        const fill = document.createElement('div');
+        fill.style.height = '100%';
+        fill.style.width = `${Math.round(ratio * 100)}%`;
+        fill.style.background = accentColor;
+        progressWrap.appendChild(fill);
+        body.appendChild(progressWrap);
+      }
+      const targetLabel = Number.isFinite(g.targetValue)
+        ? formatMetricValue(g.targetValue, g.unit, g.targetLabel || '')
+        : g.targetLabel || '';
+      if (targetLabel) {
+        const targetEl = document.createElement('div');
+        targetEl.textContent = `${T.goal || 'Tikslas'}: ${targetLabel}`;
+        targetEl.style.fontSize = '14px';
+        targetEl.style.color = 'var(--subtext)';
+        body.appendChild(targetEl);
+      }
+      if (g.dataSource) {
+        const sourceEl = document.createElement('div');
+        sourceEl.textContent = `Šaltinis: ${g.dataSource}`;
+        sourceEl.style.fontSize = '13px';
+        sourceEl.style.color = 'var(--subtext)';
+        body.appendChild(sourceEl);
+      }
+      kpiGrp.appendChild(body);
+      groupsEl.appendChild(kpiGrp);
+      setupMinSizeWatcher(kpiGrp, body);
+
+      return;
+    }
+    if (g.type === 'trend') {
+      const accentColor = g.color || '#f97316';
+      const trendGrp = createCardContainer(g, 'group metric-card metric-trend');
+      const trendHandlers = metricsHandlers.trend || {};
+      const header = document.createElement('div');
+      header.className = 'group-header';
+      header.innerHTML = `
+        <div class="group-title">
+          <span class="dot" style="background:${accentColor}"></span>
+          <h2>${escapeHtml(g.name || g.metricName || 'Trend')}</h2>
+        </div>
+        ${
+          editing
+            ? `<div class="group-actions">
+          <button type="button" title="${T.edit}" aria-label="${T.edit}" data-act="edit">${I.pencil}</button>
+          <button type="button" class="btn-danger" title="${T.deleteGroup}" aria-label="${T.deleteGroup}" data-act="del">${I.trash}</button>
+        </div>`
+            : ''
+        }`;
+      header.addEventListener('click', (e) => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        if (btn.dataset.act === 'edit') {
+          trendHandlers.edit?.(g.id);
+        }
+        if (btn.dataset.act === 'del') {
+          handlers.confirmDialog(T.confirmDelGroup).then((ok) => {
+            if (ok) trendHandlers.remove?.(g.id);
+          });
+        }
+      });
+      trendGrp.appendChild(header);
+      const body = document.createElement('div');
+      body.className = 'metric-body';
+      body.style.display = 'flex';
+      body.style.flexDirection = 'column';
+      body.style.gap = '12px';
+      body.style.padding = '16px';
+      const topRow = document.createElement('div');
+      topRow.style.display = 'flex';
+      topRow.style.alignItems = 'center';
+      topRow.style.gap = '12px';
+      const arrowWrap = document.createElement('div');
+      arrowWrap.style.display = 'flex';
+      arrowWrap.style.alignItems = 'center';
+      arrowWrap.style.justifyContent = 'center';
+      arrowWrap.style.width = '36px';
+      arrowWrap.style.height = '36px';
+      arrowWrap.style.borderRadius = '50%';
+      arrowWrap.style.background = 'var(--muted)';
+      const direction = g.direction || 'up';
+      const directionIcon =
+        direction === 'down' ? I.arrowDown : direction === 'flat' ? I.more : I.arrowUp;
+      const directionColor =
+        direction === 'down'
+          ? 'var(--danger)'
+          : direction === 'flat'
+            ? 'var(--subtext)'
+            : 'var(--accent)';
+      arrowWrap.innerHTML = directionIcon;
+      arrowWrap.style.color = directionColor;
+      topRow.appendChild(arrowWrap);
+      const valueText = Number.isFinite(g.currentValue)
+        ? formatMetricValue(g.currentValue, g.unit)
+        : g.currentLabel || formatMetricValue(null, g.unit);
+      const valueEl = document.createElement('div');
+      valueEl.textContent = valueText;
+      valueEl.style.fontSize = 'clamp(28px, 4vw, 40px)';
+      valueEl.style.fontWeight = '700';
+      valueEl.style.lineHeight = '1';
+      topRow.appendChild(valueEl);
+      body.appendChild(topRow);
+      const changeText = g.changeLabel
+        ? g.changeLabel
+        : Number.isFinite(g.changeValue)
+          ? formatMetricValue(g.changeValue, g.unit, '')
+          : '';
+      if (changeText) {
+        const changeEl = document.createElement('div');
+        changeEl.textContent = `Pokytis: ${changeText}`;
+        changeEl.style.fontSize = '16px';
+        changeEl.style.fontWeight = '600';
+        changeEl.style.color = directionColor;
+        body.appendChild(changeEl);
+      }
+      if (g.period) {
+        const periodEl = document.createElement('div');
+        periodEl.textContent = `Laikotarpis: ${g.period}`;
+        periodEl.style.fontSize = '14px';
+        periodEl.style.color = 'var(--subtext)';
+        body.appendChild(periodEl);
+      }
+      if (g.dataSource) {
+        const sourceEl = document.createElement('div');
+        sourceEl.textContent = `Šaltinis: ${g.dataSource}`;
+        sourceEl.style.fontSize = '13px';
+        sourceEl.style.color = 'var(--subtext)';
+        body.appendChild(sourceEl);
+      }
+      trendGrp.appendChild(body);
+      groupsEl.appendChild(trendGrp);
+      setupMinSizeWatcher(trendGrp, body);
+
+      return;
+    }
+    if (g.type === 'okr') {
+      const statusLabels = {
+        onTrack: 'Pagal planą',
+        atRisk: 'Rizika',
+        offTrack: 'Vėluoja',
+      };
+      const statusColors = {
+        onTrack: '#10b981',
+        atRisk: '#f59e0b',
+        offTrack: '#ef4444',
+      };
+      const statusKey = statusLabels[g.status] ? g.status : 'onTrack';
+      const statusLabel = statusLabels[statusKey];
+      const statusColor = statusColors[statusKey];
+      const okrGrp = createCardContainer(g, 'group metric-card metric-okr');
+      const okrHandlers = metricsHandlers.okr || {};
+      const header = document.createElement('div');
+      header.className = 'group-header';
+      header.innerHTML = `
+        <div class="group-title">
+          <span class="dot" style="background:${g.color || statusColor}"></span>
+          <h2>${escapeHtml(g.name || 'OKR')}</h2>
+        </div>
+        ${
+          editing
+            ? `<div class="group-actions">
+          <button type="button" title="${T.edit}" aria-label="${T.edit}" data-act="edit">${I.pencil}</button>
+          <button type="button" class="btn-danger" title="${T.deleteGroup}" aria-label="${T.deleteGroup}" data-act="del">${I.trash}</button>
+        </div>`
+            : ''
+        }`;
+      header.addEventListener('click', (e) => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        if (btn.dataset.act === 'edit') {
+          okrHandlers.edit?.(g.id);
+        }
+        if (btn.dataset.act === 'del') {
+          handlers.confirmDialog(T.confirmDelGroup).then((ok) => {
+            if (ok) okrHandlers.remove?.(g.id);
+          });
+        }
+      });
+      okrGrp.appendChild(header);
+      const body = document.createElement('div');
+      body.className = 'metric-body';
+      body.style.display = 'flex';
+      body.style.flexDirection = 'column';
+      body.style.gap = '12px';
+      body.style.padding = '16px';
+      const statusRow = document.createElement('div');
+      statusRow.style.display = 'flex';
+      statusRow.style.alignItems = 'center';
+      statusRow.style.gap = '8px';
+      const statusBadge = document.createElement('span');
+      statusBadge.textContent = statusLabel;
+      statusBadge.style.padding = '4px 8px';
+      statusBadge.style.borderRadius = '999px';
+      statusBadge.style.border = `1px solid ${statusColor}`;
+      statusBadge.style.color = statusColor;
+      statusBadge.style.fontSize = '13px';
+      statusBadge.style.fontWeight = '600';
+      statusRow.appendChild(statusBadge);
+      if (g.owner) {
+        const ownerEl = document.createElement('span');
+        ownerEl.textContent = `Atsakingas: ${g.owner}`;
+        ownerEl.style.fontSize = '13px';
+        ownerEl.style.color = 'var(--subtext)';
+        statusRow.appendChild(ownerEl);
+      }
+      body.appendChild(statusRow);
+      if (g.objective) {
+        const objectiveEl = document.createElement('div');
+        objectiveEl.textContent = g.objective;
+        objectiveEl.style.fontSize = '16px';
+        objectiveEl.style.fontWeight = '600';
+        body.appendChild(objectiveEl);
+      }
+      if (Array.isArray(g.keyResults) && g.keyResults.length) {
+        const list = document.createElement('ul');
+        list.style.margin = '0';
+        list.style.paddingLeft = '20px';
+        list.style.color = 'var(--subtext)';
+        list.style.fontSize = '14px';
+        g.keyResults.forEach((kr) => {
+          const li = document.createElement('li');
+          li.textContent = kr;
+          list.appendChild(li);
+        });
+        body.appendChild(list);
+      }
+      if (Number.isFinite(g.progress)) {
+        const ratio = Math.max(0, Math.min(1, g.progress / 100));
+        const progressWrap = document.createElement('div');
+        progressWrap.style.height = '10px';
+        progressWrap.style.background = 'var(--muted)';
+        progressWrap.style.borderRadius = '999px';
+        progressWrap.style.overflow = 'hidden';
+        progressWrap.setAttribute('role', 'progressbar');
+        progressWrap.setAttribute('aria-valuemin', '0');
+        progressWrap.setAttribute('aria-valuemax', '100');
+        progressWrap.setAttribute('aria-valuenow', String(g.progress));
+        const fill = document.createElement('div');
+        fill.style.height = '100%';
+        fill.style.width = `${Math.round(ratio * 100)}%`;
+        fill.style.background = g.color || statusColor;
+        progressWrap.appendChild(fill);
+        const progressLabel = document.createElement('div');
+        progressLabel.textContent = `Progresas: ${Math.round(g.progress)}%`;
+        progressLabel.style.fontSize = '14px';
+        progressLabel.style.color = 'var(--subtext)';
+        body.appendChild(progressWrap);
+        body.appendChild(progressLabel);
+      }
+      if (g.dataSource) {
+        const sourceEl = document.createElement('div');
+        sourceEl.textContent = `Šaltinis: ${g.dataSource}`;
+        sourceEl.style.fontSize = '13px';
+        sourceEl.style.color = 'var(--subtext)';
+        body.appendChild(sourceEl);
+      }
+      okrGrp.appendChild(body);
+      groupsEl.appendChild(okrGrp);
+      setupMinSizeWatcher(okrGrp, body);
+
       return;
     }
     if (g.type === 'note') {
