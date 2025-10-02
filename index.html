@@ -43,13 +43,35 @@
         <button id="editBtn" class="btn-outline" type="button">
           Redaguoti
         </button>
-        <div id="addMenu" style="display: none">
-          <button id="addBtn" type="button">＋ Pridėti</button>
-          <div id="addMenuList">
-            <button id="addGroup" type="button">＋ Pridėti grupę</button>
-            <button id="addChart" type="button">📈 Pridėti grafiką</button>
-            <button id="addNote" type="button">＋ Pridėti pastabas</button>
-            <button id="addRemindersCard" type="button">⏰ Pridėti priminimų kortelę</button>
+        <div id="addMenu" data-open="0" style="display: none">
+          <button
+            id="addBtn"
+            type="button"
+            aria-haspopup="true"
+            aria-expanded="false"
+            aria-controls="addMenuList"
+          >
+            ＋ Pridėti
+          </button>
+          <div class="menu-backdrop" data-menu-backdrop aria-hidden="true"></div>
+          <div
+            id="addMenuList"
+            class="menu-panel"
+            role="menu"
+            aria-labelledby="addBtn"
+          >
+            <button id="addGroup" type="button" role="menuitem">
+              ＋ Pridėti grupę
+            </button>
+            <button id="addChart" type="button" role="menuitem">
+              📈 Pridėti grafiką
+            </button>
+            <button id="addNote" type="button" role="menuitem">
+              ＋ Pridėti pastabas
+            </button>
+            <button id="addRemindersCard" type="button" role="menuitem">
+              ⏰ Pridėti priminimų kortelę
+            </button>
           </div>
         </div>
         <button
