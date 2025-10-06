@@ -12,6 +12,11 @@ import { I } from './icons.js';
 import { Tlt } from './i18n.js';
 import { exportJson } from './exporter.js';
 import { createReminderManager } from './reminders.js';
+import {
+  getReminderFormState,
+  resetReminderFormState,
+  updateReminderFormState,
+} from './reminder-form-state.js';
 
 const T = Tlt;
 // Hook future English localisation: fill T.en when translations are ready.
@@ -27,22 +32,6 @@ const REMINDER_QUICK_MINUTES = [5, 10, 15, 30];
 const NOTE_DEFAULT_COLOR = '#fef08a';
 const NOTE_DEFAULT_FONT = 20;
 const NOTE_DEFAULT_PADDING = 20;
-
-const reminderFormDefaults = {
-  editingId: null,
-  values: null,
-  error: '',
-};
-
-let reminderFormState = { ...reminderFormDefaults };
-
-function resetReminderFormState() {
-  reminderFormState = { ...reminderFormDefaults };
-}
-
-function updateReminderFormState(partial = {}) {
-  reminderFormState = { ...reminderFormState, ...partial };
-}
 
 function formatDateTimeLocal(ts) {
   if (!Number.isFinite(ts)) return '';
@@ -594,9 +583,10 @@ function submitReminderForm(formData = {}) {
     createdAt: now,
   };
 
-  if (reminderFormState.editingId) {
+  const formState = getReminderFormState();
+  if (formState.editingId) {
     const target = (state.customReminders || []).find(
-      (item) => item.id === reminderFormState.editingId,
+      (item) => item.id === formState.editingId,
     );
     if (!target) {
       resetReminderFormState();
@@ -738,7 +728,7 @@ function renderAll() {
         edit: (entry) => editReminder(entry),
         quick: (minutes) => createQuickReminder(minutes),
         submit: (payload) => submitReminderForm(payload),
-        formState: () => reminderFormState,
+        formState: () => getReminderFormState(),
         cancelEdit: () => cancelEditCustomReminder(),
         focus: () => focusReminderCard(),
         startEditCustom: (id) => beginEditCustomReminder(id),
