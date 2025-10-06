@@ -374,6 +374,20 @@ main {
   padding: 8px;
   overflow: visible;
 }
+.note-card .items {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+.note-card .items-scroll {
+  max-width: 100%;
+  max-height: 100%;
+  overflow: auto;
+}
+.note-card .items-scroll p {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 .reminder-highlight {
   outline: 3px solid var(--accent);
   outline-offset: 2px;

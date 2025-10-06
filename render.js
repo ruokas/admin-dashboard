@@ -1155,6 +1155,8 @@ export function render(state, editing, T, I, handlers, saveFn) {
       itemsScroll.className = 'items-scroll';
       const p = document.createElement('p');
       p.style.whiteSpace = 'pre-wrap';
+      p.style.overflowWrap = 'anywhere';
+      p.style.wordBreak = 'break-word';
       const padding = Number.isFinite(g.padding) ? g.padding : 20;
       const fontSize = Number.isFinite(g.fontSize) ? g.fontSize : 20;
       p.style.padding = padding + 'px';
