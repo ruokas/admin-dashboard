@@ -44,6 +44,18 @@ Numatyti matmenys – 360×360 px.
 
 Pastabų kortelės pagal nutylėjimą naudoja 20 px šriftą ir 20 px paraštes. Jei reikia nuimti paraštes visiškai, įveskite reikšmę „0“ – ji bus išsaugota ir rodoma kortelėje.
 
+## Stiliai
+
+- Pagrindiniai stiliai ir dizaino tokenai laikomi faile `styles/base.css`. Čia rasite spalvų temų kintamuosius (pvz., `--surface`, `--border-strong`), tipografijos (`--font-sm`, `--font-lg`) ir tarpų skalę (`--space-1`, `--space-4`).
+- Komponentų sluoksnis padalintas į smulkesnius failus kataloge `styles/components/` (`header.css`, `buttons.css`, `layout.css`, `reminders.css`). Tokia struktūra leidžia greitai įjungti/išjungti blokus arba kurti naujus komponentus prie tos pačios skalės.
+- Temų pritaikymas klientui atliekamas koreguojant CSS kintamuosius `:root` arba `.theme-light:root` bloke faile `styles/base.css`, arba kuriant naują `.color-*` klasę. Keičiant neutralias spalvas naudokite semantinius kintamuosius (`--surface`, `--border-strong`), kad abi temos išliktų kontrastingos.
+
+Norint pridėti kliento spalvų schemą:
+
+1. `styles/base.css` faile nukopijuokite vieną iš `.color-*` blokų ir perrašykite `--accent`/`--accent2` reikšmes.
+2. Jei reikia pakeisti foną ar kortelių spalvą, atnaujinkite `--bg`, `--surface` ir `--surface-raised`.
+3. Pritaikykite klasę `<html>` elementui arba per `document.documentElement.classList` (pvz., `document.documentElement.classList.add('color-emerald')`).
+
 ## Smoke test
 
 Šie žingsniai aktualūs tik atnaujinus ir vėl įjungus Google Sheets sinchronizavimą.
