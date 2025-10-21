@@ -379,7 +379,7 @@ dialog .error {
   font-size: 13px;
 }
 
-input:not([type='color']),
+input:not([type='color']):not(.search-input),
 textarea,
 select {
   background: var(--surface);
@@ -394,7 +394,7 @@ select {
     box-shadow 0.2s;
 }
 
-input:not([type='color']):focus,
+input:not([type='color']):not(.search-input):focus,
 textarea:focus,
 select:focus {
   border-color: var(--accent);
