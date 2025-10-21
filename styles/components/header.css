@@ -138,12 +138,14 @@ header {
   border-radius: var(--space-4);
   min-width: 240px;
   box-shadow: var(--shadow);
-  padding: var(--space-3) calc(var(--space-3) + var(--space-2)) var(--space-3) 40px;
+  padding-block: var(--space-3);
+  padding-inline-start: calc(var(--space-4) + var(--space-5));
+  padding-inline-end: calc(var(--space-3) + var(--space-2));
 }
 
 .search svg {
   position: absolute;
-  left: var(--space-3);
+  inset-inline-start: var(--space-4);
   top: 50%;
   transform: translateY(-50%);
   opacity: 0.6;
