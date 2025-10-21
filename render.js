@@ -16,6 +16,31 @@ const SNAP_THRESHOLD = GRID;
 const MIN_SIZE_ADJUSTER = Symbol('minSizeAdjuster');
 const RESIZE_HANDLE_SIZE = 20;
 
+function createGroupStructure(type, id) {
+  const section = document.createElement('section');
+  const classes = ['group'];
+  if (type) classes.push(`group--${type}`);
+  section.className = classes.join(' ');
+  if (id != null) {
+    section.dataset.id = id;
+  }
+  section.dataset.resizing = '0';
+
+  const header = document.createElement('div');
+  header.className = 'group-header';
+
+  const content = document.createElement('div');
+  content.className = 'group-content';
+
+  const footer = document.createElement('div');
+  footer.className = 'group-footer';
+  footer.hidden = true;
+
+  section.append(header, content, footer);
+
+  return { section, header, content, footer };
+}
+
 function prefersReducedMotion() {
   return (
     typeof window !== 'undefined' &&
@@ -26,7 +51,7 @@ function prefersReducedMotion() {
 
 function findCardInnerElement(cardEl) {
   if (!cardEl) return null;
-  const preferred = ['group-body', 'items', 'embed'];
+  const preferred = ['group-content', 'group-body', 'items', 'embed'];
   for (const child of cardEl.children) {
     if (!child || !child.classList) continue;
     for (const cls of preferred) {
@@ -473,6 +498,16 @@ function escapeHtml(str) {
   );
 }
 
+function createEmptyState(iconHtml, text) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'empty-state';
+  wrapper.innerHTML = `
+    <div class="empty-state__icon" aria-hidden="true">${iconHtml || ''}</div>
+    <p class="empty-state__text">${escapeHtml(text || '')}</p>
+  `;
+  return wrapper;
+}
+
 function previewItem(it, mount) {
   const existing = mount.nextElementSibling;
   if (existing && existing.classList.contains('embed')) {
@@ -633,10 +668,8 @@ export function render(state, editing, T, I, handlers, saveFn) {
         (typeof reminderHandlers.cardState === 'function'
           ? reminderHandlers.cardState()
           : state.remindersCard) || {};
-      const remGrp = document.createElement('section');
-      remGrp.className = 'group reminders-card';
-      remGrp.dataset.id = 'reminders';
-      remGrp.dataset.resizing = '0';
+      const { section: remGrp, header, content: body } =
+        createGroupStructure('reminders', 'reminders');
       const rWidth =
         cardState.width ?? SIZE_MAP[cardState.wSize || 'md']?.width ?? 360;
       const rHeight =
@@ -685,14 +718,12 @@ export function render(state, editing, T, I, handlers, saveFn) {
           remGrp.classList.remove('selected');
         }
       });
-      const header = document.createElement('div');
-      header.className = 'group-header';
       const titleText = (cardState.title || '').trim() ||
         T.remindersCardTitle ||
         T.reminders;
       header.innerHTML = `
         <div class="group-title">
-          <span class="dot" style="background:#38bdf8"></span>
+          <span class="dot" aria-hidden="true"></span>
           <h2 data-reminders-title>${escapeHtml(titleText)}</h2>
         </div>
         ${
@@ -703,6 +734,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
             : ''
         }
       `;
+      header.style.setProperty('--dot-color', '#38bdf8');
       const titleEl = header.querySelector('[data-reminders-title]');
       if (titleEl) {
         titleEl.contentEditable = editing;
@@ -732,11 +764,6 @@ export function render(state, editing, T, I, handlers, saveFn) {
           }
         }
       });
-      remGrp.appendChild(header);
-
-      const body = document.createElement('div');
-      body.className = 'reminders-card-body';
-
       const controlsWrap = document.createElement('div');
       controlsWrap.className = 'reminder-controls';
 
@@ -1067,18 +1094,15 @@ export function render(state, editing, T, I, handlers, saveFn) {
       });
       body.appendChild(listSection);
 
-      remGrp.appendChild(body);
       groupsEl.appendChild(remGrp);
-      const inner = remGrp.querySelector('.group-body');
+      const inner = remGrp.querySelector('.group-content');
       setupMinSizeWatcher(remGrp, inner);
       
       return;
     }
     if (g.type === 'note') {
-      const noteGrp = document.createElement('section');
-      noteGrp.className = 'group note-card';
-      noteGrp.dataset.id = g.id;
-      noteGrp.dataset.resizing = '0';
+      const { section: noteGrp, header: h, content } =
+        createGroupStructure('note', g.id);
       const fallbackW = SIZE_MAP[g.wSize ?? 'md']?.width ?? SIZE_MAP.md.width;
       const fallbackH = SIZE_MAP[g.hSize ?? 'md']?.height ?? SIZE_MAP.md.height;
       const nWidth = Number.isFinite(g.width) ? g.width : fallbackW;
@@ -1125,13 +1149,11 @@ export function render(state, editing, T, I, handlers, saveFn) {
           noteGrp.classList.remove('selected');
         }
       });
-      const h = document.createElement('div');
-      h.className = 'group-header';
       const dotColor = g.color || '#fef08a';
       const headerTitle = escapeHtml(g.title || g.name || T.notes);
       h.innerHTML = `
         <div class="group-title">
-          <span class="dot" style="background:${dotColor}"></span>
+          <span class="dot" aria-hidden="true"></span>
           <h2>${headerTitle}</h2>
         </div>
         ${
@@ -1142,29 +1164,27 @@ export function render(state, editing, T, I, handlers, saveFn) {
         </div>`
             : ''
         }`;
+      h.style.setProperty('--dot-color', dotColor);
       h.addEventListener('click', (e) => {
         const btn = e.target.closest('button');
         if (!btn) return;
         if (btn.dataset.act === 'edit') handlers.notes?.edit?.(g.id);
         if (btn.dataset.act === 'del') handlers.notes?.remove?.(g.id);
       });
-      noteGrp.appendChild(h);
       const itemsWrap = document.createElement('div');
       itemsWrap.className = 'items';
       const itemsScroll = document.createElement('div');
       itemsScroll.className = 'items-scroll';
       const p = document.createElement('p');
-      p.style.whiteSpace = 'pre-wrap';
-      p.style.overflowWrap = 'anywhere';
-      p.style.wordBreak = 'break-word';
+      p.className = 'note-content';
       const padding = Number.isFinite(g.padding) ? g.padding : 20;
       const fontSize = Number.isFinite(g.fontSize) ? g.fontSize : 20;
-      p.style.padding = padding + 'px';
-      p.style.fontSize = fontSize + 'px';
+      noteGrp.style.setProperty('--note-padding', `${padding}px`);
+      noteGrp.style.setProperty('--note-font-size', `${fontSize}px`);
       p.textContent = g.text || '';
       itemsScroll.appendChild(p);
       itemsWrap.appendChild(itemsScroll);
-      noteGrp.appendChild(itemsWrap);
+      content.appendChild(itemsWrap);
       groupsEl.appendChild(noteGrp);
       const inner = noteGrp.querySelector('.items');
       setupMinSizeWatcher(noteGrp, inner);
@@ -1172,10 +1192,8 @@ export function render(state, editing, T, I, handlers, saveFn) {
       return;
     }
     if (g.type === 'chart') {
-      const grp = document.createElement('section');
-      grp.className = 'group';
-      grp.dataset.id = g.id;
-      grp.dataset.resizing = '0';
+      const { section: grp, header: h, content } =
+        createGroupStructure('chart', g.id);
       const gWidth =
         g.width ?? SIZE_MAP[g.wSize ?? 'md'].width;
       const gHeight =
@@ -1224,12 +1242,10 @@ export function render(state, editing, T, I, handlers, saveFn) {
         }
       });
 
-      const h = document.createElement('div');
-      h.className = 'group-header';
       h.innerHTML = `
         <div class="group-title">
           <button type="button" class="toggle" data-collapse title="${g.collapsed ? T.expand : T.collapse}" aria-label="${g.collapsed ? T.expand : T.collapse}">${g.collapsed ? I.arrowDown : I.arrowUp}</button>
-          <span class="dot" style="background:${g.color || '#6ee7b7'}"></span>
+          <span class="dot" aria-hidden="true"></span>
           <h2 title="Tempkite, kad perrikiuotumėte" class="handle">${escapeHtml(g.name || '')}</h2>
         </div>
         ${
@@ -1242,6 +1258,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
         </div>`
             : ''
         }`;
+      h.style.setProperty('--dot-color', g.color || '#6ee7b7');
 
       h.addEventListener('click', (e) => {
         const btn = e.target.closest('button');
@@ -1273,14 +1290,13 @@ export function render(state, editing, T, I, handlers, saveFn) {
         }
       });
 
-      grp.appendChild(h);
       const emb = document.createElement('div');
       emb.className = 'embed';
       emb.dataset.custom = '1';
       emb.style.flex = '1';
       emb.style.resize = 'none';
       emb.innerHTML = `<iframe src="${g.url}" loading="lazy" referrerpolicy="no-referrer"></iframe>`;
-      grp.appendChild(emb);
+      content.appendChild(emb);
       if (g.collapsed) grp.classList.add('collapsed');
       groupsEl.appendChild(grp);
       const inner = grp.querySelector('.embed');
@@ -1288,10 +1304,8 @@ export function render(state, editing, T, I, handlers, saveFn) {
       
       return;
     }
-    const grp = document.createElement('section');
-    grp.className = 'group';
-    grp.dataset.id = g.id;
-    grp.dataset.resizing = '0';
+    const { section: grp, header: h, content } =
+      createGroupStructure('links', g.id);
     const gWidth2 =
       g.width ?? SIZE_MAP[g.wSize ?? 'md'].width;
     const gHeight2 =
@@ -1340,12 +1354,10 @@ export function render(state, editing, T, I, handlers, saveFn) {
       }
     });
 
-    const h = document.createElement('div');
-    h.className = 'group-header';
     h.innerHTML = `
         <div class="group-title">
           <button type="button" class="toggle" data-collapse title="${g.collapsed ? T.expand : T.collapse}" aria-label="${g.collapsed ? T.expand : T.collapse}">${g.collapsed ? I.arrowDown : I.arrowUp}</button>
-          <span class="dot" style="background:${g.color || '#6ee7b7'}"></span>
+          <span class="dot" aria-hidden="true"></span>
           <h2 title="Tempkite, kad perrikiuotumėte" class="handle">${escapeHtml(g.name)}</h2>
         </div>
         ${
@@ -1360,6 +1372,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
         </div>`
             : ''
         }`;
+    h.style.setProperty('--dot-color', g.color || '#6ee7b7');
 
     h.addEventListener('click', (e) => {
       const btn = e.target.closest('button');
@@ -1398,8 +1411,6 @@ export function render(state, editing, T, I, handlers, saveFn) {
       }
     });
 
-    grp.appendChild(h);
-
     const itemsWrap = document.createElement('div');
     itemsWrap.className = 'items';
     const itemsScroll = document.createElement('div');
@@ -1427,9 +1438,8 @@ export function render(state, editing, T, I, handlers, saveFn) {
     });
 
     if (filteredItems.length === 0) {
-      const empty = document.createElement('div');
-      empty.className = 'empty';
-      empty.textContent = q ? T.noMatches : T.empty;
+      const emptyMessage = q ? T.noMatches : T.empty;
+      const empty = createEmptyState(I.clipboard, emptyMessage);
       itemsScroll.appendChild(empty);
     } else {
       filteredItems.forEach((it) => {
@@ -1600,7 +1610,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
     }
 
     itemsWrap.appendChild(itemsScroll);
-    grp.appendChild(itemsWrap);
+    content.appendChild(itemsWrap);
     if (g.collapsed) grp.classList.add('collapsed');
     groupsEl.appendChild(grp);
     const inner = grp.querySelector('.items');
