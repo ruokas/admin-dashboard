@@ -1680,14 +1680,17 @@ export function render(state, editing, T, I, handlers, saveFn) {
 
 export function updateEditingUI(editing, state, T, I, renderFn) {
   const editBtn = document.getElementById('editBtn');
-  document.body.classList.toggle('editing', editing);
-  editBtn.innerHTML = editing
-    ? `${I.check} <span>${T.done}</span>`
-    : `${I.pencil} <span>${T.editMode}</span>`;
-  ['addMenu', 'importBtn', 'exportBtn'].forEach((id) => {
-    const el = document.getElementById(id);
-    if (el) el.style.display = editing ? 'inline-flex' : 'none';
-  });
+  const hasRemindersCard = Boolean(state.remindersCard?.enabled);
+  if (document.body) {
+    document.body.classList.toggle('editing', editing);
+    document.body.classList.toggle('is-editing', editing);
+    document.body.classList.toggle('has-reminders-card', hasRemindersCard);
+  }
+  if (editBtn) {
+    editBtn.innerHTML = editing
+      ? `${I.check} <span>${T.done}</span>`
+      : `${I.pencil} <span>${T.editMode}</span>`;
+  }
   const addBtn = document.getElementById('addBtn');
   const addGroup = document.getElementById('addGroup');
   const addChart = document.getElementById('addChart');
@@ -1699,11 +1702,6 @@ export function updateEditingUI(editing, state, T, I, renderFn) {
   if (addNote) addNote.innerHTML = `${I.plus} ${T.addNote}`;
   if (addReminder) {
     addReminder.innerHTML = `${I.clock} ${T.addRemindersCard}`;
-    if (!editing) addReminder.style.display = 'none';
-    else
-      addReminder.style.display = state.remindersCard?.enabled
-        ? 'none'
-        : 'block';
   }
   renderFn();
 }
