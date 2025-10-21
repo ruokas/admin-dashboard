@@ -72,7 +72,7 @@ function findCardInnerElement(cardEl) {
 
 function measureIntrinsicContentSize(cardEl, innerEl = findCardInnerElement(cardEl)) {
   if (!cardEl || !innerEl) {
-    return { width: 0, height: 0 };
+    return { width: 0, height: 0, widthExtra: 0, heightExtra: 0 };
   }
 
   const prevCard = {
@@ -120,7 +120,7 @@ function measureIntrinsicContentSize(cardEl, innerEl = findCardInnerElement(card
   innerEl.style.height = prevInner.height;
   innerEl.style.minHeight = prevInner.minHeight;
 
-  return { width, height };
+  return { width, height, widthExtra, heightExtra };
 }
 
 function applyMinSizeStyles(cardEl, width, height) {
@@ -139,19 +139,14 @@ function computeIntrinsicSizeFromState(state) {
   if (!state || !state.cardEl || !state.innerEl) {
     return { width: 0, height: 0 };
   }
-  const { cardEl, innerEl, innerRect, hostRect } = state;
-  if (innerRect && hostRect) {
-    const widthExtra = Math.max(0, hostRect.width - innerRect.width);
-    const heightExtra = Math.max(0, hostRect.height - innerRect.height);
-    const width = Math.ceil(
-      Math.max(innerRect.width, state.innerScrollWidth || innerEl.scrollWidth || 0) + widthExtra,
-    );
-    const height = Math.ceil(
-      Math.max(innerRect.height, state.innerScrollHeight || innerEl.scrollHeight || 0) + heightExtra,
-    );
-    return { width, height };
+  const measured = measureIntrinsicContentSize(state.cardEl, state.innerEl);
+  if (Number.isFinite(measured.widthExtra)) {
+    state.hostPaddingWidth = Math.max(0, measured.widthExtra);
   }
-  return measureIntrinsicContentSize(cardEl, innerEl);
+  if (Number.isFinite(measured.heightExtra)) {
+    state.hostPaddingHeight = Math.max(0, measured.heightExtra);
+  }
+  return { width: measured.width, height: measured.height };
 }
 
 function scheduleIntrinsicUpdate(cardEl) {
@@ -163,6 +158,9 @@ function scheduleIntrinsicUpdate(cardEl) {
       intrinsicFrameToken = null;
       queueMicrotask(() => {
         intrinsicPendingCards.forEach((el) => {
+          if (el?.dataset?.resizing === '1') {
+            return;
+          }
           const state = intrinsicStates.get(el);
           if (!state) return;
           const size = computeIntrinsicSizeFromState(state);
@@ -175,6 +173,9 @@ function scheduleIntrinsicUpdate(cardEl) {
   } else {
     queueMicrotask(() => {
       intrinsicPendingCards.forEach((el) => {
+        if (el?.dataset?.resizing === '1') {
+          return;
+        }
         const state = intrinsicStates.get(el);
         if (!state) return;
         const size = computeIntrinsicSizeFromState(state);
@@ -224,6 +225,8 @@ function ensureIntrinsicState(cardEl, innerEl = findCardInnerElement(cardEl)) {
       innerScrollWidth: 0,
       innerScrollHeight: 0,
       removalCleanup: null,
+      hostPaddingWidth: 0,
+      hostPaddingHeight: 0,
     };
     intrinsicStates.set(cardEl, state);
   } else if (state.innerEl !== innerEl) {
@@ -236,6 +239,9 @@ function ensureIntrinsicState(cardEl, innerEl = findCardInnerElement(cardEl)) {
     }
     state.observers = [];
     state.innerEl = innerEl;
+    state.last = { width: 0, height: 0 };
+    state.hostPaddingWidth = 0;
+    state.hostPaddingHeight = 0;
   }
 
   if (!state.observers.length && typeof ResizeObserver === 'function') {
@@ -267,7 +273,13 @@ function applyIntrinsicMinSize(cardEl, innerEl = findCardInnerElement(cardEl)) {
   }
   if (!state.last || (!state.last.width && !state.last.height)) {
     const measured = measureIntrinsicContentSize(cardEl, innerEl);
-    state.last = measured;
+    state.last = { width: measured.width, height: measured.height };
+    if (Number.isFinite(measured.widthExtra)) {
+      state.hostPaddingWidth = Math.max(0, measured.widthExtra);
+    }
+    if (Number.isFinite(measured.heightExtra)) {
+      state.hostPaddingHeight = Math.max(0, measured.heightExtra);
+    }
     applyMinSizeStyles(cardEl, measured.width, measured.height);
   }
   scheduleIntrinsicUpdate(cardEl);
