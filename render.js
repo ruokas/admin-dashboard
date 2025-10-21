@@ -78,24 +78,32 @@ function measureIntrinsicContentSize(cardEl, innerEl = findCardInnerElement(card
   const prevCard = {
     width: cardEl.style.width,
     minWidth: cardEl.style.minWidth,
+    maxWidth: cardEl.style.maxWidth,
     height: cardEl.style.height,
     minHeight: cardEl.style.minHeight,
+    maxHeight: cardEl.style.maxHeight,
   };
   const prevInner = {
     width: innerEl.style.width,
     minWidth: innerEl.style.minWidth,
+    maxWidth: innerEl.style.maxWidth,
     height: innerEl.style.height,
     minHeight: innerEl.style.minHeight,
+    maxHeight: innerEl.style.maxHeight,
   };
 
-  cardEl.style.width = 'max-content';
+  cardEl.style.width = '';
   cardEl.style.minWidth = '';
+  cardEl.style.maxWidth = 'none';
   cardEl.style.height = 'auto';
   cardEl.style.minHeight = '';
-  innerEl.style.width = 'max-content';
+  cardEl.style.maxHeight = 'none';
+  innerEl.style.width = 'auto';
   innerEl.style.minWidth = '';
-  innerEl.style.height = 'max-content';
+  innerEl.style.maxWidth = 'none';
+  innerEl.style.height = 'auto';
   innerEl.style.minHeight = '';
+  innerEl.style.maxHeight = 'none';
 
   const parseSize = (value) => {
     const numeric = Number.parseFloat(value);
@@ -126,12 +134,16 @@ function measureIntrinsicContentSize(cardEl, innerEl = findCardInnerElement(card
 
   cardEl.style.width = prevCard.width;
   cardEl.style.minWidth = prevCard.minWidth;
+  cardEl.style.maxWidth = prevCard.maxWidth;
   cardEl.style.height = prevCard.height;
   cardEl.style.minHeight = prevCard.minHeight;
+  cardEl.style.maxHeight = prevCard.maxHeight;
   innerEl.style.width = prevInner.width;
   innerEl.style.minWidth = prevInner.minWidth;
+  innerEl.style.maxWidth = prevInner.maxWidth;
   innerEl.style.height = prevInner.height;
   innerEl.style.minHeight = prevInner.minHeight;
+  innerEl.style.maxHeight = prevInner.maxHeight;
 
   return { width, height, widthExtra, heightExtra };
 }
