@@ -366,6 +366,10 @@ function beginCardResize(cardEl, event) {
   if (!cardEl) return;
   cardEl.dataset.resizing = '1';
   cardEl.draggable = false;
+  const isMultiSelection = selectedGroups.length > 1 && selectedGroups.includes(cardEl);
+  const resizeTargets = (isMultiSelection ? selectedGroups : [cardEl]).filter(
+    (el) => el && el.isConnected,
+  );
   const intrinsicSize = applyIntrinsicMinSize(cardEl);
   const rect = cardEl.getBoundingClientRect();
   const computed =
@@ -392,6 +396,14 @@ function beginCardResize(cardEl, event) {
     minHeight: minHeightCandidates.length ? Math.max(...minHeightCandidates) : 0,
     pointerId: event?.pointerId,
   };
+  resizeTargets.forEach((target) => {
+    target.dataset.resizing = '1';
+    target.draggable = false;
+    if (target !== cardEl) {
+      target.style.minWidth = '';
+      target.style.minHeight = '';
+    }
+  });
   if (cardEl.dataset?.id) {
     resizingElements.add(cardEl.dataset.id);
   }
