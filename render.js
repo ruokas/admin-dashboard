@@ -97,19 +97,32 @@ function measureIntrinsicContentSize(cardEl, innerEl = findCardInnerElement(card
   innerEl.style.height = 'max-content';
   innerEl.style.minHeight = '';
 
-  // Force layout while constraints are lifted to capture natural size.
-  const innerRect = innerEl.getBoundingClientRect();
-  const cardRect = cardEl.getBoundingClientRect();
-  const innerWidth = Math.max(innerRect.width, innerEl.scrollWidth);
-  const innerHeight = Math.max(innerRect.height, innerEl.scrollHeight);
-  const widthExtra = Math.max(0, cardRect.width - innerRect.width);
-  const heightExtra = Math.max(0, cardRect.height - innerRect.height);
+  const parseSize = (value) => {
+    const numeric = Number.parseFloat(value);
+    return Number.isFinite(numeric) ? numeric : 0;
+  };
 
-  let width = Math.max(innerWidth + widthExtra, cardRect.width);
-  let height = Math.max(innerHeight + heightExtra, cardRect.height);
+  let borderX = 0;
+  let borderY = 0;
+  if (typeof window !== 'undefined' && cardEl instanceof HTMLElement) {
+    const computed = window.getComputedStyle(cardEl);
+    borderX = parseSize(computed.borderLeftWidth) + parseSize(computed.borderRightWidth);
+    borderY = parseSize(computed.borderTopWidth) + parseSize(computed.borderBottomWidth);
+  }
 
-  width = Number.isFinite(width) ? Math.ceil(width) : 0;
-  height = Number.isFinite(height) ? Math.ceil(height) : 0;
+  const cardScrollWidth = Math.max(0, cardEl.scrollWidth);
+  const cardScrollHeight = Math.max(0, cardEl.scrollHeight);
+  const innerScrollWidth = Math.max(0, innerEl.scrollWidth);
+  const innerScrollHeight = Math.max(0, innerEl.scrollHeight);
+
+  const widthExtra = Math.max(0, cardScrollWidth - innerScrollWidth) + borderX;
+  const heightExtra = Math.max(0, cardScrollHeight - innerScrollHeight) + borderY;
+
+  const widthCandidate = Math.max(cardScrollWidth + borderX, innerScrollWidth + widthExtra);
+  const heightCandidate = Math.max(cardScrollHeight + borderY, innerScrollHeight + heightExtra);
+
+  const width = Number.isFinite(widthCandidate) ? Math.ceil(widthCandidate) : 0;
+  const height = Number.isFinite(heightCandidate) ? Math.ceil(heightCandidate) : 0;
 
   cardEl.style.width = prevCard.width;
   cardEl.style.minWidth = prevCard.minWidth;
