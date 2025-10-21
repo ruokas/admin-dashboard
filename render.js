@@ -266,10 +266,18 @@ function ensureIntrinsicState(cardEl, innerEl = findCardInnerElement(cardEl)) {
   return state;
 }
 
-function applyIntrinsicMinSize(cardEl, innerEl = findCardInnerElement(cardEl)) {
+function applyIntrinsicMinSize(
+  cardEl,
+  innerEl = findCardInnerElement(cardEl),
+  options = {},
+) {
+  const { forceMeasure = false } = options || {};
   const state = ensureIntrinsicState(cardEl, innerEl);
   if (!state) {
     return { width: 0, height: 0 };
+  }
+  if (forceMeasure) {
+    state.last = { width: 0, height: 0 };
   }
   if (!state.last || (!state.last.width && !state.last.height)) {
     const measured = measureIntrinsicContentSize(cardEl, innerEl);
@@ -370,7 +378,23 @@ function beginCardResize(cardEl, event) {
   const resizeTargets = (isMultiSelection ? selectedGroups : [cardEl]).filter(
     (el) => el && el.isConnected,
   );
-  const intrinsicSize = applyIntrinsicMinSize(cardEl);
+  const intrinsicSizes = new Map();
+  let aggregatedMinWidth = 0;
+  let aggregatedMinHeight = 0;
+  resizeTargets.forEach((target) => {
+    const size = applyIntrinsicMinSize(target, undefined, { forceMeasure: true }) || {
+      width: 0,
+      height: 0,
+    };
+    intrinsicSizes.set(target, size);
+    if (Number.isFinite(size.width)) {
+      aggregatedMinWidth = Math.max(aggregatedMinWidth, size.width);
+    }
+    if (Number.isFinite(size.height)) {
+      aggregatedMinHeight = Math.max(aggregatedMinHeight, size.height);
+    }
+  });
+  const intrinsicSize = intrinsicSizes.get(cardEl) || { width: 0, height: 0 };
   const rect = cardEl.getBoundingClientRect();
   const computed =
     typeof window !== 'undefined' && cardEl instanceof HTMLElement
@@ -379,11 +403,17 @@ function beginCardResize(cardEl, event) {
   const minWidthCandidates = [
     Number.parseFloat(cardEl.style.minWidth),
     Number.isFinite(intrinsicSize?.width) ? intrinsicSize.width : NaN,
+    Number.isFinite(aggregatedMinWidth) && aggregatedMinWidth > 0
+      ? aggregatedMinWidth
+      : NaN,
     computed ? Number.parseFloat(computed.minWidth) : NaN,
   ].filter((val) => Number.isFinite(val) && val > 0);
   const minHeightCandidates = [
     Number.parseFloat(cardEl.style.minHeight),
     Number.isFinite(intrinsicSize?.height) ? intrinsicSize.height : NaN,
+    Number.isFinite(aggregatedMinHeight) && aggregatedMinHeight > 0
+      ? aggregatedMinHeight
+      : NaN,
     computed ? Number.parseFloat(computed.minHeight) : NaN,
   ].filter((val) => Number.isFinite(val) && val > 0);
   activeResize = {
