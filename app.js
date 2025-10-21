@@ -54,6 +54,36 @@ function normalizeNoteColor(value) {
   return NOTE_DEFAULT_COLOR;
 }
 
+function computeSizeMetadata(width, height) {
+  const widthMatch = Object.entries(SIZE_MAP).find(([, dims]) => {
+    const preset = Number.isFinite(dims?.width) ? Math.round(dims.width) : NaN;
+    return Number.isFinite(preset) && Number.isFinite(width) && Math.round(width) === preset;
+  });
+  const heightMatch = Object.entries(SIZE_MAP).find(([, dims]) => {
+    const preset = Number.isFinite(dims?.height) ? Math.round(dims.height) : NaN;
+    return Number.isFinite(preset) && Number.isFinite(height) && Math.round(height) === preset;
+  });
+  return {
+    sizePreset: {
+      width: widthMatch ? widthMatch[0] : null,
+      height: heightMatch ? heightMatch[0] : null,
+    },
+    customWidth: widthMatch ? null : Number.isFinite(width) ? Math.round(width) : null,
+    customHeight: heightMatch ? null : Number.isFinite(height) ? Math.round(height) : null,
+  };
+}
+
+function applySizeMetadata(target, width, height) {
+  if (!target) return;
+  const meta = computeSizeMetadata(width, height);
+  target.sizePreset = meta.sizePreset;
+  if (meta.customWidth != null) target.customWidth = meta.customWidth;
+  else delete target.customWidth;
+  if (meta.customHeight != null) target.customHeight = meta.customHeight;
+  else delete target.customHeight;
+  return meta;
+}
+
 const editBtn = document.getElementById('editBtn');
 // const syncStatus = document.getElementById('syncStatus'); // Sheets sync indikatorius (išjungta)
 const searchEl = document.getElementById('q');
@@ -280,24 +310,31 @@ function normaliseReminderState() {
       showQuick: false,
     };
     const dims = SIZE_MAP.md || {};
-    state.remindersCard.width = Number.isFinite(dims.width) ? dims.width : 360;
-    state.remindersCard.height = Number.isFinite(dims.height) ? dims.height : 360;
+    const width = Number.isFinite(dims.width) ? dims.width : 360;
+    const height = Number.isFinite(dims.height) ? dims.height : 360;
+    state.remindersCard.width = width;
+    state.remindersCard.height = height;
+    applySizeMetadata(state.remindersCard, width, height);
   } else {
     const fallbackWidth = SIZE_MAP[state.remindersCard.wSize || 'md']?.width || 360;
-    const fallbackHeight =
-      SIZE_MAP[state.remindersCard.hSize || 'md']?.height || 360;
-    if (!Number.isFinite(state.remindersCard.width))
-      state.remindersCard.width = fallbackWidth;
-    if (!Number.isFinite(state.remindersCard.height))
-      state.remindersCard.height = fallbackHeight;
-    state.remindersCard.wSize =
-      state.remindersCard.wSize || sizeFromWidth(state.remindersCard.width);
-    state.remindersCard.hSize =
-      state.remindersCard.hSize || sizeFromHeight(state.remindersCard.height);
-    state.remindersCard.width =
-      SIZE_MAP[state.remindersCard.wSize]?.width ?? fallbackWidth;
-    state.remindersCard.height =
-      SIZE_MAP[state.remindersCard.hSize]?.height ?? fallbackHeight;
+    const fallbackHeight = SIZE_MAP[state.remindersCard.hSize || 'md']?.height || 360;
+    let width = Number.isFinite(state.remindersCard.customWidth)
+      ? state.remindersCard.customWidth
+      : Number.isFinite(state.remindersCard.width)
+        ? state.remindersCard.width
+        : fallbackWidth;
+    let height = Number.isFinite(state.remindersCard.customHeight)
+      ? state.remindersCard.customHeight
+      : Number.isFinite(state.remindersCard.height)
+        ? state.remindersCard.height
+        : fallbackHeight;
+    width = Number.isFinite(width) ? Math.max(0, Math.round(width)) : fallbackWidth;
+    height = Number.isFinite(height) ? Math.max(0, Math.round(height)) : fallbackHeight;
+    state.remindersCard.wSize = sizeFromWidth(width);
+    state.remindersCard.hSize = sizeFromHeight(height);
+    state.remindersCard.width = width;
+    state.remindersCard.height = height;
+    applySizeMetadata(state.remindersCard, width, height);
     state.remindersCard.title =
       typeof state.remindersCard.title === 'string'
         ? state.remindersCard.title
@@ -618,8 +655,11 @@ function addRemindersCard() {
       showQuick: false,
     };
     const dims = SIZE_MAP.md || {};
-    state.remindersCard.width = Number.isFinite(dims.width) ? dims.width : 360;
-    state.remindersCard.height = Number.isFinite(dims.height) ? dims.height : 360;
+    const width = Number.isFinite(dims.width) ? dims.width : 360;
+    const height = Number.isFinite(dims.height) ? dims.height : 360;
+    state.remindersCard.width = width;
+    state.remindersCard.height = height;
+    applySizeMetadata(state.remindersCard, width, height);
   } else {
     state.remindersCard.enabled = true;
   }
@@ -766,15 +806,20 @@ async function addGroup() {
   const res = await groupFormDialog(T);
   if (!res) return;
   const dims = SIZE_MAP[res.size] ?? SIZE_MAP.md;
-  state.groups.push({
+  const width = Number.isFinite(dims.width) ? dims.width : SIZE_MAP.md.width;
+  const height = Number.isFinite(dims.height) ? dims.height : SIZE_MAP.md.height;
+  const group = {
     id: uid(),
     name: res.name,
     color: res.color,
-    ...dims,
-    wSize: sizeFromWidth(dims.width),
-    hSize: sizeFromHeight(dims.height),
+    width,
+    height,
+    wSize: sizeFromWidth(width),
+    hSize: sizeFromHeight(height),
     items: [],
-  });
+  };
+  applySizeMetadata(group, width, height);
+  state.groups.push(group);
   persistState();
   renderAll();
 }
@@ -791,9 +836,13 @@ async function editGroup(gid) {
   g.name = res.name;
   g.color = res.color;
   const dims2 = SIZE_MAP[res.size] ?? SIZE_MAP.md;
-  Object.assign(g, dims2);
-  g.wSize = sizeFromWidth(dims2.width);
-  g.hSize = sizeFromHeight(dims2.height);
+  const width = Number.isFinite(dims2.width) ? dims2.width : g.width;
+  const height = Number.isFinite(dims2.height) ? dims2.height : g.height;
+  g.width = width;
+  g.height = height;
+  g.wSize = sizeFromWidth(width);
+  g.hSize = sizeFromHeight(height);
+  applySizeMetadata(g, width, height);
   persistState();
   renderAll();
 }
@@ -803,16 +852,21 @@ async function addChart() {
   if (!res) return;
   const parsed = parseIframe(res.url);
   const cDims = SIZE_MAP.md;
-  state.groups.push({
+  const width = Number.isFinite(cDims.width) ? cDims.width : SIZE_MAP.md.width;
+  const height = Number.isFinite(cDims.height) ? cDims.height : SIZE_MAP.md.height;
+  const chart = {
     id: uid(),
     type: 'chart',
     name: res.title,
     url: parsed.src,
     h: parsed.height ? parsed.height + 56 : undefined,
-    ...cDims,
-    wSize: sizeFromWidth(cDims.width),
-    hSize: sizeFromHeight(cDims.height),
-  });
+    width,
+    height,
+    wSize: sizeFromWidth(width),
+    hSize: sizeFromHeight(height),
+  };
+  applySizeMetadata(chart, width, height);
+  state.groups.push(chart);
   persistState();
   renderAll();
 }
@@ -827,6 +881,8 @@ async function addNoteCard() {
   });
   if (res === null) return;
   const dims = SIZE_MAP.md;
+  const width = Number.isFinite(dims.width) ? dims.width : SIZE_MAP.md.width;
+  const height = Number.isFinite(dims.height) ? dims.height : SIZE_MAP.md.height;
   const note = {
     id: uid(),
     type: 'note',
@@ -834,13 +890,14 @@ async function addNoteCard() {
     name: res.title.trim() || T.notes,
     text: res.text,
     color: normalizeNoteColor(res.color),
-    width: dims.width,
-    height: dims.height,
-    wSize: sizeFromWidth(dims.width),
-    hSize: sizeFromHeight(dims.height),
+    width,
+    height,
+    wSize: sizeFromWidth(width),
+    hSize: sizeFromHeight(height),
     fontSize: Number.isFinite(res.size) ? res.size : NOTE_DEFAULT_FONT,
     padding: Number.isFinite(res.padding) ? res.padding : NOTE_DEFAULT_PADDING,
   };
+  applySizeMetadata(note, width, height);
   state.groups.push(note);
   persistState();
   renderAll();

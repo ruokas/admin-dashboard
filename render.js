@@ -15,6 +15,13 @@ const SNAP_THRESHOLD = GRID;
 
 const MIN_SIZE_ADJUSTER = Symbol('minSizeAdjuster');
 const RESIZE_HANDLE_SIZE = 20;
+const RESIZE_HANDLER_KEY = Symbol('resizeHandler');
+
+let resizeGuideEl = null;
+
+const intrinsicStates = new WeakMap();
+const intrinsicPendingCards = new Set();
+let intrinsicFrameToken = null;
 
 function createGroupStructure(type, id) {
   const section = document.createElement('section');
@@ -116,8 +123,8 @@ function measureIntrinsicContentSize(cardEl, innerEl = findCardInnerElement(card
   return { width, height };
 }
 
-function applyIntrinsicMinSize(cardEl, innerEl = findCardInnerElement(cardEl)) {
-  const { width, height } = measureIntrinsicContentSize(cardEl, innerEl);
+function applyMinSizeStyles(cardEl, width, height) {
+  if (!cardEl) return;
   const widthPx = width > 0 ? `${width}px` : '';
   const heightPx = height > 0 ? `${height}px` : '';
   if (cardEl.style.minWidth !== widthPx) {
@@ -126,7 +133,145 @@ function applyIntrinsicMinSize(cardEl, innerEl = findCardInnerElement(cardEl)) {
   if (cardEl.style.minHeight !== heightPx) {
     cardEl.style.minHeight = heightPx;
   }
-  return { width, height };
+}
+
+function computeIntrinsicSizeFromState(state) {
+  if (!state || !state.cardEl || !state.innerEl) {
+    return { width: 0, height: 0 };
+  }
+  const { cardEl, innerEl, innerRect, hostRect } = state;
+  if (innerRect && hostRect) {
+    const widthExtra = Math.max(0, hostRect.width - innerRect.width);
+    const heightExtra = Math.max(0, hostRect.height - innerRect.height);
+    const width = Math.ceil(
+      Math.max(innerRect.width, state.innerScrollWidth || innerEl.scrollWidth || 0) + widthExtra,
+    );
+    const height = Math.ceil(
+      Math.max(innerRect.height, state.innerScrollHeight || innerEl.scrollHeight || 0) + heightExtra,
+    );
+    return { width, height };
+  }
+  return measureIntrinsicContentSize(cardEl, innerEl);
+}
+
+function scheduleIntrinsicUpdate(cardEl) {
+  if (!cardEl || !intrinsicStates.has(cardEl)) return;
+  intrinsicPendingCards.add(cardEl);
+  if (intrinsicFrameToken != null) return;
+  if (typeof requestAnimationFrame === 'function') {
+    intrinsicFrameToken = requestAnimationFrame(() => {
+      intrinsicFrameToken = null;
+      queueMicrotask(() => {
+        intrinsicPendingCards.forEach((el) => {
+          const state = intrinsicStates.get(el);
+          if (!state) return;
+          const size = computeIntrinsicSizeFromState(state);
+          state.last = size;
+          applyMinSizeStyles(el, size.width, size.height);
+        });
+        intrinsicPendingCards.clear();
+      });
+    });
+  } else {
+    queueMicrotask(() => {
+      intrinsicPendingCards.forEach((el) => {
+        const state = intrinsicStates.get(el);
+        if (!state) return;
+        const size = computeIntrinsicSizeFromState(state);
+        state.last = size;
+        applyMinSizeStyles(el, size.width, size.height);
+      });
+      intrinsicPendingCards.clear();
+    });
+  }
+}
+
+function cleanupIntrinsicState(cardEl) {
+  const state = intrinsicStates.get(cardEl);
+  if (!state) return;
+  if (state.observers?.length) {
+    state.observers.forEach((disconnect) => {
+      try {
+        disconnect();
+      } catch {}
+    });
+    state.observers = [];
+  }
+  if (state.removalCleanup) {
+    try {
+      state.removalCleanup();
+    } catch {}
+    state.removalCleanup = null;
+  }
+  intrinsicPendingCards.delete(cardEl);
+  intrinsicStates.delete(cardEl);
+  if (cardEl[MIN_SIZE_ADJUSTER]) {
+    delete cardEl[MIN_SIZE_ADJUSTER];
+  }
+}
+
+function ensureIntrinsicState(cardEl, innerEl = findCardInnerElement(cardEl)) {
+  if (!cardEl || !innerEl) return null;
+  let state = intrinsicStates.get(cardEl);
+  if (!state) {
+    state = {
+      cardEl,
+      innerEl,
+      observers: [],
+      last: { width: 0, height: 0 },
+      hostRect: null,
+      innerRect: null,
+      innerScrollWidth: 0,
+      innerScrollHeight: 0,
+      removalCleanup: null,
+    };
+    intrinsicStates.set(cardEl, state);
+  } else if (state.innerEl !== innerEl) {
+    if (state.observers?.length) {
+      state.observers.forEach((disconnect) => {
+        try {
+          disconnect();
+        } catch {}
+      });
+    }
+    state.observers = [];
+    state.innerEl = innerEl;
+  }
+
+  if (!state.observers.length && typeof ResizeObserver === 'function') {
+    const hostObserver = new ResizeObserver((entries) => {
+      const entry = entries?.[entries.length - 1];
+      state.hostRect = entry?.contentRect || null;
+      scheduleIntrinsicUpdate(cardEl);
+    });
+    hostObserver.observe(cardEl);
+    const innerObserver = new ResizeObserver((entries) => {
+      const entry = entries?.[entries.length - 1];
+      state.innerRect = entry?.contentRect || null;
+      state.innerScrollWidth = innerEl.scrollWidth;
+      state.innerScrollHeight = innerEl.scrollHeight;
+      scheduleIntrinsicUpdate(cardEl);
+    });
+    innerObserver.observe(innerEl);
+    state.observers.push(() => hostObserver.disconnect());
+    state.observers.push(() => innerObserver.disconnect());
+  }
+
+  return state;
+}
+
+function applyIntrinsicMinSize(cardEl, innerEl = findCardInnerElement(cardEl)) {
+  const state = ensureIntrinsicState(cardEl, innerEl);
+  if (!state) {
+    return { width: 0, height: 0 };
+  }
+  if (!state.last || (!state.last.width && !state.last.height)) {
+    const measured = measureIntrinsicContentSize(cardEl, innerEl);
+    state.last = measured;
+    applyMinSizeStyles(cardEl, measured.width, measured.height);
+  }
+  scheduleIntrinsicUpdate(cardEl);
+  return state.last;
 }
 
 function isWithinResizeHandle(cardEl, event) {
@@ -136,6 +281,71 @@ function isWithinResizeHandle(cardEl, event) {
     event.clientX >= rect.right - RESIZE_HANDLE_SIZE &&
     event.clientY >= rect.bottom - RESIZE_HANDLE_SIZE
   );
+}
+
+function getGroupLabel(cardEl) {
+  if (!cardEl) return '';
+  const title = cardEl.querySelector('.group-title h2');
+  if (title && title.textContent) {
+    const trimmed = title.textContent.trim();
+    if (trimmed) return trimmed;
+  }
+  if (cardEl.dataset?.id) {
+    return `#${cardEl.dataset.id}`;
+  }
+  return 'Kortelė';
+}
+
+function ensureResizeGuide() {
+  if (resizeGuideEl && resizeGuideEl.isConnected) return resizeGuideEl;
+  const guide = document.createElement('div');
+  guide.className = 'resize-guide';
+  guide.setAttribute('aria-hidden', 'true');
+  guide.hidden = true;
+  guide.innerHTML = `
+    <div class="resize-guide__outline"></div>
+    <div class="resize-guide__label resize-guide__label--width"></div>
+    <div class="resize-guide__label resize-guide__label--height"></div>
+  `;
+  document.body.appendChild(guide);
+  resizeGuideEl = guide;
+  return guide;
+}
+
+function hideResizeGuide() {
+  if (!resizeGuideEl) return;
+  resizeGuideEl.hidden = true;
+}
+
+function updateResizeGuide(rect, widthSnap, heightSnap) {
+  if (!rect) {
+    hideResizeGuide();
+    return;
+  }
+  const guide = ensureResizeGuide();
+  guide.style.left = `${Math.round(rect.left)}px`;
+  guide.style.top = `${Math.round(rect.top)}px`;
+  guide.style.width = `${Math.round(rect.width)}px`;
+  guide.style.height = `${Math.round(rect.height)}px`;
+  const widthLabel = guide.querySelector('.resize-guide__label--width');
+  const heightLabel = guide.querySelector('.resize-guide__label--height');
+  if (widthLabel) {
+    if (widthSnap) {
+      widthLabel.textContent = `Plotis: ${widthSnap.value}px • ${widthSnap.label}`;
+      widthLabel.hidden = false;
+    } else {
+      widthLabel.hidden = true;
+    }
+  }
+  if (heightLabel) {
+    if (heightSnap) {
+      heightLabel.textContent = `Aukštis: ${heightSnap.value}px • ${heightSnap.label}`;
+      heightLabel.hidden = false;
+    } else {
+      heightLabel.hidden = true;
+    }
+  }
+  guide.hidden = !widthSnap && !heightSnap;
 }
 
 let activeResize = null;
@@ -168,62 +378,183 @@ function beginCardResize(cardEl, event) {
     startHeight: rect.height,
     minWidth: minWidthCandidates.length ? Math.max(...minWidthCandidates) : 0,
     minHeight: minHeightCandidates.length ? Math.max(...minHeightCandidates) : 0,
+    pointerId: event?.pointerId,
   };
   if (cardEl.dataset?.id) {
     resizingElements.add(cardEl.dataset.id);
   }
 }
 
-function setupMinSizeWatcher(cardEl, innerEl) {
-  if (!cardEl || !innerEl || typeof ResizeObserver === 'undefined') return;
-  const adjustMinSize = () => {
-    if (!cardEl.isConnected || !innerEl.isConnected) return;
-    applyIntrinsicMinSize(cardEl, innerEl);
-  };
-
-  let frameId = null;
-  const scheduleAdjust = () => {
-    if (typeof requestAnimationFrame !== 'function') {
-      adjustMinSize();
-      return;
+function finalizeActiveResize() {
+  const changed = applyPendingResizes();
+  const allowDrag = document.body.classList.contains('editing');
+  document.querySelectorAll('.group').forEach((g) => {
+    g.dataset.resizing = '0';
+    g.style.minWidth = '';
+    g.style.minHeight = '';
+    g.draggable = allowDrag;
+    const adjust = g[MIN_SIZE_ADJUSTER];
+    if (typeof adjust === 'function') {
+      adjust();
     }
-    if (frameId != null) return;
-    frameId = requestAnimationFrame(() => {
-      frameId = null;
-      adjustMinSize();
+  });
+  activeResize = null;
+  hideResizeGuide();
+  if (changed && typeof persist === 'function') {
+    persist();
+  }
+}
+
+function initResizeHandles(cardEl) {
+  if (!cardEl || cardEl[RESIZE_HANDLER_KEY]) return;
+
+  const handlePointerMove = (event) => {
+    if (!activeResize || activeResize.el !== cardEl) return;
+    const { startX, startY, startWidth, startHeight, minWidth, minHeight } = activeResize;
+    const deltaX = event.clientX - startX;
+    const deltaY = event.clientY - startY;
+    let nextWidth = startWidth + deltaX;
+    let nextHeight = startHeight + deltaY;
+    if (Number.isFinite(minWidth)) nextWidth = Math.max(minWidth, nextWidth);
+    if (Number.isFinite(minHeight)) nextHeight = Math.max(minHeight, nextHeight);
+    if (Number.isFinite(nextWidth)) {
+      nextWidth = Math.max(0, Math.round(nextWidth));
+    }
+    if (Number.isFinite(nextHeight)) {
+      nextHeight = Math.max(0, Math.round(nextHeight));
+    }
+
+    let widthSnap = null;
+    let heightSnap = null;
+    let bestWidthDiff = SNAP_THRESHOLD + 1;
+    let bestHeightDiff = SNAP_THRESHOLD + 1;
+    const allGroups = Array.from(document.querySelectorAll('.group'));
+    allGroups.forEach((group) => {
+      if (!group || group === cardEl) return;
+      const rect = group.getBoundingClientRect();
+      const widthCandidate = Math.round(rect.width);
+      const heightCandidate = Math.round(rect.height);
+      if (Number.isFinite(nextWidth)) {
+        const diffW = Math.abs(widthCandidate - nextWidth);
+        if (diffW <= SNAP_THRESHOLD && diffW < bestWidthDiff) {
+          bestWidthDiff = diffW;
+          widthSnap = { value: widthCandidate, label: getGroupLabel(group) };
+        }
+      }
+      if (Number.isFinite(nextHeight)) {
+        const diffH = Math.abs(heightCandidate - nextHeight);
+        if (diffH <= SNAP_THRESHOLD && diffH < bestHeightDiff) {
+          bestHeightDiff = diffH;
+          heightSnap = { value: heightCandidate, label: getGroupLabel(group) };
+        }
+      }
     });
+
+    if (widthSnap) {
+      nextWidth = widthSnap.value;
+    }
+    if (heightSnap) {
+      nextHeight = heightSnap.value;
+    }
+
+    if (Number.isFinite(nextWidth)) {
+      cardEl.style.width = `${Math.max(0, nextWidth)}px`;
+    }
+    if (Number.isFinite(nextHeight)) {
+      cardEl.style.height = `${Math.max(0, nextHeight)}px`;
+    }
+
+    activeResize.snapWidth = widthSnap?.value ?? null;
+    activeResize.snapHeight = heightSnap?.value ?? null;
+
+    if (widthSnap || heightSnap) {
+      const rect = cardEl.getBoundingClientRect();
+      updateResizeGuide(rect, widthSnap, heightSnap);
+    } else {
+      hideResizeGuide();
+    }
+
+    event.preventDefault();
   };
 
-  const mo = new ResizeObserver(() => scheduleAdjust());
-  mo.observe(innerEl);
+  const handlePointerUp = (event) => {
+    if (activeResize && activeResize.el === cardEl && cardEl.releasePointerCapture) {
+      try {
+        cardEl.releasePointerCapture(activeResize.pointerId);
+      } catch {}
+    }
+    cardEl.removeEventListener('pointermove', handlePointerMove);
+    cardEl.removeEventListener('pointerup', handlePointerUp);
+    cardEl.removeEventListener('pointercancel', handlePointerUp);
+    finalizeActiveResize();
+    event.preventDefault();
+  };
+
+  const handlePointerDown = (event) => {
+    if (!document.body.classList.contains('editing')) return;
+    if (event.button != null && event.button !== 0 && event.pointerType !== 'touch') return;
+    if (!isWithinResizeHandle(cardEl, event)) return;
+    beginCardResize(cardEl, event);
+    if (!activeResize) return;
+    if (cardEl.setPointerCapture && Number.isFinite(event.pointerId)) {
+      try {
+        cardEl.setPointerCapture(event.pointerId);
+      } catch {}
+    }
+    cardEl.addEventListener('pointermove', handlePointerMove);
+    cardEl.addEventListener('pointerup', handlePointerUp);
+    cardEl.addEventListener('pointercancel', handlePointerUp);
+    event.preventDefault();
+  };
+
+  cardEl.addEventListener('pointerdown', handlePointerDown);
+  cardEl[RESIZE_HANDLER_KEY] = {
+    destroy() {
+      cardEl.removeEventListener('pointerdown', handlePointerDown);
+      cardEl.removeEventListener('pointermove', handlePointerMove);
+      cardEl.removeEventListener('pointerup', handlePointerUp);
+      cardEl.removeEventListener('pointercancel', handlePointerUp);
+    },
+  };
+}
+
+function setupMinSizeWatcher(cardEl, innerEl) {
+  if (!cardEl || !innerEl) return;
+  const state = ensureIntrinsicState(cardEl, innerEl);
+  if (!state) return;
+
+  const adjustMinSize = () => {
+    if (!cardEl.isConnected) return;
+    scheduleIntrinsicUpdate(cardEl);
+  };
+
+  state.adjust = adjustMinSize;
   cardEl[MIN_SIZE_ADJUSTER] = adjustMinSize;
   adjustMinSize();
 
   let cleaned = false;
-  let removalObserver = null;
   const cleanup = () => {
     if (cleaned) return;
     cleaned = true;
-    if (frameId != null && typeof cancelAnimationFrame === 'function') {
-      cancelAnimationFrame(frameId);
-      frameId = null;
-    }
-    mo.disconnect();
-    if (removalObserver) {
-      removalObserver.disconnect();
-      removalObserver = null;
-    }
-    if (cardEl[MIN_SIZE_ADJUSTER] === adjustMinSize) {
-      delete cardEl[MIN_SIZE_ADJUSTER];
-    }
+    cleanupIntrinsicState(cardEl);
   };
+
+  if (state.removalCleanup) {
+    try {
+      state.removalCleanup();
+    } catch {}
+    state.removalCleanup = null;
+  }
 
   const watchParent = (node) => {
     if (!node || typeof MutationObserver !== 'function') return;
-    if (removalObserver) {
-      removalObserver.disconnect();
+    if (state.removalCleanup) {
+      try {
+        state.removalCleanup();
+      } catch {}
+      state.removalCleanup = null;
     }
-    removalObserver = new MutationObserver(() => {
+    const removalObserver = new MutationObserver(() => {
       if (!cardEl.isConnected) {
         cleanup();
         return;
@@ -233,6 +564,9 @@ function setupMinSizeWatcher(cardEl, innerEl) {
       }
     });
     removalObserver.observe(node, { childList: true });
+    state.removalCleanup = () => {
+      removalObserver.disconnect();
+    };
   };
 
   if (typeof MutationObserver === 'function') {
@@ -303,19 +637,14 @@ function formatDueLabel(ts) {
 }
 
 function applySize(el, width, height, wSize = sizeFromWidth(width), hSize = sizeFromHeight(height)) {
-  const widthPreset = SIZE_MAP[wSize]?.width;
-  const heightPreset = SIZE_MAP[hSize]?.height;
-  const finalWidth = Number.isFinite(widthPreset) ? widthPreset : width;
-  const finalHeight = Number.isFinite(heightPreset) ? heightPreset : height;
-
-  if (Number.isFinite(finalWidth)) {
-    el.style.width = `${finalWidth}px`;
+  if (Number.isFinite(width)) {
+    el.style.width = `${Math.round(width)}px`;
   } else {
     el.style.removeProperty('width');
   }
 
-  if (Number.isFinite(finalHeight)) {
-    el.style.height = `${finalHeight}px`;
+  if (Number.isFinite(height)) {
+    el.style.height = `${Math.round(height)}px`;
   } else {
     el.style.removeProperty('height');
   }
@@ -324,13 +653,38 @@ function applySize(el, width, height, wSize = sizeFromWidth(width), hSize = size
   el.classList.add(`w-${wSize}`, `h-${hSize}`);
 }
 
+function resolveSizeMetadata(width, height) {
+  const widthMatch = Object.entries(SIZE_MAP).find(([, dims]) => {
+    const preset = Number.isFinite(dims?.width) ? Math.round(dims.width) : NaN;
+    return Number.isFinite(preset) && Number.isFinite(width) && Math.round(width) === preset;
+  });
+  const heightMatch = Object.entries(SIZE_MAP).find(([, dims]) => {
+    const preset = Number.isFinite(dims?.height) ? Math.round(dims.height) : NaN;
+    return Number.isFinite(preset) && Number.isFinite(height) && Math.round(height) === preset;
+  });
+  const metadata = {
+    sizePreset: {
+      width: widthMatch ? widthMatch[0] : null,
+      height: heightMatch ? heightMatch[0] : null,
+    },
+    customWidth: widthMatch ? null : Number.isFinite(width) ? Math.round(width) : null,
+    customHeight: heightMatch ? null : Number.isFinite(height) ? Math.round(height) : null,
+  };
+  return metadata;
+}
+
 const resizingElements = new Set();
 
 function applyResizeForElement(el, width, height, wSize, hSize) {
   const widthPreset = SIZE_MAP[wSize]?.width;
   const heightPreset = SIZE_MAP[hSize]?.height;
-  const finalWidth = Number.isFinite(widthPreset) ? widthPreset : width;
-  const finalHeight = Number.isFinite(heightPreset) ? heightPreset : height;
+  const widthMatchesPreset =
+    Number.isFinite(widthPreset) && Number.isFinite(width) && Math.round(width) === Math.round(widthPreset);
+  const heightMatchesPreset =
+    Number.isFinite(heightPreset) && Number.isFinite(height) && Math.round(height) === Math.round(heightPreset);
+  const finalWidth = widthMatchesPreset ? widthPreset : width;
+  const finalHeight = heightMatchesPreset ? heightPreset : height;
+  const metadata = resolveSizeMetadata(finalWidth, finalHeight);
 
   applySize(el, finalWidth, finalHeight, wSize, hSize);
   if (el.dataset.id === 'reminders') {
@@ -343,6 +697,9 @@ function applyResizeForElement(el, width, height, wSize, hSize) {
       height: finalHeight,
       wSize,
       hSize,
+      sizePreset: metadata.sizePreset,
+      customWidth: metadata.customWidth,
+      customHeight: metadata.customHeight,
     };
     return changed;
   }
@@ -354,6 +711,11 @@ function applyResizeForElement(el, width, height, wSize, hSize) {
   sg.height = finalHeight;
   sg.wSize = wSize;
   sg.hSize = hSize;
+  sg.sizePreset = metadata.sizePreset;
+  if (metadata.customWidth != null) sg.customWidth = metadata.customWidth;
+  else delete sg.customWidth;
+  if (metadata.customHeight != null) sg.customHeight = metadata.customHeight;
+  else delete sg.customHeight;
   delete sg.size;
   return changed;
 }
@@ -384,8 +746,16 @@ function applyPendingResizes() {
       });
     const wSize = sizeFromWidth(baseW);
     const hSize = sizeFromHeight(baseH);
-    const finalWidth = Number.isFinite(SIZE_MAP[wSize]?.width) ? SIZE_MAP[wSize].width : baseW;
-    const finalHeight = Number.isFinite(SIZE_MAP[hSize]?.height) ? SIZE_MAP[hSize].height : baseH;
+    const presetWidth = SIZE_MAP[wSize]?.width;
+    const presetHeight = SIZE_MAP[hSize]?.height;
+    const finalWidth =
+      Number.isFinite(presetWidth) && Math.round(baseW) === Math.round(presetWidth)
+        ? presetWidth
+        : baseW;
+    const finalHeight =
+      Number.isFinite(presetHeight) && Math.round(baseH) === Math.round(presetHeight)
+        ? presetHeight
+        : baseH;
     const targets = selectedGroups.includes(baseEl) ? selectedGroups : [baseEl];
     targets.forEach((target) => {
       const didChange = applyResizeForElement(target, finalWidth, finalHeight, wSize, hSize);
@@ -395,48 +765,6 @@ function applyPendingResizes() {
   resizingElements.clear();
   return changed;
 }
-
-document.addEventListener('mousemove', (event) => {
-  if (!activeResize || !activeResize.el) return;
-  const { el, startX, startY, startWidth, startHeight, minWidth, minHeight } =
-    activeResize;
-  if (el.dataset.resizing !== '1') {
-    activeResize = null;
-    return;
-  }
-  const deltaX = event.clientX - startX;
-  const deltaY = event.clientY - startY;
-  let nextWidth = startWidth + deltaX;
-  let nextHeight = startHeight + deltaY;
-  if (Number.isFinite(minWidth)) nextWidth = Math.max(minWidth, nextWidth);
-  if (Number.isFinite(minHeight)) nextHeight = Math.max(minHeight, nextHeight);
-  if (Number.isFinite(nextWidth)) {
-    el.style.width = `${Math.max(0, Math.round(nextWidth))}px`;
-  }
-  if (Number.isFinite(nextHeight)) {
-    el.style.height = `${Math.max(0, Math.round(nextHeight))}px`;
-  }
-  event.preventDefault();
-});
-
-document.addEventListener('mouseup', () => {
-  const changed = applyPendingResizes();
-  const allowDrag = document.body.classList.contains('editing');
-  document.querySelectorAll('.group').forEach((g) => {
-    g.dataset.resizing = '0';
-    g.style.minWidth = '';
-    g.style.minHeight = '';
-    g.draggable = allowDrag;
-    const adjust = g[MIN_SIZE_ADJUSTER];
-    if (typeof adjust === 'function') {
-      adjust();
-    }
-  });
-  activeResize = null;
-  if (changed) {
-    persist();
-  }
-});
 
 document.addEventListener('click', (e) => {
   if (
@@ -677,15 +1005,10 @@ export function render(state, editing, T, I, handlers, saveFn) {
       const rWSize = cardState.wSize || sizeFromWidth(rWidth);
       const rHSize = cardState.hSize || sizeFromHeight(rHeight);
       applySize(remGrp, rWidth, rHeight, rWSize, rHSize);
+      initResizeHandles(remGrp);
       remGrp.style.resize = editing ? 'both' : 'none';
       remGrp.style.overflow = editing ? 'auto' : 'visible';
       if (editing) {
-        remGrp.addEventListener('mousedown', (e) => {
-          if (isWithinResizeHandle(remGrp, e)) {
-            e.preventDefault();
-            beginCardResize(remGrp, e);
-          }
-        });
         remGrp.draggable = true;
         remGrp.addEventListener('dragstart', (e) => {
           if (remGrp.dataset.resizing === '1') {
@@ -1110,15 +1433,10 @@ export function render(state, editing, T, I, handlers, saveFn) {
       const nWSize = g.wSize || sizeFromWidth(nWidth);
       const nHSize = g.hSize || sizeFromHeight(nHeight);
       applySize(noteGrp, nWidth, nHeight, nWSize, nHSize);
+      initResizeHandles(noteGrp);
       noteGrp.style.resize = editing ? 'both' : 'none';
       noteGrp.style.overflow = editing ? 'auto' : 'visible';
       if (editing) {
-        noteGrp.addEventListener('mousedown', (e) => {
-          if (isWithinResizeHandle(noteGrp, e)) {
-            e.preventDefault();
-            beginCardResize(noteGrp, e);
-          }
-        });
         noteGrp.draggable = true;
         noteGrp.addEventListener('dragstart', (e) => {
           if (noteGrp.dataset.resizing === '1') {
@@ -1201,24 +1519,19 @@ export function render(state, editing, T, I, handlers, saveFn) {
       const gWSize = g.wSize ?? sizeFromWidth(gWidth);
       const gHSize = g.hSize ?? sizeFromHeight(gHeight);
       applySize(grp, gWidth, gHeight, gWSize, gHSize);
+      initResizeHandles(grp);
       grp.style.resize = editing ? 'both' : 'none';
       grp.style.overflow = editing ? 'auto' : 'visible';
-    if (editing) {
-      grp.addEventListener('mousedown', (e) => {
-        if (isWithinResizeHandle(grp, e)) {
-          e.preventDefault();
-          beginCardResize(grp, e);
-        }
-      });
-      grp.draggable = true;
-      grp.addEventListener('dragstart', (e) => {
-        if (grp.dataset.resizing === '1') {
-          e.preventDefault();
-          return;
-        }
-        e.dataTransfer.setData('text/group', g.id);
-        grp.style.opacity = 0.5;
-      });
+      if (editing) {
+        grp.draggable = true;
+        grp.addEventListener('dragstart', (e) => {
+          if (grp.dataset.resizing === '1') {
+            e.preventDefault();
+            return;
+          }
+          e.dataTransfer.setData('text/group', g.id);
+          grp.style.opacity = 0.5;
+        });
         grp.addEventListener('dragend', () => {
           grp.style.opacity = 1;
         });
@@ -1313,15 +1626,10 @@ export function render(state, editing, T, I, handlers, saveFn) {
     const gWSize2 = g.wSize ?? sizeFromWidth(gWidth2);
     const gHSize2 = g.hSize ?? sizeFromHeight(gHeight2);
     applySize(grp, gWidth2, gHeight2, gWSize2, gHSize2);
+    initResizeHandles(grp);
     grp.style.resize = editing ? 'both' : 'none';
     grp.style.overflow = editing ? 'auto' : 'visible';
     if (editing) {
-      grp.addEventListener('mousedown', (e) => {
-        if (isWithinResizeHandle(grp, e)) {
-          e.preventDefault();
-          beginCardResize(grp, e);
-        }
-      });
       grp.draggable = true;
       grp.addEventListener('dragstart', (e) => {
         if (grp.dataset.resizing === '1') {
@@ -1691,6 +1999,9 @@ export function render(state, editing, T, I, handlers, saveFn) {
 export function updateEditingUI(editing, state, T, I, renderFn) {
   const editBtn = document.getElementById('editBtn');
   const hasRemindersCard = Boolean(state.remindersCard?.enabled);
+  if (!editing) {
+    hideResizeGuide();
+  }
   if (document.body) {
     document.body.classList.toggle('editing', editing);
     document.body.classList.toggle('is-editing', editing);
