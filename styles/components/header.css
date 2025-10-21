@@ -132,6 +132,8 @@ header {
 
 .search {
   position: relative;
+  --search-icon-offset: var(--space-4);
+  --search-icon-size: calc(var(--space-4) + var(--space-1));
 }
 
 .search input {
@@ -139,14 +141,18 @@ header {
   min-width: 240px;
   box-shadow: var(--shadow);
   padding-block: var(--space-3);
-  padding-inline-start: calc(var(--space-4) + var(--space-5));
+  padding-inline-start: calc(
+    var(--search-icon-offset) + var(--search-icon-size) + var(--space-2)
+  );
   padding-inline-end: calc(var(--space-3) + var(--space-2));
 }
 
 .search svg {
   position: absolute;
-  inset-inline-start: var(--space-4);
+  inset-inline-start: var(--search-icon-offset);
   top: 50%;
+  width: var(--search-icon-size);
+  height: var(--search-icon-size);
   transform: translateY(-50%);
   opacity: 0.6;
   pointer-events: none;
