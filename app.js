@@ -1155,6 +1155,81 @@ document.addEventListener('click', (event) => {
   }
 });
 
+// Išplėtimui: jei reikia kitų laukų ignoravimo, papildykite žemiau esantį sąrašą.
+function isEditableTarget(target) {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName?.toLowerCase();
+  if (target.isContentEditable) return true;
+  if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
+  if (target.getAttribute('role') === 'textbox') return true;
+  return false;
+}
+
+// Jei keičiate paieškos identifikatorių – atnaujinkite fokusavimo logiką.
+function focusSearchField() {
+  if (!(searchEl instanceof HTMLElement)) return;
+  const focusOptions = { preventScroll: true };
+  try {
+    searchEl.focus(focusOptions);
+  } catch (err) {
+    searchEl.focus();
+  }
+  if (typeof searchEl.select === 'function') {
+    searchEl.select();
+  }
+}
+
+// Pagrindinis kelias naujiems trumpiniams – praplėskite šią funkciją arba pridėkite naują.
+function openAddMenuViaShortcut() {
+  if (!addMenu || !addBtn) return;
+  if (!editing) {
+    editing = true;
+    updateUI();
+  }
+  if (!editing) return;
+  if (!isMenuOpen()) {
+    setMenuOpen(true, { restoreFocus: false });
+  }
+  if (addMenuList && addMenuList.contains(document.activeElement)) {
+    return;
+  }
+  if (addMenuList) {
+    const firstItem = addMenuList.querySelector('button:not([disabled])');
+    if (firstItem instanceof HTMLElement) {
+      firstItem.focus();
+    }
+  }
+}
+
+document.addEventListener('keydown', (event) => {
+  if (event.defaultPrevented) return;
+  const target = event.target instanceof HTMLElement ? event.target : null;
+  if (isEditableTarget(target)) {
+    return;
+  }
+
+  const key = event.key?.toLowerCase();
+  if (
+    event.key === '/' &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.altKey
+  ) {
+    event.preventDefault();
+    focusSearchField();
+    return;
+  }
+
+  if (
+    (event.ctrlKey || event.metaKey) &&
+    !event.altKey &&
+    key === 'k'
+  ) {
+    event.preventDefault();
+    openAddMenuViaShortcut();
+  }
+});
+
 [
   ['addGroup', () => addGroup()],
   ['addChart', () => addChart()],

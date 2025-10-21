@@ -12,12 +12,12 @@
   </head>
   <body>
     <header>
-      <div class="title">
+      <div class="title" data-zone="title">
         <span id="pageIcon" class="page-icon" aria-hidden="true"></span>
         <h1 id="pageTitle"></h1>
         <span class="badge" id="stats"></span>
       </div>
-      <div class="controls">
+      <div class="primary-actions" data-zone="primary-actions">
         <div class="search">
           <svg
             width="20"
@@ -41,19 +41,21 @@
             />
           </svg>
           <label for="q" id="searchLabel" class="sr-only">Paieška</label>
-          <input id="q" class="search-input" placeholder="Paieška nuorodose…" />
+          <input
+            id="q"
+            class="search-input"
+            placeholder="Paieška nuorodose…"
+            aria-keyshortcuts="/"
+          />
         </div>
-        <!-- Fallback labels so buttons are visible before JS initializes -->
-        <button id="editBtn" class="btn-outline" type="button">
-          Redaguoti
-        </button>
-        <div id="addMenu" data-open="0" style="display: none">
+        <div id="addMenu" data-open="0" data-editing-visible>
           <button
             id="addBtn"
             type="button"
             aria-haspopup="true"
             aria-expanded="false"
             aria-controls="addMenuList"
+            aria-keyshortcuts="Control+K"
           >
             ＋ Pridėti
           </button>
@@ -73,16 +75,28 @@
             <button id="addNote" type="button" role="menuitem">
               ＋ Pridėti pastabas
             </button>
-            <button id="addRemindersCard" type="button" role="menuitem">
+            <button
+              id="addRemindersCard"
+              type="button"
+              role="menuitem"
+              data-editing-visible
+              data-hide-when-reminders
+            >
               ⏰ Pridėti priminimų kortelę
             </button>
           </div>
         </div>
+      </div>
+      <div class="secondary-actions" data-zone="secondary-actions">
+        <!-- Fallback labels so buttons are visible before JS initializes -->
+        <button id="editBtn" class="btn-outline" type="button">
+          Redaguoti
+        </button>
         <button
           id="importBtn"
           class="btn-outline"
           type="button"
-          style="display: none"
+          data-editing-visible
         >
           <svg class="icon" viewBox="0 0 24 24">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -94,7 +108,7 @@
           id="exportBtn"
           class="btn-outline"
           type="button"
-          style="display: none"
+          data-editing-visible
         >
           <svg class="icon" viewBox="0 0 24 24">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />

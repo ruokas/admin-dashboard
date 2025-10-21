@@ -8,6 +8,9 @@ Statinis vieno failo HTML projektas, skirtas publikuoti per **GitHub Pages**.
 
 1. Atidarykite [projekto puslapį](https://<user>.github.io/admin-dashboard/) GitHub Pages (pakeiskite `<user>` savo GitHub naudotojo vardu).
 2. Viskas vyksta naršyklėje, nereikia jokių priklausomybių.
+3. Naudokite klaviatūros trumpinius:
+   - `/` – akimirksniu fokusuoja paieškos lauką.
+   - `Ctrl+K` (`⌘K` Mac) – įjungia redagavimą ir atidaro **Pridėti** meniu.
 
 ## Funkcijos
 
