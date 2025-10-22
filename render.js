@@ -1783,7 +1783,6 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
 
       h.innerHTML = `
         <div class="group-title">
-          <button type="button" class="toggle" data-collapse title="${g.collapsed ? T.expand : T.collapse}" aria-label="${g.collapsed ? T.expand : T.collapse}">${g.collapsed ? I.arrowDown : I.arrowUp}</button>
           <span class="dot" aria-hidden="true"></span>
           <h2 title="Tempkite, kad perrikiuotumėte" class="handle">${escapeHtml(g.name || '')}</h2>
         </div>
@@ -1800,12 +1799,8 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
       h.style.setProperty('--dot-color', g.color || '#6ee7b7');
 
       h.addEventListener('click', (e) => {
-        const btn = e.target.closest('button');
+        const btn = e.target.closest('button[data-act]');
         if (!btn) return;
-        if (btn.dataset.collapse !== undefined) {
-          handlers.toggleCollapse(g.id);
-          return;
-        }
         const act = btn.dataset.act;
         if (act === 'edit') return handlers.editChart(g.id);
         if (act === 'del') {
@@ -1836,7 +1831,6 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
       emb.style.resize = 'none';
       emb.innerHTML = `<iframe src="${g.url}" loading="lazy" referrerpolicy="no-referrer"></iframe>`;
       content.appendChild(emb);
-      if (g.collapsed) grp.classList.add('collapsed');
       fragment.appendChild(grp);
       activeCardIds.add(g.id);
       registerCard(g.id, grp);
@@ -1892,7 +1886,6 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
 
     h.innerHTML = `
         <div class="group-title">
-          <button type="button" class="toggle" data-collapse title="${g.collapsed ? T.expand : T.collapse}" aria-label="${g.collapsed ? T.expand : T.collapse}">${g.collapsed ? I.arrowDown : I.arrowUp}</button>
           <span class="dot" aria-hidden="true"></span>
           <h2 title="Tempkite, kad perrikiuotumėte" class="handle">${escapeHtml(g.name)}</h2>
         </div>
@@ -1911,12 +1904,8 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
     h.style.setProperty('--dot-color', g.color || '#6ee7b7');
 
     h.addEventListener('click', (e) => {
-      const btn = e.target.closest('button');
+      const btn = e.target.closest('button[data-act]');
       if (!btn) return;
-      if (btn.dataset.collapse !== undefined) {
-        handlers.toggleCollapse(g.id);
-        return;
-      }
       const act = btn.dataset.act;
       if (act === 'add') return handlers.addItem(g.id);
       if (act === 'edit') return handlers.editGroup(g.id);
@@ -2147,7 +2136,6 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
 
     itemsWrap.appendChild(itemsScroll);
     content.appendChild(itemsWrap);
-    if (g.collapsed) grp.classList.add('collapsed');
     fragment.appendChild(grp);
     activeCardIds.add(g.id);
     registerCard(g.id, grp);

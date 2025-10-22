@@ -69,14 +69,6 @@ function activateEntry(entry, attempt = 0) {
       setTimeout(() => activateEntry(entry, attempt + 1), 120);
       return;
     }
-    if (groupEl.classList.contains('collapsed')) {
-      const toggleBtn = groupEl.querySelector('[data-collapse]');
-      if (toggleBtn) {
-        toggleBtn.click();
-        setTimeout(() => activateEntry(entry, attempt + 1), 120);
-        return;
-      }
-    }
     let itemEl = null;
     if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
       itemEl = groupEl.querySelector(

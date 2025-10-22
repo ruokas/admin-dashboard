@@ -59,8 +59,7 @@
   gap: var(--space-1);
 }
 
-.group-actions button,
-.group-header .toggle {
+.group-actions button {
   padding: var(--space-1);
 }
 
@@ -83,11 +82,6 @@
 }
 
 .group-footer[hidden] {
-  display: none;
-}
-
-.group.collapsed .items,
-.group.collapsed .embed {
   display: none;
 }
 
