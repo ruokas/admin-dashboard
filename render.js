@@ -18,6 +18,7 @@ const RESIZE_HANDLE_SIZE = 20;
 const RESIZE_HANDLER_KEY = Symbol('resizeHandler');
 
 let resizeGuideEl = null;
+let measureHostEl = null;
 
 const intrinsicStates = new WeakMap();
 const intrinsicPendingCards = new Set();
@@ -70,9 +71,75 @@ function findCardInnerElement(cardEl) {
   return cardEl.firstElementChild || null;
 }
 
+function ensureMeasureHost() {
+  if (measureHostEl && measureHostEl.isConnected) {
+    return measureHostEl;
+  }
+  if (typeof document === 'undefined' || !document?.body) {
+    return null;
+  }
+  const host = document.createElement('div');
+  host.setAttribute('aria-hidden', 'true');
+  host.style.position = 'absolute';
+  host.style.left = '-10000px';
+  host.style.top = '-10000px';
+  host.style.visibility = 'hidden';
+  host.style.pointerEvents = 'none';
+  host.style.width = 'auto';
+  host.style.height = 'auto';
+  host.style.overflow = 'visible';
+  document.body.appendChild(host);
+  measureHostEl = host;
+  return host;
+}
+
 function measureIntrinsicContentSize(cardEl, innerEl = findCardInnerElement(cardEl)) {
   if (!cardEl || !innerEl) {
     return { width: 0, height: 0, widthExtra: 0, heightExtra: 0 };
+  }
+
+  const host = ensureMeasureHost();
+  if (host) {
+    const clone = cardEl.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.dataset.resizing = '0';
+    clone.style.position = 'relative';
+    clone.style.visibility = 'visible';
+    clone.style.pointerEvents = 'none';
+    clone.style.width = 'auto';
+    clone.style.minWidth = '0';
+    clone.style.maxWidth = 'none';
+    clone.style.height = 'auto';
+    clone.style.minHeight = '0';
+    clone.style.maxHeight = 'none';
+    clone.style.flex = '0 0 auto';
+    clone.style.transform = 'none';
+    clone.style.transition = 'none';
+
+    const cloneInner = findCardInnerElement(clone);
+    if (cloneInner) {
+      cloneInner.style.width = 'auto';
+      cloneInner.style.minWidth = '0';
+      cloneInner.style.maxWidth = 'none';
+      cloneInner.style.height = 'auto';
+      cloneInner.style.minHeight = '0';
+      cloneInner.style.maxHeight = 'none';
+      cloneInner.style.flex = '0 0 auto';
+    }
+
+    host.appendChild(clone);
+    const rect = clone.getBoundingClientRect();
+    const innerRect = cloneInner ? cloneInner.getBoundingClientRect() : null;
+    const width = Number.isFinite(rect.width) ? Math.ceil(rect.width) : 0;
+    const height = Number.isFinite(rect.height) ? Math.ceil(rect.height) : 0;
+    const widthExtra = innerRect
+      ? Math.max(0, Math.ceil(rect.width - innerRect.width))
+      : 0;
+    const heightExtra = innerRect
+      ? Math.max(0, Math.ceil(rect.height - innerRect.height))
+      : 0;
+    host.removeChild(clone);
+    return { width, height, widthExtra, heightExtra };
   }
 
   const prevCard = {
