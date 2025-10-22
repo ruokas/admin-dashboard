@@ -839,7 +839,6 @@ function renderAll() {
         edit: (id) => editNoteCard(id),
         remove: (id) => removeNoteCard(id),
       },
-      toggleCollapse,
       confirmDialog: (msg) => confirmDlg(T, msg),
       reminders: {
         entries: () => buildReminderEntries().sort((a, b) => a.at - b.at),
@@ -1035,14 +1034,6 @@ async function editChart(gid) {
   if (parsed.height) {
     g.h = parsed.height + 56;
   }
-  persistState();
-  renderAll();
-}
-
-function toggleCollapse(gid) {
-  const g = state.groups.find((x) => x.id === gid);
-  if (!g) return;
-  g.collapsed = !g.collapsed;
   persistState();
   renderAll();
 }

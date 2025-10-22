@@ -61,8 +61,6 @@ export const Tlt = {
   toDark: 'Perjungti į tamsią temą',
   toLight: 'Perjungti į šviesią temą',
   openAll: 'Atverti visas',
-  collapse: 'Suskleisti',
-  expand: 'Išskleisti',
   addItem: 'Pridėti įrašą',
   editGroup: 'Redaguoti grupę',
   editChart: 'Redaguoti grafiką',
