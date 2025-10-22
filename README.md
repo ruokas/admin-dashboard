@@ -75,6 +75,9 @@ Norint pridėti kliento spalvų schemą:
 3. Atidarykite puslapį ir paspauskite **Eksportuoti** – duomenys nusiųsami į Sheets.
 4. Perkraukite puslapį (išvalykite `localStorage`, jei reikia).
 5. Paspauskite **Importuoti** – duomenys parsiunčiami iš Sheets.
+6. Įjunkite redagavimą, pasirinkite kelias korteles (Shift + paspaudimas) ir vilkite vienos kortelės kampą – visos pasirinktų kortelių kopijos turi pasikeisti į tą patį dydį.
+7. Tempdami kampą stebėkite mėlynas „snap“ gaires – jos turi rodyti artimiausių kortelių pločio/aukščio reikšmes ir kortelė turi prisifiksuoti prie parodytų matmenų.
+8. Atlaisvinę kampą įsitikinkite, kad individualių kortelių nustatymai įrašo tiek pasirinktą presetą (`sm`/`md`/`lg`), tiek nestandartinius pločius/aukščius (patikrinkite `localStorage`).
 
 ## Licencija
 

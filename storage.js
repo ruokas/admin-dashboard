@@ -45,6 +45,25 @@ function normalizeDimensionPair(width, height, wSize, hSize) {
   };
 }
 
+function resolveSizeMetadata(width, height) {
+  const widthMatch = Object.entries(SIZE_MAP).find(([, dims]) => {
+    const preset = Number.isFinite(dims?.width) ? Math.round(dims.width) : NaN;
+    return Number.isFinite(preset) && Number.isFinite(width) && Math.round(width) === preset;
+  });
+  const heightMatch = Object.entries(SIZE_MAP).find(([, dims]) => {
+    const preset = Number.isFinite(dims?.height) ? Math.round(dims.height) : NaN;
+    return Number.isFinite(preset) && Number.isFinite(height) && Math.round(height) === preset;
+  });
+  return {
+    sizePreset: {
+      width: widthMatch ? widthMatch[0] : null,
+      height: heightMatch ? heightMatch[0] : null,
+    },
+    customWidth: widthMatch ? null : Number.isFinite(width) ? Math.round(width) : null,
+    customHeight: heightMatch ? null : Number.isFinite(height) ? Math.round(height) : null,
+  };
+}
+
 export function load() {
   try {
     const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '');
@@ -72,12 +91,10 @@ export function load() {
         }
         const wSize = legacyBox.wSize || sizeFromWidth(width);
         const hSize = legacyBox.hSize || sizeFromHeight(height);
-        const { width: widthSnap, height: heightSnap } = normalizeDimensionPair(
-          width,
-          height,
-          wSize,
-          hSize,
-        );
+        const dims = normalizeDimensionPair(width, height, wSize, hSize);
+        const widthSnap = Number.isFinite(dims.width) ? dims.width : Math.round(width);
+        const heightSnap = Number.isFinite(dims.height) ? dims.height : Math.round(height);
+        const sizeMeta = resolveSizeMetadata(widthSnap, heightSnap);
         const note = {
           id: makeId(),
           type: 'note',
@@ -89,6 +106,9 @@ export function load() {
           height: heightSnap,
           wSize,
           hSize,
+          sizePreset: sizeMeta.sizePreset,
+          customWidth: sizeMeta.customWidth,
+          customHeight: sizeMeta.customHeight,
           fontSize:
             Number.isFinite(legacyOpts.size) && legacyOpts.size > 0
               ? Math.round(legacyOpts.size)
@@ -130,6 +150,7 @@ export function load() {
           );
           width = Number.isFinite(widthSnap) ? widthSnap : width;
           height = Number.isFinite(heightSnap) ? heightSnap : height;
+          const sizeMeta = resolveSizeMetadata(width, height);
 
           if (g.type === 'note') {
             const title =
@@ -157,6 +178,9 @@ export function load() {
               height,
               wSize,
               hSize,
+              sizePreset: sizeMeta.sizePreset,
+              customWidth: sizeMeta.customWidth,
+              customHeight: sizeMeta.customHeight,
               fontSize,
               padding,
             };
@@ -168,6 +192,11 @@ export function load() {
           group.height = height;
           group.wSize = wSize;
           group.hSize = hSize;
+          group.sizePreset = sizeMeta.sizePreset;
+          if (sizeMeta.customWidth != null) group.customWidth = sizeMeta.customWidth;
+          else delete group.customWidth;
+          if (sizeMeta.customHeight != null) group.customHeight = sizeMeta.customHeight;
+          else delete group.customHeight;
           delete group.size;
           if (!Array.isArray(group.items)) group.items = [];
           group.items = group.items.map((it) => {
@@ -233,12 +262,10 @@ export function load() {
         const height = DEFAULT_CARD_HEIGHT;
         const wSize = sizeFromWidth(width);
         const hSize = sizeFromHeight(height);
-        const { width: widthSnap, height: heightSnap } = normalizeDimensionPair(
-          width,
-          height,
-          wSize,
-          hSize,
-        );
+        const dims = normalizeDimensionPair(width, height, wSize, hSize);
+        const widthSnap = Number.isFinite(dims.width) ? dims.width : Math.round(width);
+        const heightSnap = Number.isFinite(dims.height) ? dims.height : Math.round(height);
+        const sizeMeta = resolveSizeMetadata(widthSnap, heightSnap);
         data.remindersCard = {
           enabled: false,
           title: '',
@@ -246,6 +273,9 @@ export function load() {
           height: heightSnap,
           wSize,
           hSize,
+          sizePreset: sizeMeta.sizePreset,
+          customWidth: sizeMeta.customWidth,
+          customHeight: sizeMeta.customHeight,
           showQuick: false,
         };
       } else {
@@ -264,10 +294,20 @@ export function load() {
           wSize,
           hSize,
         );
-        data.remindersCard.width = dims.width;
-        data.remindersCard.height = dims.height;
+        const widthSnap = Number.isFinite(dims.width)
+          ? dims.width
+          : Math.round(data.remindersCard.width);
+        const heightSnap = Number.isFinite(dims.height)
+          ? dims.height
+          : Math.round(data.remindersCard.height);
+        const sizeMeta = resolveSizeMetadata(widthSnap, heightSnap);
+        data.remindersCard.width = widthSnap;
+        data.remindersCard.height = heightSnap;
         data.remindersCard.wSize = wSize;
         data.remindersCard.hSize = hSize;
+        data.remindersCard.sizePreset = sizeMeta.sizePreset;
+        data.remindersCard.customWidth = sizeMeta.customWidth;
+        data.remindersCard.customHeight = sizeMeta.customHeight;
         data.remindersCard.showQuick = data.remindersCard.showQuick === true;
       }
       if (typeof data.remindersPos !== 'number') data.remindersPos = 0;
@@ -291,15 +331,25 @@ export function seed() {
     defaultWSize,
     defaultHSize,
   );
+  const defaultWidth = Number.isFinite(defaultDims.width)
+    ? defaultDims.width
+    : Math.round(DEFAULT_CARD_WIDTH);
+  const defaultHeight = Number.isFinite(defaultDims.height)
+    ? defaultDims.height
+    : Math.round(DEFAULT_CARD_HEIGHT);
+  const defaultMeta = resolveSizeMetadata(defaultWidth, defaultHeight);
   const data = {
     groups: [],
     remindersCard: {
       enabled: false,
       title: '',
-      width: defaultDims.width,
-      height: defaultDims.height,
+      width: defaultWidth,
+      height: defaultHeight,
       wSize: defaultWSize,
       hSize: defaultHSize,
+      sizePreset: defaultMeta.sizePreset,
+      customWidth: defaultMeta.customWidth,
+      customHeight: defaultMeta.customHeight,
       showQuick: false,
     },
     remindersPos: 0,
