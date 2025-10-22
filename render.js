@@ -20,6 +20,9 @@ const RESIZE_HANDLER_KEY = Symbol('resizeHandler');
 let resizeGuideEl = null;
 let measureHostEl = null;
 
+const cardRegistry = new Map();
+const cardDimensions = new WeakMap();
+
 const intrinsicStates = new WeakMap();
 const intrinsicPendingCards = new Set();
 let intrinsicFrameToken = null;
@@ -47,6 +50,20 @@ function createGroupStructure(type, id) {
   section.append(header, content, footer);
 
   return { section, header, content, footer };
+}
+
+export function renderStats(state) {
+  const statsEl = document.getElementById('stats');
+  if (!statsEl) return;
+  const groups = Array.isArray(state?.groups) ? state.groups : [];
+  const totalGroups = groups.length;
+  const totalItems = countGroupItems(groups);
+  statsEl.textContent = `${totalGroups} grupės • ${totalItems} įrašai`;
+}
+
+export function render(state, editing, T, I, handlers, saveFn) {
+  renderGroups(state, editing, T, I, handlers, saveFn);
+  renderStats(state);
 }
 
 function prefersReducedMotion() {
@@ -91,6 +108,54 @@ function ensureMeasureHost() {
   document.body.appendChild(host);
   measureHostEl = host;
   return host;
+}
+
+function registerCard(id, el) {
+  if (!id || !el) return;
+  cardRegistry.set(id, el);
+}
+
+function rememberCardDimensions(el, width, height) {
+  if (!el) return;
+  cardDimensions.set(el, {
+    width: Number.isFinite(width) ? Math.round(width) : null,
+    height: Number.isFinite(height) ? Math.round(height) : null,
+  });
+}
+
+function getCardDimensions(el) {
+  if (!el) {
+    return { width: 0, height: 0 };
+  }
+  const cached = cardDimensions.get(el);
+  if (
+    cached &&
+    Number.isFinite(cached.width) &&
+    Number.isFinite(cached.height)
+  ) {
+    return cached;
+  }
+  if (!el.isConnected) {
+    return { width: 0, height: 0 };
+  }
+  const rect = el.getBoundingClientRect();
+  const next = {
+    width: Number.isFinite(rect?.width) ? Math.round(rect.width) : 0,
+    height: Number.isFinite(rect?.height) ? Math.round(rect.height) : 0,
+  };
+  cardDimensions.set(el, next);
+  return next;
+}
+
+function cleanupCardRegistry(activeIds = new Set()) {
+  cardRegistry.forEach((el, id) => {
+    if (!activeIds.has(id) || !el?.isConnected) {
+      cardRegistry.delete(id);
+      if (el) {
+        cardDimensions.delete(el);
+      }
+    }
+  });
 }
 
 function measureIntrinsicContentSize(cardEl, innerEl = findCardInnerElement(cardEl)) {
@@ -797,6 +862,8 @@ function applySize(el, width, height, wSize = sizeFromWidth(width), hSize = size
 
   el.classList.remove('w-sm', 'w-md', 'w-lg', 'h-sm', 'h-md', 'h-lg');
   el.classList.add(`w-${wSize}`, `h-${hSize}`);
+
+  rememberCardDimensions(el, width, height);
 }
 
 function resolveSizeMetadata(width, height) {
@@ -868,28 +935,32 @@ function applyResizeForElement(el, width, height, wSize, hSize) {
 
 function applyPendingResizes() {
   if (!resizingElements.size) return false;
-  const allGroups = Array.from(document.querySelectorAll('.group'));
   let changed = false;
   const processed = new Set();
   resizingElements.forEach((id) => {
     if (!id || processed.has(id)) return;
     processed.add(id);
-    const baseEl = allGroups.find((g) => g.dataset.id === id);
-    if (!baseEl) return;
+    const baseEl = cardRegistry.get(id);
+    if (!baseEl || !baseEl.isConnected) {
+      if (baseEl) {
+        cardDimensions.delete(baseEl);
+      }
+      cardRegistry.delete(id);
+      return;
+    }
     const rect = baseEl.getBoundingClientRect();
     let baseW = Math.round(rect.width / GRID) * GRID;
     let baseH = Math.round(rect.height / GRID) * GRID;
-    allGroups
-      .filter((g) => g !== baseEl)
-      .forEach((g) => {
-        const gRect = g.getBoundingClientRect();
-        if (Math.abs(baseW - Math.round(gRect.width)) <= SNAP_THRESHOLD) {
-          baseW = Math.round(gRect.width);
-        }
-        if (Math.abs(baseH - Math.round(gRect.height)) <= SNAP_THRESHOLD) {
-          baseH = Math.round(gRect.height);
-        }
-      });
+    cardRegistry.forEach((otherEl) => {
+      if (!otherEl || otherEl === baseEl || !otherEl.isConnected) return;
+      const dims = getCardDimensions(otherEl);
+      if (Math.abs(baseW - Math.round(dims.width)) <= SNAP_THRESHOLD) {
+        baseW = Math.round(dims.width);
+      }
+      if (Math.abs(baseH - Math.round(dims.height)) <= SNAP_THRESHOLD) {
+        baseH = Math.round(dims.height);
+      }
+    });
     const wSize = sizeFromWidth(baseW);
     const hSize = sizeFromHeight(baseH);
     const presetWidth = SIZE_MAP[wSize]?.width;
@@ -906,6 +977,7 @@ function applyPendingResizes() {
     targets.forEach((target) => {
       const didChange = applyResizeForElement(target, finalWidth, finalHeight, wSize, hSize);
       if (didChange) changed = true;
+      rememberCardDimensions(target, finalWidth, finalHeight);
     });
   });
   resizingElements.clear();
@@ -1007,11 +1079,10 @@ function previewItem(it, mount) {
   mount.after(wrap);
 }
 
-export function render(state, editing, T, I, handlers, saveFn) {
+export function renderGroups(state, editing, T, I, handlers, saveFn) {
   currentState = state;
   persist = saveFn;
   const groupsEl = document.getElementById('groups');
-  const statsEl = document.getElementById('stats');
   const searchEl = document.getElementById('q');
   const reduceMotion = prefersReducedMotion();
   const previousGroupRects = new Map();
@@ -1082,8 +1153,13 @@ export function render(state, editing, T, I, handlers, saveFn) {
   }
   reminderEntryCache = new Map();
 
-  const q = (searchEl.value || '').toLowerCase().trim();
-  groupsEl.innerHTML = '';
+  const q = (searchEl?.value || '').toLowerCase().trim();
+  if (!groupsEl) {
+    cleanupCardRegistry(new Set());
+    return;
+  }
+  const fragment = document.createDocumentFragment();
+  const activeCardIds = new Set();
   function handleDrop(e) {
     e.preventDefault();
     const fromId = e.dataTransfer.getData('text/group');
@@ -1563,10 +1639,12 @@ export function render(state, editing, T, I, handlers, saveFn) {
       });
       body.appendChild(listSection);
 
-      groupsEl.appendChild(remGrp);
+      fragment.appendChild(remGrp);
+      activeCardIds.add('reminders');
+      registerCard('reminders', remGrp);
       const inner = remGrp.querySelector('.group-content');
       setupMinSizeWatcher(remGrp, inner);
-      
+
       return;
     }
     if (g.type === 'note') {
@@ -1649,7 +1727,9 @@ export function render(state, editing, T, I, handlers, saveFn) {
       itemsScroll.appendChild(p);
       itemsWrap.appendChild(itemsScroll);
       content.appendChild(itemsWrap);
-      groupsEl.appendChild(noteGrp);
+      fragment.appendChild(noteGrp);
+      activeCardIds.add(g.id);
+      registerCard(g.id, noteGrp);
       const inner = noteGrp.querySelector('.items');
       setupMinSizeWatcher(noteGrp, inner);
       
@@ -1757,7 +1837,9 @@ export function render(state, editing, T, I, handlers, saveFn) {
       emb.innerHTML = `<iframe src="${g.url}" loading="lazy" referrerpolicy="no-referrer"></iframe>`;
       content.appendChild(emb);
       if (g.collapsed) grp.classList.add('collapsed');
-      groupsEl.appendChild(grp);
+      fragment.appendChild(grp);
+      activeCardIds.add(g.id);
+      registerCard(g.id, grp);
       const inner = grp.querySelector('.embed');
       setupMinSizeWatcher(grp, inner);
       
@@ -2066,11 +2148,16 @@ export function render(state, editing, T, I, handlers, saveFn) {
     itemsWrap.appendChild(itemsScroll);
     content.appendChild(itemsWrap);
     if (g.collapsed) grp.classList.add('collapsed');
-    groupsEl.appendChild(grp);
+    fragment.appendChild(grp);
+    activeCardIds.add(g.id);
+    registerCard(g.id, grp);
     const inner = grp.querySelector('.items');
     setupMinSizeWatcher(grp, inner);
 
   });
+
+  groupsEl.replaceChildren(fragment);
+  cleanupCardRegistry(activeCardIds);
 
   const applyLayoutAnimations = () => {
     if (!groupsEl) return;
@@ -2136,10 +2223,6 @@ export function render(state, editing, T, I, handlers, saveFn) {
   } else {
     applyLayoutAnimations();
   }
-
-  const totalGroups = state.groups.length;
-  const totalItems = countGroupItems(state.groups);
-  statsEl.textContent = `${totalGroups} grupės • ${totalItems} įrašai`;
 }
 
 export function updateEditingUI(editing, state, T, I, renderFn) {

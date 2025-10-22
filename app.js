@@ -116,6 +116,7 @@ if (!Array.isArray(state.groups)) state.groups = [];
 if (!state.title) state.title = DEFAULT_TITLE;
 let editing = false;
 let reminders;
+let debouncedSearchRender = null;
 
 normaliseReminderState();
 
@@ -155,6 +156,88 @@ function findItemElement(gid, iid) {
   return Array.from(
     document.querySelectorAll('.item[data-gid][data-iid]'),
   ).find((el) => el.dataset?.gid === gid && el.dataset?.iid === iid);
+}
+
+function scheduleRender(callback, delay = 150) {
+  let controller = null;
+  let timeoutId = null;
+  let rafId = null;
+
+  const clearTimers = () => {
+    if (timeoutId != null) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+    if (rafId != null && typeof cancelAnimationFrame === 'function') {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
+  };
+
+  const schedule = (...args) => {
+    if (controller) {
+      controller.abort();
+    }
+    controller = new AbortController();
+    const { signal } = controller;
+
+    clearTimers();
+
+    const start = () => {
+      if (signal.aborted) return;
+      const run = () => {
+        if (signal.aborted) return;
+        controller = null;
+        callback(...args);
+      };
+      if (typeof requestAnimationFrame === 'function') {
+        rafId = requestAnimationFrame(run);
+      } else {
+        run();
+      }
+    };
+
+    if (
+      typeof window !== 'undefined' &&
+      typeof window.setTimeout === 'function' &&
+      delay > 0
+    ) {
+      timeoutId = window.setTimeout(start, delay);
+    } else {
+      start();
+    }
+
+    signal.addEventListener(
+      'abort',
+      () => {
+        clearTimers();
+      },
+      { once: true },
+    );
+
+    return controller;
+  };
+
+  schedule.cancel = () => {
+    if (controller) {
+      controller.abort();
+      controller = null;
+    } else {
+      clearTimers();
+    }
+  };
+
+  schedule.flush = (...args) => {
+    schedule.cancel();
+    const run = () => callback(...args);
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(run);
+    } else {
+      run();
+    }
+  };
+
+  return schedule;
 }
 
 function animateLeaveElement(el) {
@@ -737,6 +820,9 @@ function persistState() {
 }
 
 function renderAll() {
+  if (typeof debouncedSearchRender?.cancel === 'function') {
+    debouncedSearchRender.cancel();
+  }
   render(
     state,
     editing,
@@ -1332,9 +1418,15 @@ editBtn.addEventListener('click', () => {
   updateUI();
 });
 if (searchLabelEl) searchLabelEl.textContent = T.searchLabel;
+debouncedSearchRender = scheduleRender(() => renderAll());
 searchEl.setAttribute('aria-label', T.searchLabel);
 searchEl.placeholder = T.searchPH;
-searchEl.addEventListener('input', renderAll);
+searchEl.addEventListener('input', () => {
+  debouncedSearchRender();
+});
+searchEl.addEventListener('change', () => {
+  debouncedSearchRender.flush();
+});
 
 applyTheme();
 applyColor();

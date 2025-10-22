@@ -79,6 +79,14 @@ Norint pridėti kliento spalvų schemą:
 7. Tempdami kampą stebėkite mėlynas „snap“ gaires – jos turi rodyti artimiausių kortelių pločio/aukščio reikšmes ir kortelė turi prisifiksuoti prie parodytų matmenų.
 8. Atlaisvinę kampą įsitikinkite, kad individualių kortelių nustatymai įrašo tiek pasirinktą presetą (`sm`/`md`/`lg`), tiek nestandartinius pločius/aukščius (patikrinkite `localStorage`).
 
+## Našumo profilis (Chrome Performance)
+
+1. Atidarykite aplikaciją Chrome naršyklėje ir įjunkite **DevTools** (`Ctrl+Shift+I`).
+2. Pereikite į **Performance** skiltį ir paspauskite **Record** (raudoną tašką).
+3. Atlikite tipines sąveikas (pvz., paiešką, kortelių pertempimą, priminimų kortelės atidarymą) ~5–10 sekundžių.
+4. Sustabdykite įrašymą – grafikuose matysite kadrų laiką, skriptų vykdymą ir atminties pokyčius.
+5. Išsaugokite profilį (`Save profile...`) prieš ir po pakeitimų, kad komanda galėtų palyginti rezultatus.
+
 ## Licencija
 
 Projektas platinamas pagal [MIT licenciją](LICENSE).
