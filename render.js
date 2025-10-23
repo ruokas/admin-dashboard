@@ -582,6 +582,7 @@ function beginCardResize(cardEl, event) {
     minWidth: minWidthCandidates.length ? Math.max(...minWidthCandidates) : 0,
     minHeight: minHeightCandidates.length ? Math.max(...minHeightCandidates) : 0,
     pointerId: event?.pointerId,
+    targets: resizeTargets,
   };
   resizeTargets.forEach((target) => {
     target.dataset.resizing = '1';
@@ -668,12 +669,20 @@ function initResizeHandles(cardEl) {
       nextHeight = heightSnap.value;
     }
 
-    if (Number.isFinite(nextWidth)) {
-      cardEl.style.width = `${Math.max(0, nextWidth)}px`;
-    }
-    if (Number.isFinite(nextHeight)) {
-      cardEl.style.height = `${Math.max(0, nextHeight)}px`;
-    }
+    const targets = Array.isArray(activeResize.targets) && activeResize.targets.length
+      ? activeResize.targets
+      : [cardEl];
+    targets
+      .filter((target, index) => target && target.isConnected && targets.indexOf(target) === index)
+      .forEach((target) => {
+        if (Number.isFinite(nextWidth)) {
+          target.style.width = `${Math.max(0, nextWidth)}px`;
+        }
+        if (Number.isFinite(nextHeight)) {
+          target.style.height = `${Math.max(0, nextHeight)}px`;
+        }
+        rememberCardDimensions(target, nextWidth, nextHeight);
+      });
 
     activeResize.snapWidth = widthSnap?.value ?? null;
     activeResize.snapHeight = heightSnap?.value ?? null;
