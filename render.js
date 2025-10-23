@@ -2220,6 +2220,14 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
     groupEls.forEach((el) => {
       const id = el.dataset?.id;
       if (!id) return;
+      if (id === 'reminders') {
+        // Reminder card turinys kinta dažnai (pvz., laikmačiams tiksint),
+        // todėl praleidžiame bendrą FLIP animaciją, kad kortelė nešokinėtų.
+        if (el.dataset.anim) {
+          el.removeAttribute('data-anim');
+        }
+        return;
+      }
       const previous = previousGroupRects.get(id);
       if (
         previous &&
