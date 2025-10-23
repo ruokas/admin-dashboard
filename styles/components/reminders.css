@@ -264,6 +264,14 @@
   font-size: calc(var(--font-md) - 0.05rem);
 }
 
+.reminder-list-section[data-state='has-items'] .reminder-empty {
+  display: none;
+}
+
+.reminder-list-section[data-state='empty'] .reminder-items {
+  display: none;
+}
+
 .reminder-empty {
   font-size: calc(var(--font-sm) - 0.0625rem);
   color: var(--subtext);

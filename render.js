@@ -1535,6 +1535,7 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
 
       const listSection = document.createElement('section');
       listSection.className = 'reminder-list-section';
+      listSection.dataset.state = 'empty';
       listSection.innerHTML = `
         <h3>${escapeHtml(T.remindersUpcoming)}</h3>
         <div class="reminder-empty" data-reminder-empty>${escapeHtml(
@@ -1555,13 +1556,22 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
         reminderEntryCache = new Map(sorted.map((entry) => [entry.key, entry]));
         if (!listEl) return;
         listEl.innerHTML = '';
-        if (!sorted.length) {
-          if (emptyEl) emptyEl.hidden = false;
+        const hasItems = sorted.length > 0;
+        if (!hasItems) {
+          if (emptyEl) {
+            emptyEl.hidden = false;
+            emptyEl.setAttribute('aria-hidden', 'false');
+          }
           listEl.hidden = true;
+          listSection.dataset.state = 'empty';
           return;
         }
-        if (emptyEl) emptyEl.hidden = true;
+        if (emptyEl) {
+          emptyEl.hidden = true;
+          emptyEl.setAttribute('aria-hidden', 'true');
+        }
         listEl.hidden = false;
+        listSection.dataset.state = 'has-items';
         sorted.forEach((entry) => {
           const li = document.createElement('li');
           li.dataset.key = entry.key;
