@@ -18,6 +18,13 @@ import {
   resetReminderFormState,
   updateReminderFormState,
 } from './reminder-form-state.js';
+import {
+  REMINDER_MODE_NONE,
+  REMINDER_MODE_DATETIME,
+  REMINDER_MODE_MINUTES,
+  parseReminderInput,
+  hasReminderPayload,
+} from './reminder-input.js';
 
 const T = Tlt;
 // Hook future English localisation: fill T.en when translations are ready.
@@ -25,9 +32,6 @@ T.en = T.en || {};
 
 const DEFAULT_TITLE = 'Admin skydelis';
 
-const REMINDER_MODE_NONE = 'none';
-const REMINDER_MODE_DATETIME = 'datetime';
-const REMINDER_MODE_MINUTES = 'minutes';
 const REMINDER_SNOOZE_MINUTES = 5;
 const REMINDER_QUICK_MINUTES = [5, 10, 15, 30];
 const NOTE_DEFAULT_COLOR = '#fef08a';
@@ -297,75 +301,6 @@ function parseIframe(html) {
   const height = heightAttr ? parseInt(heightAttr, 10) : undefined;
 
   return { src, height };
-}
-
-function parseReminderInput(data = {}) {
-  const rawMode =
-    typeof data.reminderMode === 'string' ? data.reminderMode : '';
-  let mode;
-  if (rawMode === REMINDER_MODE_MINUTES || rawMode === REMINDER_MODE_DATETIME) {
-    mode = rawMode;
-  } else if (rawMode === REMINDER_MODE_NONE) {
-    mode = REMINDER_MODE_NONE;
-  }
-  if (!mode) {
-    if (
-      (typeof data.reminderAt === 'string' && data.reminderAt) ||
-      Number.isFinite(data.reminderAt)
-    ) {
-      mode = REMINDER_MODE_DATETIME;
-    } else if (
-      Number.isFinite(data.reminderMinutes) &&
-      data.reminderMinutes > 0
-    ) {
-      mode = REMINDER_MODE_MINUTES;
-    } else {
-      mode = REMINDER_MODE_NONE;
-    }
-  }
-
-  let reminderMinutes = 0;
-  if (mode === REMINDER_MODE_MINUTES) {
-    const minutesVal = Number.parseInt(data.reminderMinutes, 10);
-    if (Number.isFinite(minutesVal) && minutesVal > 0) {
-      reminderMinutes = Math.max(0, Math.round(minutesVal));
-    } else if (
-      Number.isFinite(data.reminderMinutes) &&
-      data.reminderMinutes > 0
-    ) {
-      reminderMinutes = Math.max(0, Math.round(data.reminderMinutes));
-    }
-    if (reminderMinutes <= 0) {
-      reminderMinutes = 0;
-      mode = REMINDER_MODE_NONE;
-    }
-  }
-
-  let reminderAt = null;
-  if (mode === REMINDER_MODE_DATETIME) {
-    let parsed = NaN;
-    if (typeof data.reminderAt === 'string') {
-      const raw = data.reminderAt.trim();
-      if (raw) parsed = Date.parse(raw);
-    } else if (Number.isFinite(data.reminderAt)) {
-      parsed = data.reminderAt;
-    }
-    if (Number.isFinite(parsed)) {
-      reminderAt = Math.round(parsed);
-    } else {
-      mode = REMINDER_MODE_NONE;
-    }
-  }
-
-  return { mode, reminderMinutes, reminderAt };
-}
-
-function hasReminderPayload(data = {}) {
-  return (
-    Object.prototype.hasOwnProperty.call(data, 'reminderMode') ||
-    Object.prototype.hasOwnProperty.call(data, 'reminderMinutes') ||
-    Object.prototype.hasOwnProperty.call(data, 'reminderAt')
-  );
 }
 
 function normaliseReminderState() {
