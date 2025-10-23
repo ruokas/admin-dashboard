@@ -2,6 +2,7 @@ import { load, save, seed } from './storage.js';
 import { render, updateEditingUI, toSheetEmbed } from './render.js';
 import { SIZE_MAP, sizeFromWidth, sizeFromHeight } from './sizes.js';
 import {
+  remindersDialog,
   groupFormDialog,
   itemFormDialog,
   chartFormDialog,
@@ -772,10 +773,47 @@ function setRemindersCardTitle(title) {
 }
 
 function openReminders() {
-  if (state.remindersCard?.enabled && focusReminderCard()) {
+  const entries = buildReminderEntries().sort((a, b) => a.at - b.at);
+  if (!state.remindersCard?.enabled && entries.length === 0) {
+    alert(T.reminderCardMissing);
     return;
   }
-  alert(T.reminderCardMissing);
+  return remindersDialog(T, entries, async (action, key, meta = {}) => {
+    if (!action) return null;
+    if (action === 'remove') {
+      clearReminder(key);
+      const idx = entries.findIndex((entry) => entry.key === key);
+      if (idx >= 0) entries.splice(idx, 1);
+      return { removed: true };
+    }
+    if (action === 'snooze') {
+      const minutes = Number.isFinite(Number(meta?.minutes))
+        ? Number(meta.minutes)
+        : REMINDER_SNOOZE_MINUTES;
+      const newAt = snoozeReminder(key, minutes);
+      if (Number.isFinite(newAt)) {
+        const target = entries.find((entry) => entry.key === key);
+        if (target) target.at = newAt;
+        persistState();
+        renderAll();
+        return { at: newAt };
+      }
+      return { error: true };
+    }
+    if (action === 'edit') {
+      const entry = entries.find((item) => item.key === key);
+      if (!entry) return { error: true };
+      await editReminder(entry);
+      return { edited: true };
+    }
+    if (action === 'quick') {
+      const minutes = Number.isFinite(Number(meta?.minutes))
+        ? Number(meta.minutes)
+        : REMINDER_SNOOZE_MINUTES;
+      return createQuickReminder(minutes);
+    }
+    return null;
+  });
 }
 
 /**
