@@ -64,8 +64,9 @@ export function remindersDialog(T, entries = [], onAction = () => {}) {
       if (!action) return;
       const li = btn.closest('li');
       const key = li?.dataset.key;
-      if (!key) return;
-      const result = await onAction(action, key);
+      if (!key && action !== 'quick') return;
+      const meta = { ...btn.dataset };
+      const result = await onAction(action, key, meta);
       const shouldRemove =
         result?.removed || (action === 'remove' && result !== false);
       if (shouldRemove) {
