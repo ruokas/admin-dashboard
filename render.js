@@ -1053,13 +1053,37 @@ function escapeHtml(str) {
   );
 }
 
-function createEmptyState(iconHtml, text) {
+function createEmptyState(iconHtml, text, action) {
   const wrapper = document.createElement('div');
   wrapper.className = 'empty-state';
   wrapper.innerHTML = `
     <div class="empty-state__icon" aria-hidden="true">${iconHtml || ''}</div>
     <p class="empty-state__text">${escapeHtml(text || '')}</p>
   `;
+  if (
+    action &&
+    typeof action.actionLabel === 'string' &&
+    action.actionLabel.trim() !== '' &&
+    typeof action.onAction === 'function'
+  ) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'empty-state__action';
+    button.textContent = action.actionLabel;
+    button.addEventListener('click', (event) => {
+      try {
+        const result = action.onAction(event);
+        if (result && typeof result.then === 'function') {
+          result.catch((err) =>
+            console.error('empty-state action failed', err),
+          );
+        }
+      } catch (err) {
+        console.error('empty-state action failed', err);
+      }
+    });
+    wrapper.appendChild(button);
+  }
   return wrapper;
 }
 
@@ -1973,7 +1997,28 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
 
     if (filteredItems.length === 0) {
       const emptyMessage = q ? T.noMatches : T.empty;
-      const empty = createEmptyState(I.clipboard, emptyMessage);
+      const emptyAction =
+        editing && typeof handlers?.addItem === 'function'
+          ? {
+              actionLabel: T.addItem,
+              onAction: () => {
+                // Allow adding items straight from the empty state while editing.
+                const result = handlers.addItem(g.id);
+                if (result && typeof result.then === 'function') {
+                  return result
+                    .then(() =>
+                      render(state, editing, T, I, handlers, saveFn),
+                    )
+                    .catch((err) => {
+                      console.error('Failed to add item from empty state', err);
+                    });
+                }
+                render(state, editing, T, I, handlers, saveFn);
+                return null;
+              },
+            }
+          : undefined;
+      const empty = createEmptyState(I.clipboard, emptyMessage, emptyAction);
       itemsScroll.appendChild(empty);
     } else {
       filteredItems.forEach((it) => {
