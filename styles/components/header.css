@@ -44,6 +44,35 @@ header > .title {
   width: 100%;
 }
 
+#remindersBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1-5);
+  position: relative;
+}
+
+#remindersBtn .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.reminder-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding: 0 var(--space-1);
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--btn-accent-text);
+  font-size: var(--font-xs);
+  font-weight: 600;
+  line-height: 1;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+
 .title h1 {
   margin: 0;
   font-size: clamp(18px, 3.5vw, var(--font-xl));
