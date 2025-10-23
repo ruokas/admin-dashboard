@@ -1417,28 +1417,21 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
       form.className = 'reminder-form';
       form.setAttribute('data-reminder-form', '1');
       form.innerHTML = `
-        <label>
-          <span>${escapeHtml(T.reminderName)}</span>
-          <input name="title" placeholder="${escapeHtml(
-            T.reminderNamePH || ''
-          )}" autocomplete="off">
-        </label>
-        <label>
-          <span>${escapeHtml(T.reminderMode)}</span>
-          <select name="reminderMode">
-            <option value="minutes">${escapeHtml(T.reminderAfter)}</option>
-            <option value="datetime">${escapeHtml(T.reminderExactTime)}</option>
-          </select>
-        </label>
-        <div class="reminder-form-section" data-reminder-section="minutes">
-          <label>
-            <span>${escapeHtml(T.reminderMinutes)}</span>
-            <input name="reminderMinutes" type="number" min="1" step="1">
+        <div class="reminder-form-fields">
+          <label class="reminder-field reminder-field--full" data-reminder-field="title">
+            <span>${escapeHtml(T.reminderName)}</span>
+            <input name="title" placeholder="${escapeHtml(
+              T.reminderNamePH || ''
+            )}" autocomplete="off">
           </label>
-          <div class="reminder-quick-fill" data-reminder-quick-fill></div>
-        </div>
-        <div class="reminder-form-section" data-reminder-section="datetime">
-          <label>
+          <div class="reminder-form-row">
+            <label class="reminder-field" data-reminder-field="minutes">
+              <span>${escapeHtml(T.reminderMinutes)}</span>
+              <input name="reminderMinutes" type="number" min="1" step="1">
+            </label>
+            <div class="reminder-quick-fill" data-reminder-quick-fill></div>
+          </div>
+          <label class="reminder-field reminder-field--full" data-reminder-field="datetime">
             <span>${escapeHtml(T.reminderExactTime)}</span>
             <input name="reminderAt" type="datetime-local">
           </label>
@@ -1468,7 +1461,6 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
         : { editingId: null, values: null, error: '' };
       const values = formState?.values || {};
       form.title.value = values.title || '';
-      form.reminderMode.value = values.reminderMode || 'minutes';
       form.reminderMinutes.value = values.reminderMinutes || '';
       form.reminderAt.value = values.reminderAt || '';
       const errorEl = form.querySelector('[data-reminder-error]');
@@ -1492,22 +1484,31 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
         if (cancelBtn) cancelBtn.hidden = true;
         form.classList.remove('is-editing');
       }
-      const updateMode = () => {
-        const mode = form.reminderMode.value || 'minutes';
-        form
-          .querySelectorAll('[data-reminder-section]')
-          .forEach((section) => {
-            section.hidden = section.dataset.reminderSection !== mode;
-          });
+      const setActiveMode = (mode) => {
+        const next = mode === 'datetime' ? 'datetime' : 'minutes';
+        form.setAttribute('data-active-mode', next);
       };
-      updateMode();
-      form.reminderMode.addEventListener('change', updateMode);
+      const initialMode = values.reminderMode
+        ? values.reminderMode
+        : values.reminderAt
+          ? 'datetime'
+          : 'minutes';
+      setActiveMode(initialMode);
+      form.reminderMinutes.addEventListener('input', () => {
+        if (form.reminderMinutes.value) setActiveMode('minutes');
+      });
+      form.reminderAt.addEventListener('input', () => {
+        if (form.reminderAt.value) setActiveMode('datetime');
+      });
       quickFill?.addEventListener('click', (event) => {
         const btn = event.target.closest('button[data-minutes]');
         if (!btn) return;
-        form.reminderMode.value = 'minutes';
         form.reminderMinutes.value = btn.dataset.minutes || '';
-        updateMode();
+        setActiveMode('minutes');
+        form.reminderMinutes.dispatchEvent(new Event('input', { bubbles: true }));
+        if (typeof form.reminderMinutes.focus === 'function') {
+          form.reminderMinutes.focus();
+        }
       });
       quickButtons.addEventListener('click', (event) => {
         const btn = event.target.closest('button[data-minutes]');
@@ -1516,12 +1517,12 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
         if (Number.isFinite(minutes) && reminderHandlers.quick) {
           reminderHandlers.quick(minutes);
         }
+        setActiveMode('minutes');
       });
       form.addEventListener('submit', (event) => {
         event.preventDefault();
         if (typeof reminderHandlers.submit === 'function') {
           const payload = Object.fromEntries(new FormData(form));
-          payload.reminderMode = payload.reminderMode || 'minutes';
           reminderHandlers.submit(payload);
         }
       });
@@ -1556,9 +1557,11 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
         listEl.innerHTML = '';
         if (!sorted.length) {
           if (emptyEl) emptyEl.hidden = false;
+          listEl.hidden = true;
           return;
         }
         if (emptyEl) emptyEl.hidden = true;
+        listEl.hidden = false;
         sorted.forEach((entry) => {
           const li = document.createElement('li');
           li.dataset.key = entry.key;
