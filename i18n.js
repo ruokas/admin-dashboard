@@ -69,6 +69,9 @@ export const Tlt = {
   deleteGroup: 'Pašalinti grupę',
   deleteNotes: 'Pašalinti pastabų kortelę',
   empty: 'Nėra įrašų. Spauskite ＋, kad pridėtumėte nuorodą ar įterpimą.',
+  emptyGroups:
+    'Dar nėra sukurtų grupių. Įjunkite redagavimą ir sukurkite pirmą kortelę.',
+  emptyGroupsAction: 'Pridėti pirmą grupę',
   noMatches: 'Nėra atitikmenų šioje grupėje.',
   itemType: 'Įrašo tipas',
   groupName: 'Grupės pavadinimas (pvz., „Kasdieniai darbai“, „Gairės“)',
@@ -100,4 +103,27 @@ export const Tlt = {
   sizeSm: 'Mažas',
   sizeMd: 'Vidutinis',
   sizeLg: 'Didelis',
+  help: 'Pagalba',
+  helpTitle: 'Spartus naudojimo gidas',
+  helpIntro: 'Kelios gairės, kaip greitai pradėti dirbti su skydeliu.',
+  helpQuickTitle: 'Dažniausi veiksmai',
+  helpQuickItems: [
+    'Paspauskite „Redaguoti“, kad įjungtumėte kortelių tvarkymą.',
+    'Sukurkite grupes (pvz., „Pamaina“, „Formos“) ir įrašus su nuorodomis ar įterpimais.',
+    'Korteles galite tempti ir keisti jų dydį – laikykite Shift, kad pažymėtumėte kelias.',
+    'Įjunkite priminimų kortelę ir naudokite laikmačius dažniausioms užduotims.',
+  ],
+  helpShortcutsTitle: 'Klaviatūros trumpiniai',
+  helpShortcuts: [
+    '/: Fokusuoja paiešką',
+    'Ctrl + K: Įjungia pridėjimo meniu',
+    '?: Atidaro pagalbos langą',
+  ],
+  helpTipsTitle: 'Papildomi patarimai',
+  helpTips: [
+    'Eksportuokite JSON failą prieš dalindamiesi skydeliu – turėsite atsarginę kopiją.',
+    'Tema keičiama viršuje esančiu mėnulio/saulės mygtuku.',
+  ],
+  helpClose: 'Uždaryti',
+  searchClear: 'Išvalyti paiešką',
 };

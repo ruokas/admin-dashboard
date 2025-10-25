@@ -11,6 +11,7 @@ Statinis vieno failo HTML projektas, skirtas publikuoti per **GitHub Pages**.
 3. Naudokite klaviatūros trumpinius:
    - `/` – akimirksniu fokusuoja paieškos lauką.
    - `Ctrl+K` (`⌘K` Mac) – įjungia redagavimą ir atidaro **Pridėti** meniu.
+   - `?` – atidaro trumpą pagalbos langą su gidu.
 
 ## Funkcijos
 
@@ -32,6 +33,9 @@ Statinis vieno failo HTML projektas, skirtas publikuoti per **GitHub Pages**.
 - Priminimų skydelis leidžia peržiūrėti ir atšaukti aktyvius priminimus.
 - Redagavimo režime galima pridėti priminimų kortelę su vizualiais laikmačiais,
   greitais +5/+10/+15/+30 min. mygtukais ir individualių priminimų sąrašu.
+- Viršuje veikia **Pagalbos** mygtukas ir `?` klavišas – trumpa instrukcija ir dažniausi veiksmai viename lange.
+- Paieškos lauke yra aiškus „Išvalyti“ mygtukas, leidžiantis akimirksniu pradėti naują paiešką.
+- Jei grupių dar nėra, rodoma tuščio puslapio būsena su mygtuku „Pridėti pirmą grupę“.
 
 ## Priminimai ir privatumas
 

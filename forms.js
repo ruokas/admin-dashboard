@@ -9,6 +9,132 @@ function escapeHtml(str = '') {
     .replace(/'/g, '&#39;');
 }
 
+function toArray(value, fallback = []) {
+  if (Array.isArray(value) && value.length) return value;
+  return fallback;
+}
+
+function parseShortcutEntry(entry) {
+  if (typeof entry !== 'string') return null;
+  const [keysPart, descPart] = entry.split(':');
+  if (!keysPart || !descPart) return null;
+  const keys = keysPart
+    .split('+')
+    .map((k) => k.trim())
+    .filter(Boolean);
+  if (!keys.length) return null;
+  const description = descPart.trim();
+  if (!description) return null;
+  return { keys, description };
+}
+
+export function helpDialog(T) {
+  return new Promise((resolve) => {
+    const prevFocus = document.activeElement;
+    const dlg = document.createElement('dialog');
+    dlg.classList.add('help-dialog');
+
+    const title = T.helpTitle || 'Spartus naudojimo gidas';
+    const intro = T.helpIntro ||
+      'Kelios gairės, kaip greitai pradėti dirbti su skydeliu.';
+    const quickItems = toArray(T.helpQuickItems, [
+      'Paspauskite „Redaguoti“, kad įjungtumėte kortelių tvarkymą.',
+      'Sukurkite grupes (pvz., „Pamaina“, „Formos“) ir įrašus su nuorodomis ar įterpimais.',
+      'Korteles galite tempti ir keisti jų dydį – laikykite Shift, kad pažymėtumėte kelias.',
+      'Įjunkite priminimų kortelę ir naudokite laikmačius dažniausioms užduotims.',
+    ]);
+    const shortcutEntries = toArray(T.helpShortcuts, [
+      '/: Fokusuoja paiešką',
+      'Ctrl + K: Įjungia pridėjimo meniu',
+      '?: Atidaro pagalbos langą',
+    ]);
+    const shortcuts = shortcutEntries
+      .map((entry) => parseShortcutEntry(entry))
+      .filter(Boolean);
+    const tips = toArray(T.helpTips, [
+      'Eksportuokite JSON failą prieš dalindamiesi skydeliu – turėsite atsarginę kopiją.',
+      'Tema keičiama viršuje esančiu mėnulio/saulės mygtuku.',
+    ]);
+    const quickHtml = quickItems
+      .map((item) => `<li>${escapeHtml(item)}</li>`)
+      .join('');
+    const shortcutsHtml = shortcuts
+      .map((entry) => {
+        const keysHtml = entry.keys
+          .map((key) => `<kbd>${escapeHtml(key)}</kbd>`)
+          .join('<span class="help-dialog__shortcut-plus">+</span>');
+        return `<li class="help-dialog__shortcut"><span class="help-dialog__shortcut-keys">${keysHtml}</span><span class="help-dialog__shortcut-desc">${escapeHtml(entry.description)}</span></li>`;
+      })
+      .join('');
+    const tipsHtml = tips
+      .map((item) => `<li>${escapeHtml(item)}</li>`)
+      .join('');
+
+    const quickSection = quickItems.length
+      ? `<section class="help-dialog__section"><h3 class="help-dialog__section-title">${escapeHtml(
+          T.helpQuickTitle || 'Dažniausi veiksmai',
+        )}</h3><ol class="help-dialog__list help-dialog__list--numbered">${quickHtml}</ol></section>`
+      : '';
+    const shortcutSection = shortcuts.length
+      ? `<section class="help-dialog__section"><h3 class="help-dialog__section-title">${escapeHtml(
+          T.helpShortcutsTitle || 'Klaviatūros trumpiniai',
+        )}</h3><ul class="help-dialog__shortcuts">${shortcutsHtml}</ul></section>`
+      : '';
+    const tipsSection = tips.length
+      ? `<section class="help-dialog__section"><h3 class="help-dialog__section-title">${escapeHtml(
+          T.helpTipsTitle || 'Papildomi patarimai',
+        )}</h3><ul class="help-dialog__list help-dialog__list--bullets">${tipsHtml}</ul></section>`
+      : '';
+
+    const closeLabel = T.helpClose || T.cancel || 'Uždaryti';
+    const iconHtml = I.help || '';
+
+    dlg.innerHTML = `<form method="dialog" class="help-dialog__form" id="helpDialogForm"><div class="help-dialog__header"><h2 class="help-dialog__title" id="helpDialogLabel"><span class="help-dialog__title-icon" aria-hidden="true">${iconHtml}</span>${escapeHtml(
+      title,
+    )}</h2><p class="help-dialog__intro">${escapeHtml(intro)}</p></div><div class="help-dialog__sections">${
+      quickSection + shortcutSection + tipsSection
+    }</div><menu><button type="submit" class="btn-outline" data-act="close">${escapeHtml(
+      closeLabel,
+    )}</button></menu></form>`;
+
+    dlg.setAttribute('aria-modal', 'true');
+    dlg.setAttribute('aria-labelledby', 'helpDialogLabel');
+    document.body.appendChild(dlg);
+    const form = dlg.querySelector('form');
+    const closeBtn = form.querySelector('[data-act="close"]');
+
+    function cleanup() {
+      form.removeEventListener('submit', submit);
+      closeBtn?.removeEventListener('click', close);
+      dlg.removeEventListener('cancel', close);
+      dlg.remove();
+      prevFocus?.focus();
+      resolve();
+    }
+
+    function close() {
+      dlg.close();
+      cleanup();
+    }
+
+    function submit(e) {
+      e.preventDefault();
+      close();
+    }
+
+    form.addEventListener('submit', submit);
+    closeBtn?.addEventListener('click', (event) => {
+      event.preventDefault();
+      close();
+    });
+    dlg.addEventListener('cancel', close);
+    dlg.showModal();
+    if (closeBtn instanceof HTMLElement) {
+      closeBtn.focus();
+    }
+  });
+}
+
 function formatDateTime(ts) {
   try {
     return new Date(ts).toLocaleString('lt-LT').replace(',', '');
