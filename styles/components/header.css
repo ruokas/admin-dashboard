@@ -180,6 +180,8 @@ header > .title {
   position: relative;
   --search-icon-offset: var(--space-4);
   --search-icon-size: calc(var(--space-4) + var(--space-1));
+  --search-clear-size: 28px;
+  --search-clear-gap: var(--space-2);
 }
 
 .search input {
@@ -193,11 +195,15 @@ header > .title {
   padding-inline-start: calc(
       var(--search-icon-offset) + var(--search-icon-size) + var(--space-2)
     );
-  padding-inline-end: calc(var(--space-3) + var(--space-2));
+  padding-inline-end: calc(
+      var(--search-clear-size) + var(--search-clear-gap) + var(--space-1)
+    );
   padding-left: calc(
       var(--search-icon-offset) + var(--search-icon-size) + var(--space-2)
     );
-  padding-right: calc(var(--space-3) + var(--space-2));
+  padding-right: calc(
+      var(--search-clear-size) + var(--search-clear-gap) + var(--space-1)
+    );
   outline: none;
   transition:
     border-color 0.2s,
@@ -218,6 +224,50 @@ header > .title {
   transform: translateY(-50%);
   opacity: 0.6;
   pointer-events: none;
+}
+
+.search .search-clear {
+  position: absolute;
+  inset-inline-end: var(--search-clear-gap);
+  top: 50%;
+  transform: translateY(-50%);
+  width: var(--search-clear-size);
+  height: var(--search-clear-size);
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--subtext);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.search .search-clear:hover,
+.search .search-clear:focus-visible {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.theme-light .search .search-clear:hover,
+.theme-light .search .search-clear:focus-visible {
+  background: rgba(12, 17, 22, 0.08);
+}
+
+.search .search-clear:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.search .search-clear[hidden] {
+  display: none;
+}
+
+.search .search-clear .icon {
+  width: 16px;
+  height: 16px;
 }
 
 @media (min-width: 600px) {

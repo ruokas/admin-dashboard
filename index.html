@@ -48,6 +48,9 @@
             placeholder="Paieška nuorodose…"
             aria-keyshortcuts="/"
           />
+          <button id="searchClear" class="search-clear" type="button" hidden>
+            <span class="sr-only">Išvalyti</span>
+          </button>
         </div>
         <div id="addMenu" data-open="0" data-editing-visible>
           <button
@@ -90,6 +93,14 @@
       </div>
       <div class="secondary-actions" data-zone="secondary-actions">
         <!-- Fallback labels so buttons are visible before JS initializes -->
+        <button
+          id="helpBtn"
+          class="btn-outline"
+          type="button"
+          aria-keyshortcuts="?"
+        >
+          Pagalba
+        </button>
         <button id="editBtn" class="btn-outline" type="button">
           Redaguoti
         </button>

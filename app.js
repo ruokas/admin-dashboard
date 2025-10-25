@@ -8,6 +8,7 @@ import {
   chartFormDialog,
   confirmDialog as confirmDlg,
   notesDialog,
+  helpDialog,
 } from './forms.js';
 import { I } from './icons.js';
 import { Tlt } from './i18n.js';
@@ -102,6 +103,8 @@ const addMenu = document.getElementById('addMenu');
 const addMenuList = document.getElementById('addMenuList');
 const addBtn = document.getElementById('addBtn');
 const addMenuBackdrop = addMenu?.querySelector('[data-menu-backdrop]') ?? null;
+const helpBtn = document.getElementById('helpBtn');
+const searchClearBtn = document.getElementById('searchClear');
 
 if (addMenu && !addMenu.dataset.open) {
   addMenu.dataset.open = '0';
@@ -142,6 +145,14 @@ pageIconEl.addEventListener('input', () => {
 });
 
 const uid = () => crypto.randomUUID().slice(0, 8);
+
+const openHelp = () => helpDialog(T);
+
+const updateSearchClearVisibility = () => {
+  if (!searchClearBtn) return;
+  const hasValue = Boolean(searchEl?.value?.trim());
+  searchClearBtn.hidden = !hasValue;
+};
 
 function prefersReducedMotion() {
   return (
@@ -802,6 +813,8 @@ function renderAll() {
     T,
     I,
     {
+      addGroup: () => addGroup(),
+      beginAddGroup: () => beginAddGroupFlow(),
       addItem,
       editGroup,
       editItem,
@@ -880,6 +893,16 @@ async function addGroup() {
   state.groups.push(group);
   persistState();
   renderAll();
+}
+
+function beginAddGroupFlow() {
+  if (editing) {
+    addGroup();
+    return;
+  }
+  editing = true;
+  updateUI();
+  setTimeout(() => addGroup(), 0);
 }
 
 async function editGroup(gid) {
@@ -1328,6 +1351,17 @@ document.addEventListener('keydown', (event) => {
   }
 
   if (
+    (event.key === '?' || (event.shiftKey && key === '/')) &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.altKey
+  ) {
+    event.preventDefault();
+    openHelp();
+    return;
+  }
+
+  if (
     (event.ctrlKey || event.metaKey) &&
     !event.altKey &&
     key === 'k'
@@ -1369,6 +1403,13 @@ document.getElementById('fileInput').addEventListener('change', (e) => {
   e.target.value = '';
 });
 
+if (helpBtn) {
+  helpBtn.innerHTML = `${I.help} <span>${T.help}</span>`;
+  helpBtn.setAttribute('aria-label', `${T.help} (?)`);
+  helpBtn.title = `${T.help} (?)`;
+  helpBtn.addEventListener('click', () => openHelp());
+}
+
 reminders = createReminderManager();
 if (remindersBtn) {
   remindersBtn.innerHTML = `${I.clock} <span>${T.reminders}</span>`;
@@ -1385,12 +1426,30 @@ if (searchLabelEl) searchLabelEl.textContent = T.searchLabel;
 debouncedSearchRender = scheduleRender(() => renderAll());
 searchEl.setAttribute('aria-label', T.searchLabel);
 searchEl.placeholder = T.searchPH;
+searchEl.addEventListener('focus', () => updateSearchClearVisibility());
 searchEl.addEventListener('input', () => {
+  updateSearchClearVisibility();
   debouncedSearchRender();
 });
 searchEl.addEventListener('change', () => {
+  updateSearchClearVisibility();
   debouncedSearchRender.flush();
 });
+if (searchClearBtn) {
+  searchClearBtn.innerHTML = `${I.close}<span class="sr-only">${T.searchClear}</span>`;
+  searchClearBtn.setAttribute('aria-label', T.searchClear);
+  searchClearBtn.title = T.searchClear;
+  searchClearBtn.addEventListener('click', () => {
+    searchEl.value = '';
+    updateSearchClearVisibility();
+    if (typeof debouncedSearchRender?.cancel === 'function') {
+      debouncedSearchRender.cancel();
+    }
+    renderAll();
+    searchEl.focus();
+  });
+  updateSearchClearVisibility();
+}
 
 applyTheme();
 applyColor();

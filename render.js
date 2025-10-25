@@ -1244,6 +1244,40 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
       return groupMap.get(id);
     })
     .filter(Boolean);
+  const hasAnyGroups = Array.isArray(state.groups) && state.groups.length > 0;
+  const hasRemindersCard = Boolean(state.remindersCard?.enabled);
+
+  if (!hasAnyGroups && !hasRemindersCard) {
+    groupsEl.classList.add('is-empty');
+    const performAddGroup = () => {
+      if (typeof handlers?.beginAddGroup === 'function') {
+        handlers.beginAddGroup();
+        return;
+      }
+      if (typeof handlers?.addGroup === 'function') {
+        handlers.addGroup();
+      }
+    };
+    const emptyMessage =
+      T.emptyGroups ||
+      T.empty ||
+      'Dar nėra sukurtų grupių. Įjunkite redagavimą ir sukurkite pirmą kortelę.';
+    const emptyAction =
+      typeof handlers?.beginAddGroup === 'function' ||
+      typeof handlers?.addGroup === 'function'
+        ? {
+            actionLabel: T.emptyGroupsAction || T.addGroup || 'Pridėti grupę',
+            onAction: () => performAddGroup(),
+          }
+        : undefined;
+    const emptyState = createEmptyState(I.folder, emptyMessage, emptyAction);
+    fragment.appendChild(emptyState);
+    groupsEl.replaceChildren(fragment);
+    cleanupCardRegistry(new Set());
+    return;
+  }
+
+  groupsEl.classList.remove('is-empty');
   allGroups.forEach((g) => {
     if (g.id === 'reminders') {
       const reminderHandlers = handlers.reminders || {};

@@ -143,3 +143,26 @@ body {
   font-size: 28px;
   line-height: 1;
 }
+
+kbd {
+  font-family: inherit;
+  font-size: 0.85em;
+  line-height: 1.4;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.75em;
+  padding: 0 var(--space-1);
+  border-radius: var(--space-1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.25);
+  text-transform: uppercase;
+}
+
+.theme-light kbd {
+  border-color: rgba(12, 17, 22, 0.18);
+  background: rgba(12, 17, 22, 0.08);
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.35);
+}

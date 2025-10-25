@@ -57,4 +57,6 @@ export const I = {
     '<svg class="icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
   video:
     '<svg class="icon" viewBox="0 0 24 24"><rect x="1" y="5" width="15" height="14" rx="2"/><path d="m23 7-7 5 7 5V7z"/></svg>',
+  help:
+    '<svg class="icon" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 2.5-3 4"/><path d="M12 17h.01"/></svg>',
 };
