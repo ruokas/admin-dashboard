@@ -90,6 +90,28 @@ function applySizeMetadata(target, width, height) {
   return meta;
 }
 
+function escapeHtml(str = '') {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function parseShortcutEntry(entry) {
+  if (typeof entry !== 'string') return null;
+  const [keysPart, descPart] = entry.split(':');
+  if (!keysPart || !descPart) return null;
+  const keys = keysPart
+    .split('+')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const description = descPart.trim();
+  if (!keys.length || !description) return null;
+  return { keys, description };
+}
+
 const editBtn = document.getElementById('editBtn');
 // const syncStatus = document.getElementById('syncStatus'); // Sheets sync indikatorius (išjungta)
 const searchEl = document.getElementById('q');
@@ -105,6 +127,12 @@ const addBtn = document.getElementById('addBtn');
 const addMenuBackdrop = addMenu?.querySelector('[data-menu-backdrop]') ?? null;
 const helpBtn = document.getElementById('helpBtn');
 const searchClearBtn = document.getElementById('searchClear');
+const headerHintsEl = document.getElementById('headerHints');
+const headerHintsListEl = document.getElementById('headerHintsList');
+const headerHintsTitleEl = document.getElementById('headerHintsTitle');
+const headerHintsToggleEl = document.getElementById('headerHintsToggle');
+
+const HEADER_HINTS_STORAGE_KEY = 'ed_dash_hints_collapsed';
 
 if (addMenu && !addMenu.dataset.open) {
   addMenu.dataset.open = '0';
@@ -144,6 +172,9 @@ pageIconEl.addEventListener('input', () => {
   persistState();
 });
 
+renderHeaderHints();
+headerHintsToggleEl?.addEventListener('click', handleHeaderHintsToggle);
+
 const uid = () => crypto.randomUUID().slice(0, 8);
 
 const openHelp = () => helpDialog(T);
@@ -153,6 +184,75 @@ const updateSearchClearVisibility = () => {
   const hasValue = Boolean(searchEl?.value?.trim());
   searchClearBtn.hidden = !hasValue;
 };
+
+function getHeaderHintEntries() {
+  // Jei reikia kitų trumpinių – papildykite `T.headerHints` sąrašą (`i18n.js`).
+  const fallback = [
+    '/: Fokusuoja paiešką',
+    'Ctrl + K: Pridėti naują kortelę',
+    '?: Pagalbos langas',
+  ];
+  const source = Array.isArray(T.headerHints) && T.headerHints.length
+    ? T.headerHints
+    : fallback;
+  return source.map((entry) => parseShortcutEntry(entry)).filter(Boolean);
+}
+
+function setHeaderHintsCollapsed(collapsed) {
+  if (!headerHintsEl) return;
+  headerHintsEl.dataset.collapsed = collapsed ? '1' : '0';
+  if (headerHintsToggleEl) {
+    headerHintsToggleEl.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    const label = collapsed
+      ? T.headerHintsToggleShow || 'Rodyti patarimus'
+      : T.headerHintsToggleHide || 'Slėpti patarimus';
+    const icon = collapsed ? I.chevronDown : I.chevronUp;
+    headerHintsToggleEl.innerHTML = `${icon}<span>${escapeHtml(label)}</span>`;
+    headerHintsToggleEl.setAttribute('aria-label', label);
+    headerHintsToggleEl.title = label;
+  }
+  if (collapsed) {
+    localStorage.setItem(HEADER_HINTS_STORAGE_KEY, '1');
+  } else {
+    localStorage.removeItem(HEADER_HINTS_STORAGE_KEY);
+  }
+}
+
+function renderHeaderHints() {
+  if (!headerHintsEl) return;
+  const entries = getHeaderHintEntries();
+  if (!entries.length) {
+    headerHintsEl.hidden = true;
+    return;
+  }
+  headerHintsEl.hidden = false;
+  const title = T.headerHintsTitle || T.helpShortcutsTitle || 'Greiti trumpiniai';
+  headerHintsEl.setAttribute('aria-label', title);
+  if (headerHintsTitleEl) {
+    headerHintsTitleEl.textContent = title;
+  }
+  if (headerHintsListEl) {
+    const plusHtml = '<span class="header-hints__plus" aria-hidden="true">+</span>';
+    headerHintsListEl.innerHTML = entries
+      .map(({ keys, description }) => {
+        const keysHtml = keys
+          .map((key) => `<kbd>${escapeHtml(key)}</kbd>`)
+          .join(plusHtml);
+        return `<li><span class="header-hints__keys">${keysHtml}</span><span class="header-hints__desc">${escapeHtml(
+          description,
+        )}</span></li>`;
+      })
+      .join('');
+  }
+  const collapsed = localStorage.getItem(HEADER_HINTS_STORAGE_KEY) === '1';
+  setHeaderHintsCollapsed(collapsed);
+}
+
+function handleHeaderHintsToggle() {
+  if (!headerHintsEl) return;
+  const isCollapsed = headerHintsEl.dataset.collapsed === '1';
+  setHeaderHintsCollapsed(!isCollapsed);
+}
 
 function prefersReducedMotion() {
   return (

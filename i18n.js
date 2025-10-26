@@ -1,6 +1,14 @@
 export const Tlt = {
   searchPH: 'Paieška nuorodose…',
   searchLabel: 'Paieška',
+  headerHintsTitle: 'Greiti trumpiniai',
+  headerHintsToggleHide: 'Slėpti patarimus',
+  headerHintsToggleShow: 'Rodyti patarimus',
+  headerHints: [
+    '/: Paieška',
+    'Ctrl + K: Pridėti naują kortelę',
+    '?: Pagalbos langas',
+  ],
   add: 'Pridėti',
   addGroup: 'Pridėti grupę',
   addChart: 'Pridėti grafiką',

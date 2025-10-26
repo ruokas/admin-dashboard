@@ -35,6 +35,7 @@ Statinis vieno failo HTML projektas, skirtas publikuoti per **GitHub Pages**.
   greitais +5/+10/+15/+30 min. mygtukais ir individualių priminimų sąrašu.
 - Viršuje veikia **Pagalbos** mygtukas ir `?` klavišas – trumpa instrukcija ir dažniausi veiksmai viename lange.
 - Paieškos lauke yra aiškus „Išvalyti“ mygtukas, leidžiantis akimirksniu pradėti naują paiešką.
+- Virš antraštės veikia „Greiti trumpiniai“ juosta su `/`, `Ctrl+K`, `?` patarimais – ją galima paslėpti, nustatymas išsaugomas naršyklėje.
 - Jei grupių dar nėra, rodoma tuščio puslapio būsena su mygtuku „Pridėti pirmą grupę“.
 
 ## Priminimai ir privatumas
