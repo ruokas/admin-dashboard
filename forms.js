@@ -223,25 +223,90 @@ export function remindersDialog(T, entries = [], onAction = () => {}) {
 
 export function groupFormDialog(T, data = {}) {
   return new Promise((resolve) => {
+    const HEX_COLOR_RE = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
+    const DEFAULT_GROUP_COLOR = '#f97316';
+
+    function expandHex(hex) {
+      if (!HEX_COLOR_RE.test(hex)) return null;
+      const lower = hex.toLowerCase();
+      if (lower.length === 4) {
+        return (
+          '#' +
+          lower
+            .slice(1)
+            .split('')
+            .map((ch) => ch + ch)
+            .join('')
+        );
+      }
+      return lower;
+    }
+
+    function hexToRgb(hex) {
+      const normalized = expandHex(hex);
+      if (!normalized) return null;
+      return {
+        r: Number.parseInt(normalized.slice(1, 3), 16),
+        g: Number.parseInt(normalized.slice(3, 5), 16),
+        b: Number.parseInt(normalized.slice(5, 7), 16),
+      };
+    }
+
+    function toHexChannel(n) {
+      return Math.max(0, Math.min(255, Math.round(n)))
+        .toString(16)
+        .padStart(2, '0');
+    }
+
+    function mixHex(base, target, ratio) {
+      const src = hexToRgb(base);
+      const dst = hexToRgb(target);
+      if (!src || !dst) return base;
+      const clampRatio = Math.max(0, Math.min(1, Number(ratio)));
+      const r = src.r + (dst.r - src.r) * clampRatio;
+      const g = src.g + (dst.g - src.g) * clampRatio;
+      const b = src.b + (dst.b - src.b) * clampRatio;
+      return `#${toHexChannel(r)}${toHexChannel(g)}${toHexChannel(b)}`;
+    }
+
+    function normalizeHex(hex, fallback = DEFAULT_GROUP_COLOR) {
+      const expanded = expandHex(hex);
+      if (expanded) return expanded;
+      if (HEX_COLOR_RE.test(hex)) return hex.toLowerCase();
+      return fallback;
+    }
+
+    function makeAutoGradient(hex) {
+      const normalized = expandHex(hex);
+      if (!normalized) {
+        return `linear-gradient(135deg, ${hex}, ${hex})`;
+      }
+      const bright = mixHex(normalized, '#ffffff', 0.38);
+      const mid = mixHex(normalized, '#ffffff', 0.12);
+      const deep = mixHex(normalized, '#000000', 0.18);
+      return `linear-gradient(135deg, ${bright}, ${mid}, ${deep})`;
+    }
+
     const paletteColors = [
-      { value: '#f1f5f9', label: 'Švelni pilka' },
-      { value: '#e0f2fe', label: 'Rami mėlyna' },
-      { value: '#e9d5ff', label: 'Levandų violetinė' },
-      { value: '#fce7f3', label: 'Pastelinė rožinė' },
-      { value: '#fef3c7', label: 'Šilta gelsva' },
-      { value: '#dcfce7', label: 'Švelni žalia' },
-      { value: '#f5f3ff', label: 'Šviesi alyvinė' },
-      { value: '#ffe4e6', label: 'Švelni koralinė' },
+      { value: DEFAULT_GROUP_COLOR, label: 'Ryški oranžinė' },
+      { value: '#ef4444', label: 'Sodri raudona' },
+      { value: '#ec4899', label: 'Ryški avietinė' },
+      { value: '#a855f7', label: 'Sodri violetinė' },
+      { value: '#6366f1', label: 'Gilus mėlynas' },
+      { value: '#22d3ee', label: 'Ryški žydra' },
+      { value: '#34d399', label: 'Sodri žalia' },
+      { value: '#facc15', label: 'Ryški gelsva' },
     ];
     const prevFocus = document.activeElement;
     const dlg = document.createElement('dialog');
     const paletteButtons = paletteColors
-      .map(
-        (c) =>
-          `<button type="button" data-color="${c.value}" style="--swatch:${c.value}" aria-label="${escapeHtml(
-            c.label,
-          )}" aria-pressed="false"></button>`,
-      )
+      .map((c) => {
+        const norm = normalizeHex(c.value);
+        const gradient = makeAutoGradient(norm);
+        return `<button type="button" data-color="${norm}" style="--swatch:${norm};--swatch-gradient:${gradient}" aria-label="${escapeHtml(
+          c.label,
+        )}" aria-pressed="false"></button>`;
+      })
       .join('');
     dlg.innerHTML = `<form method="dialog" id="groupForm" class="group-form">
       <header class="group-form__header">
@@ -249,7 +314,7 @@ export function groupFormDialog(T, data = {}) {
           T.groupDialogTitle || 'Nauja kortelė',
         )}</h2>
         <p class="group-form__description">${escapeHtml(
-          T.groupDialogDescription || 'Sukurkite kortelę, parinkite jai spalvą ir dydį.',
+          T.groupDialogDescription || 'Sukurkite kortelę ir parinkite ryškią spalvą.',
         )}</p>
       </header>
       <label class="group-form__field">
@@ -262,7 +327,7 @@ export function groupFormDialog(T, data = {}) {
             T.groupColor,
           )}</span>
           <span class="group-form__hint">${escapeHtml(
-            T.groupPaletteLabel || 'Švelni paletė',
+            T.groupPaletteLabel || 'Ryški gradiento paletė',
           )}</span>
         </div>
         <div class="group-form__color">
@@ -273,41 +338,24 @@ export function groupFormDialog(T, data = {}) {
             <span class="group-form__custom-label">${escapeHtml(
               T.groupColorCustom || 'Pasirinktinė spalva',
             )}</span>
-            <input name="color" type="color" value="#6ee7b7" aria-label="${escapeHtml(
+            <input name="color" type="color" value="${DEFAULT_GROUP_COLOR}" aria-label="${escapeHtml(
               T.groupColorCustom || 'Pasirinktinė spalva',
             )}">
           </label>
         </div>
       </section>
-      <fieldset class="group-form__field">
-        <legend class="group-form__label">${escapeHtml(T.groupSize)}</legend>
-        <div class="group-form__sizes" role="radiogroup">
-          <label class="group-form__size">
-            <input type="radio" name="size" value="sm">
-            <span>${escapeHtml(T.sizeSm)}</span>
-          </label>
-          <label class="group-form__size">
-            <input type="radio" name="size" value="md">
-            <span>${escapeHtml(T.sizeMd)}</span>
-          </label>
-          <label class="group-form__size">
-            <input type="radio" name="size" value="lg">
-            <span>${escapeHtml(T.sizeLg)}</span>
-          </label>
-        </div>
-      </fieldset>
       <div class="group-form__preview" aria-hidden="true">
         <span class="group-form__preview-label">${escapeHtml(
           T.preview || 'Peržiūra',
         )}</span>
-        <div class="group-form__preview-card" data-size="md">
+        <div class="group-form__preview-card">
           <div class="group-form__preview-dot"></div>
           <div class="group-form__preview-content">
             <span class="group-form__preview-title">${escapeHtml(
               T.groupPreviewPlaceholder || 'Kortelė',
             )}</span>
             <span class="group-form__preview-sub">${escapeHtml(
-              T.groupDialogDescription || 'Sukurkite kortelę, parinkite jai spalvą ir dydį.',
+              T.groupDialogDescription || 'Sukurkite kortelę ir parinkite ryškią spalvą.',
             )}</span>
           </div>
         </div>
@@ -324,21 +372,15 @@ export function groupFormDialog(T, data = {}) {
     const form = dlg.querySelector('form');
     const err = dlg.querySelector('#groupErr');
     const cancel = form.querySelector('[data-act="cancel"]');
-    const defaultColor = data.color || '#6ee7b7';
-    const initialSize = data.size || 'md';
+    const defaultColor = normalizeHex(data.color || DEFAULT_GROUP_COLOR);
     form.name.value = data.name || '';
     form.color.value = defaultColor;
-    form.size.value = initialSize;
     const palette = Array.from(
       dlg.querySelectorAll('.group-form__palette button[data-color]'),
     );
     const previewCard = dlg.querySelector('.group-form__preview-card');
     const previewTitle = dlg.querySelector('.group-form__preview-title');
     const previewSub = dlg.querySelector('.group-form__preview-sub');
-    const sizeInputs = Array.from(form.querySelectorAll('input[name="size"]'));
-    sizeInputs.forEach((input) => {
-      input.checked = input.value === initialSize;
-    });
 
     function updatePaletteSelection(value) {
       palette.forEach((btn) => {
@@ -347,34 +389,27 @@ export function groupFormDialog(T, data = {}) {
       });
     }
 
-    function updateSizeSelection() {
-      sizeInputs.forEach((input) => {
-        const label = input.closest('.group-form__size');
-        if (!label) return;
-        label.classList.toggle('group-form__size--selected', input.checked);
-      });
-    }
-
     function updatePreview() {
       if (!previewCard) return;
-      const color = form.color.value || '#6ee7b7';
+      const color = normalizeHex(form.color.value || DEFAULT_GROUP_COLOR);
+      const gradient = makeAutoGradient(color);
       previewCard.style.setProperty('--group-accent', color);
+      previewCard.style.setProperty('--group-accent-gradient', gradient);
       const name = form.name.value.trim();
       if (previewTitle) {
         previewTitle.textContent = name || (T.groupPreviewPlaceholder || 'Kortelė');
       }
       if (previewSub) {
         previewSub.textContent = T.groupDialogDescription ||
-          'Sukurkite kortelę, parinkite jai spalvą ir dydį.';
+          'Sukurkite kortelę ir parinkite ryškią spalvą.';
       }
-      previewCard.dataset.size = form.size.value || 'md';
-      updateSizeSelection();
     }
 
     function applyColor(value) {
       if (!value) return;
-      form.color.value = value;
-      updatePaletteSelection(value);
+      const normalized = normalizeHex(value);
+      form.color.value = normalized;
+      updatePaletteSelection(normalized);
       updatePreview();
     }
 
@@ -416,19 +451,13 @@ export function groupFormDialog(T, data = {}) {
       updatePreview();
     }
 
-    function handleSizeChange() {
-      updatePreview();
-    }
-
     paletteContainer?.addEventListener('click', handlePaletteClick);
     paletteContainer?.addEventListener('keydown', handlePaletteKeydown);
     form.color.addEventListener('input', handleColorInput);
     form.name.addEventListener('input', handleNameInput);
-    sizeInputs.forEach((input) => input.addEventListener('change', handleSizeChange));
 
     updatePaletteSelection(defaultColor);
     updatePreview();
-    updateSizeSelection();
 
     function cleanup() {
       form.removeEventListener('submit', submit);
@@ -437,7 +466,6 @@ export function groupFormDialog(T, data = {}) {
       paletteContainer?.removeEventListener('keydown', handlePaletteKeydown);
       form.color.removeEventListener('input', handleColorInput);
       form.name.removeEventListener('input', handleNameInput);
-      sizeInputs.forEach((input) => input.removeEventListener('change', handleSizeChange));
       dlg.remove();
       prevFocus?.focus();
     }
@@ -449,7 +477,8 @@ export function groupFormDialog(T, data = {}) {
         err.textContent = T.required;
         return;
       }
-      resolve({ name, color: form.color.value, size: form.size.value });
+      const normalized = normalizeHex(form.color.value || DEFAULT_GROUP_COLOR);
+      resolve({ name, color: normalized });
       cleanup();
     }
 

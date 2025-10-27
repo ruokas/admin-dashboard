@@ -334,23 +334,35 @@ dialog form {
   width: 40px;
   height: 40px;
   border-radius: var(--space-2);
-  border: 1px solid var(--border);
+  border: 1px solid color-mix(in srgb, var(--swatch, var(--accent)) 30%, transparent);
   background: var(--swatch, var(--surface));
+  background-image: var(
+    --swatch-gradient,
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--swatch, var(--accent)) 65%, white),
+      color-mix(in srgb, var(--swatch, var(--accent)) 90%, transparent)
+    )
+  );
+  background-size: 180% 180%;
+  background-position: center;
   cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .group-form__palette button[aria-pressed='true'] {
-  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent);
+  box-shadow: 0 0 0 2px var(--surface),
+    0 0 0 4px color-mix(in srgb, var(--swatch, var(--accent)) 65%, transparent);
 }
 
 .group-form__palette button:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid color-mix(in srgb, var(--swatch, var(--accent)) 70%, var(--accent));
   outline-offset: 2px;
 }
 
 .group-form__palette button:hover {
   transform: translateY(-1px);
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--swatch, var(--accent)) 35%, transparent);
 }
 
 .group-form__custom-color {
@@ -373,41 +385,6 @@ dialog form {
   padding: 0;
 }
 
-.group-form__sizes {
-  display: flex;
-  gap: var(--space-1);
-}
-
-.group-form__size {
-  flex: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-1);
-  padding: var(--space-1-5) var(--space-2);
-  border: 1px solid var(--border);
-  border-radius: var(--space-2);
-  cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
-}
-
-.group-form__size input {
-  appearance: none;
-  width: 0;
-  height: 0;
-  margin: 0;
-}
-
-.group-form__size span {
-  font-size: var(--font-sm);
-}
-
-.group-form__size--selected {
-  border-color: var(--accent);
-  background: var(--surface-raised);
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-}
-
 .group-form__preview {
   display: grid;
   gap: var(--space-1);
@@ -422,24 +399,24 @@ dialog form {
 
 .group-form__preview-card {
   --group-accent: var(--accent);
+  --group-accent-gradient: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--group-accent) 65%, white),
+    color-mix(in srgb, var(--group-accent) 90%, transparent)
+  );
   display: grid;
   grid-template-columns: auto 1fr;
   gap: var(--space-2);
   align-items: center;
   padding: var(--space-2);
   border-radius: var(--space-2);
-  background: var(--surface-raised);
-  border: 1px solid var(--border);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--group-accent) 20%, transparent);
-}
-
-.group-form__preview-card[data-size='sm'] {
-  transform: scale(0.95);
-  opacity: 0.9;
-}
-
-.group-form__preview-card[data-size='lg'] {
-  transform: scale(1.03);
+  background: var(--group-accent);
+  background-image: var(--group-accent-gradient);
+  background-size: 200% 200%;
+  border: 1px solid color-mix(in srgb, var(--group-accent) 45%, transparent);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--group-accent) 40%, transparent),
+    0 12px 24px -18px color-mix(in srgb, var(--group-accent) 45%, transparent);
 }
 
 .group-form__preview-dot {
@@ -447,6 +424,9 @@ dialog form {
   height: 16px;
   border-radius: 50%;
   background: var(--group-accent);
+  background-image: var(--group-accent-gradient);
+  background-size: 160% 160%;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--group-accent) 35%, transparent);
 }
 
 .group-form__preview-content {
