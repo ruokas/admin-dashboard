@@ -519,6 +519,7 @@ export function itemFormDialog(T, data = {}) {
     const formSubtitle = escapeHtml(
       T.itemFormSubtitle || 'Įveskite nuorodos duomenis.',
     );
+    const resolvedType = data.type || 'link';
     dlg.innerHTML = `<form method="dialog" id="itemForm">
       <header class="item-form__header">
         <h2 class="item-form__title" id="itemFormLabel">${formTitle}</h2>
@@ -528,15 +529,6 @@ export function itemFormDialog(T, data = {}) {
         <label class="item-form__field item-form__field--full">
           <span class="item-form__label">${escapeHtml(T.itemTitle)}</span>
           <input name="title" required>
-        </label>
-        <label class="item-form__field item-form__field--full">
-          <span class="item-form__label">${escapeHtml(T.itemType)}</span>
-          <select name="type">
-            <option value="link">${escapeHtml(T.itemTypeLink || 'Nuoroda')}</option>
-            <option value="sheet">${escapeHtml(T.itemTypeSheet || 'Skaičiuoklė')}</option>
-            <option value="chart">${escapeHtml(T.itemTypeChart || 'Grafikas')}</option>
-            <option value="embed">${escapeHtml(T.itemTypeEmbed || 'Įterptas turinys')}</option>
-          </select>
         </label>
         <label class="item-form__field item-form__field--full">
           <span class="item-form__label">${escapeHtml(T.itemUrl)}</span>
@@ -574,7 +566,6 @@ export function itemFormDialog(T, data = {}) {
     const cancel = form.querySelector('[data-act="cancel"]');
     const picker = form.querySelector('.icon-picker');
     const iconInput = form.icon;
-    form.type.value = data.type || 'link';
     form.title.value = data.title || '';
     form.url.value = data.url || '';
     iconInput.value = data.icon || '';
@@ -617,6 +608,7 @@ export function itemFormDialog(T, data = {}) {
     function submit(e) {
       e.preventDefault();
       const formData = Object.fromEntries(new FormData(form));
+      formData.type = resolvedType;
       formData.title = formData.title.trim();
       formData.url = formData.url.trim();
       formData.icon = formData.icon.trim();
