@@ -528,10 +528,10 @@ export function itemFormDialog(T, data = {}) {
         <label class="item-form__field">
           <span class="item-form__label">${escapeHtml(T.itemType)}</span>
           <select name="type">
-            <option value="link">link</option>
-            <option value="sheet">sheet</option>
-            <option value="chart">chart</option>
-            <option value="embed">embed</option>
+            <option value="link">${escapeHtml(T.itemTypeLink || 'Nuoroda')}</option>
+            <option value="sheet">${escapeHtml(T.itemTypeSheet || 'Skaičiuoklė')}</option>
+            <option value="chart">${escapeHtml(T.itemTypeChart || 'Grafikas')}</option>
+            <option value="embed">${escapeHtml(T.itemTypeEmbed || 'Įterptas turinys')}</option>
           </select>
         </label>
         <label class="item-form__field">
