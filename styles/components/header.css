@@ -84,8 +84,8 @@ header > .title {
 .page-icon-action .page-icon-action-label {
   position: absolute;
   inset-inline-start: 50%;
-  bottom: calc(100% + var(--space-1));
-  transform: translate(-50%, 4px);
+  top: calc(100% + var(--space-1));
+  transform: translate(-50%, -4px);
   padding: var(--space-1) var(--space-2);
   border-radius: var(--space-2);
   background: rgba(8, 13, 18, 0.92);
@@ -103,11 +103,11 @@ header > .title {
   content: '';
   position: absolute;
   inset-inline-start: 50%;
-  top: 100%;
+  bottom: 100%;
   transform: translateX(-50%);
-  border-width: 6px 6px 0 6px;
+  border-width: 0 6px 6px 6px;
   border-style: solid;
-  border-color: rgba(8, 13, 18, 0.92) transparent transparent transparent;
+  border-color: transparent transparent rgba(8, 13, 18, 0.92) transparent;
 }
 
 body.is-editing .page-icon-action:hover .page-icon-action-label,
@@ -153,7 +153,7 @@ body.is-editing .page-icon-action:focus-visible .page-icon-action-label {
 }
 
 .theme-light .page-icon-action .page-icon-action-label::after {
-  border-color: rgba(12, 17, 22, 0.92) transparent transparent transparent;
+  border-color: transparent transparent rgba(12, 17, 22, 0.92) transparent;
 }
 
 .primary-actions {
