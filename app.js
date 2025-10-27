@@ -38,6 +38,17 @@ const REMINDER_QUICK_MINUTES = [5, 10, 15, 30];
 const NOTE_DEFAULT_COLOR = '#fef08a';
 const NOTE_DEFAULT_FONT = 20;
 const NOTE_DEFAULT_PADDING = 20;
+const MAX_ICON_IMAGE_BYTES = 200 * 1024; // 200 KB
+const MAX_ICON_IMAGE_LENGTH = Math.ceil((MAX_ICON_IMAGE_BYTES / 3) * 4) + 512;
+const ICON_IMAGE_ACCEPT_PREFIX = 'data:image/';
+
+function sanitizeIconImage(value) {
+  if (typeof value !== 'string') return '';
+  const trimmed = value.trim();
+  if (!trimmed || !trimmed.startsWith(ICON_IMAGE_ACCEPT_PREFIX)) return '';
+  if (trimmed.length > MAX_ICON_IMAGE_LENGTH) return '';
+  return trimmed;
+}
 
 function formatDateTimeLocal(ts) {
   if (!Number.isFinite(ts)) return '';
@@ -105,6 +116,12 @@ const addBtn = document.getElementById('addBtn');
 const addMenuBackdrop = addMenu?.querySelector('[data-menu-backdrop]') ?? null;
 const helpBtn = document.getElementById('helpBtn');
 const searchClearBtn = document.getElementById('searchClear');
+const pageIconImageBtn = document.getElementById('pageIconImageBtn');
+const pageIconClearBtn = document.getElementById('pageIconClearBtn');
+const pageIconFileInput = document.getElementById('pageIconFile');
+let pageIconImageEl = null;
+
+applyPageIconActionLabels();
 
 if (addMenu && !addMenu.dataset.open) {
   addMenu.dataset.open = '0';
@@ -122,6 +139,10 @@ if (addBtn) {
 let state = load() || seed();
 if (!Array.isArray(state.groups)) state.groups = [];
 if (!state.title) state.title = DEFAULT_TITLE;
+if (typeof state.icon !== 'string') state.icon = '';
+if (typeof state.iconImage !== 'string') state.iconImage = '';
+state.iconImage = sanitizeIconImage(state.iconImage);
+if (state.iconImage) state.icon = '';
 let editing = false;
 let reminders;
 let debouncedSearchRender = null;
@@ -129,7 +150,7 @@ let debouncedSearchRender = null;
 normaliseReminderState();
 
 pageTitleEl.textContent = state.title;
-pageIconEl.textContent = state.icon || '';
+updatePageIconPresentation();
 document.title = state.title;
 
 pageTitleEl.addEventListener('input', () => {
@@ -140,9 +161,34 @@ pageTitleEl.addEventListener('input', () => {
 });
 pageIconEl.addEventListener('input', () => {
   if (!editing) return;
-  state.icon = pageIconEl.textContent.trim();
+  state.iconImage = '';
+  state.icon = pageIconEl.textContent.replace(/\s+/g, ' ').trim();
+  updatePageIconPresentation({ preserveTextSelection: true });
   persistState();
 });
+
+if (pageIconImageBtn && pageIconFileInput) {
+  pageIconImageBtn.addEventListener('click', () => {
+    if (!editing) return;
+    pageIconFileInput.click();
+  });
+}
+
+if (pageIconClearBtn) {
+  pageIconClearBtn.addEventListener('click', () => {
+    if (!editing) return;
+    state.icon = '';
+    state.iconImage = '';
+    pageIconEl.textContent = '';
+    updatePageIconPresentation();
+    persistState();
+    pageIconEl.focus();
+  });
+}
+
+if (pageIconFileInput) {
+  pageIconFileInput.addEventListener('change', (event) => handlePageIconFileSelection(event));
+}
 
 const uid = () => crypto.randomUUID().slice(0, 8);
 
@@ -153,6 +199,143 @@ const updateSearchClearVisibility = () => {
   const hasValue = Boolean(searchEl?.value?.trim());
   searchClearBtn.hidden = !hasValue;
 };
+
+function applyPageIconActionLabels() {
+  if (pageIconImageBtn) {
+    pageIconImageBtn.innerHTML = `${I.camera} <span class="page-icon-action-label">${T.pageIconImage}</span>`;
+    pageIconImageBtn.querySelector('svg')?.setAttribute('aria-hidden', 'true');
+  }
+  if (pageIconClearBtn) {
+    pageIconClearBtn.innerHTML = `${I.close} <span class="page-icon-action-label">${T.pageIconClear}</span>`;
+    pageIconClearBtn.querySelector('svg')?.setAttribute('aria-hidden', 'true');
+  }
+}
+
+function updatePageIconPresentation(options = {}) {
+  if (!pageIconEl) return;
+  const { preserveTextSelection = false } = options;
+  const placeholder = T.pageIconPlaceholder || '🖼';
+  pageIconEl.dataset.placeholder = placeholder;
+
+  const iconText = typeof state?.icon === 'string' ? state.icon.trim() : '';
+  const sanitizedImage = sanitizeIconImage(state?.iconImage || '');
+  if (state && state.iconImage !== sanitizedImage) {
+    state.iconImage = sanitizedImage;
+  }
+  const hasImage = Boolean(sanitizedImage);
+  const isEmpty = !hasImage && iconText === '';
+
+  pageIconEl.dataset.empty = isEmpty ? '1' : '0';
+  pageIconEl.classList.toggle('page-icon--image', hasImage);
+
+  if (hasImage) {
+    if (!pageIconImageEl) {
+      pageIconImageEl = document.createElement('img');
+      pageIconImageEl.decoding = 'async';
+      pageIconImageEl.loading = 'lazy';
+    }
+    const altText = T.pageIconImageAlt || T.pageIconImage || 'Puslapio piktograma';
+    if (pageIconImageEl.alt !== altText) pageIconImageEl.alt = altText;
+    if (pageIconImageEl.src !== sanitizedImage) {
+      pageIconImageEl.src = sanitizedImage;
+    }
+    if (pageIconEl.firstChild !== pageIconImageEl) {
+      pageIconEl.textContent = '';
+      pageIconEl.appendChild(pageIconImageEl);
+    }
+    pageIconEl.setAttribute('role', 'img');
+    pageIconEl.setAttribute('aria-hidden', 'false');
+    pageIconEl.setAttribute('aria-label', altText);
+  } else {
+    if (pageIconImageEl?.parentNode === pageIconEl) {
+      pageIconImageEl.remove();
+    }
+    if (!preserveTextSelection) {
+      pageIconEl.textContent = iconText;
+    }
+    pageIconEl.removeAttribute('role');
+    pageIconEl.removeAttribute('aria-label');
+    pageIconEl.setAttribute('aria-hidden', 'true');
+  }
+
+  const canEditText = Boolean(editing) && !hasImage;
+  pageIconEl.contentEditable = canEditText ? 'true' : 'false';
+
+  const imageHint = T.pageIconImageHint || '';
+  const editHint = T.pageIconEditHint || '';
+  if (editing) {
+    pageIconEl.title = hasImage ? imageHint : editHint;
+  } else if (hasImage && imageHint) {
+    pageIconEl.title = imageHint;
+  } else {
+    pageIconEl.removeAttribute('title');
+  }
+
+  if (pageIconImageBtn) {
+    const label = T.pageIconImageAria || T.pageIconImage || 'Paveikslėlis';
+    pageIconImageBtn.disabled = !editing;
+    pageIconImageBtn.setAttribute('aria-label', label);
+    pageIconImageBtn.title = T.pageIconImage || '';
+    pageIconImageBtn.setAttribute('aria-disabled', editing ? 'false' : 'true');
+  }
+
+  if (pageIconClearBtn) {
+    const clearLabel = T.pageIconClearAria || T.pageIconClear || 'Pašalinti';
+    pageIconClearBtn.hidden = isEmpty;
+    pageIconClearBtn.disabled = !editing;
+    pageIconClearBtn.setAttribute('aria-label', clearLabel);
+    pageIconClearBtn.title = T.pageIconClear || '';
+    pageIconClearBtn.setAttribute('aria-disabled', editing ? 'false' : 'true');
+  }
+}
+
+function handlePageIconFileSelection(event) {
+  const input = event?.target;
+  if (!editing) {
+    if (input) input.value = '';
+    return;
+  }
+  const file = input?.files?.[0];
+  if (!file) {
+    if (input) input.value = '';
+    return;
+  }
+  if (!file.type?.startsWith('image/')) {
+    alert(T.pageIconImageInvalid || 'Pasirinkite paveikslėlio failą.');
+    input.value = '';
+    return;
+  }
+  if (file.size > MAX_ICON_IMAGE_BYTES) {
+    alert(T.pageIconImageTooLarge || 'Paveikslėlis per didelis (maks. 200 KB).');
+    input.value = '';
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    const result = reader.result;
+    if (typeof result === 'string' && result.startsWith(ICON_IMAGE_ACCEPT_PREFIX)) {
+      const sanitized = sanitizeIconImage(result);
+      if (!sanitized) {
+        alert(T.pageIconImageTooLarge || 'Paveikslėlis per didelis (maks. 200 KB).');
+        return;
+      }
+      state.iconImage = sanitized;
+      state.icon = '';
+      updatePageIconPresentation();
+      persistState();
+    } else {
+      alert(T.pageIconImageInvalid || T.pageIconImageError || 'Nepavyko įkelti paveikslėlio.');
+    }
+  };
+  reader.onerror = () => {
+    alert(T.pageIconImageError || 'Nepavyko įkelti paveikslėlio.');
+  };
+  reader.onloadend = () => {
+    if (input) input.value = '';
+  };
+  reader.readAsDataURL(file);
+}
 
 function prefersReducedMotion() {
   return (
@@ -860,12 +1043,17 @@ function updateUI() {
   }
   updateEditingUI(editing, state, T, I, renderAll);
   pageTitleEl.contentEditable = editing;
-  pageIconEl.contentEditable = editing;
   if (!editing) {
     state.title = pageTitleEl.textContent.trim();
-    state.icon = pageIconEl.textContent.trim();
+    if (!state.iconImage) {
+      state.icon = pageIconEl.textContent.trim();
+    }
     document.title = state.title;
+    updatePageIconPresentation({ preserveTextSelection: false });
     persistState();
+  } else {
+    const preserveSelection = document.activeElement === pageIconEl;
+    updatePageIconPresentation({ preserveTextSelection: preserveSelection });
   }
 }
 
@@ -1159,9 +1347,11 @@ function importJson(file) {
       state.title = importedTitle || DEFAULT_TITLE;
       const importedIcon =
         typeof state.icon === 'string' ? state.icon.trim() : '';
-      state.icon = importedIcon;
+      const importedIconImage = sanitizeIconImage(state.iconImage || '');
+      state.iconImage = importedIconImage;
+      state.icon = importedIconImage ? '' : importedIcon;
       pageTitleEl.textContent = state.title || DEFAULT_TITLE;
-      pageIconEl.textContent = state.icon || '';
+      updatePageIconPresentation();
       document.title = state.title || DEFAULT_TITLE;
       persistState();
       renderAll();

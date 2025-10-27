@@ -25,6 +25,90 @@ header > .title {
   flex-wrap: wrap;
 }
 
+.page-icon-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.page-icon-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+}
+
+.page-icon-action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--space-3);
+  border: 1px dashed var(--muted);
+  background: transparent;
+  color: var(--subtext);
+  font-size: var(--font-xs);
+  font-weight: 600;
+  line-height: 1.2;
+  box-shadow: none;
+  transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
+}
+
+.page-icon-action:hover,
+.page-icon-action:focus-visible {
+  border-style: solid;
+  border-color: var(--accent);
+  color: var(--text);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.page-icon-action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.page-icon-action svg {
+  width: 16px;
+  height: 16px;
+}
+
+.page-icon-action .page-icon-action-label {
+  line-height: 1.2;
+}
+
+.page-icon-action--remove {
+  border-color: rgba(255, 255, 255, 0.18);
+  color: var(--danger);
+}
+
+.page-icon-action--remove:hover,
+.page-icon-action--remove:focus-visible {
+  border-color: var(--danger);
+  background: rgba(255, 107, 107, 0.12);
+  color: var(--btn-danger-text);
+}
+
+.theme-light .page-icon-action {
+  border-color: rgba(12, 17, 22, 0.18);
+  color: var(--subtext);
+}
+
+.theme-light .page-icon-action:hover,
+.theme-light .page-icon-action:focus-visible {
+  background: rgba(12, 17, 22, 0.06);
+}
+
+.theme-light .page-icon-action--remove {
+  border-color: rgba(12, 17, 22, 0.18);
+  color: var(--danger);
+}
+
+.theme-light .page-icon-action--remove:hover,
+.theme-light .page-icon-action--remove:focus-visible {
+  background: rgba(216, 58, 58, 0.12);
+}
+
 .primary-actions {
   grid-area: primary;
   display: flex;
