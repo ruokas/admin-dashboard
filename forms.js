@@ -223,18 +223,95 @@ export function remindersDialog(T, entries = [], onAction = () => {}) {
 
 export function groupFormDialog(T, data = {}) {
   return new Promise((resolve) => {
+    const paletteColors = [
+      { value: '#f1f5f9', label: 'Švelni pilka' },
+      { value: '#e0f2fe', label: 'Rami mėlyna' },
+      { value: '#e9d5ff', label: 'Levandų violetinė' },
+      { value: '#fce7f3', label: 'Pastelinė rožinė' },
+      { value: '#fef3c7', label: 'Šilta gelsva' },
+      { value: '#dcfce7', label: 'Švelni žalia' },
+      { value: '#f5f3ff', label: 'Šviesi alyvinė' },
+      { value: '#ffe4e6', label: 'Švelni koralinė' },
+    ];
     const prevFocus = document.activeElement;
     const dlg = document.createElement('dialog');
-    dlg.innerHTML = `<form method="dialog" id="groupForm">
-      <label id="groupFormLabel">${T.groupName}<br><input name="name" required></label>
-      <label>${T.groupColor}<br><input name="color" type="color" value="#6ee7b7"></label>
-      <label>${T.groupSize}<br>
-        <select name="size">
-          <option value="sm">${T.sizeSm}</option>
-          <option value="md">${T.sizeMd}</option>
-          <option value="lg">${T.sizeLg}</option>
-        </select>
+    const paletteButtons = paletteColors
+      .map(
+        (c) =>
+          `<button type="button" data-color="${c.value}" style="--swatch:${c.value}" aria-label="${escapeHtml(
+            c.label,
+          )}" aria-pressed="false"></button>`,
+      )
+      .join('');
+    dlg.innerHTML = `<form method="dialog" id="groupForm" class="group-form">
+      <header class="group-form__header">
+        <h2 id="groupFormLabel">${escapeHtml(
+          T.groupDialogTitle || 'Nauja kortelė',
+        )}</h2>
+        <p class="group-form__description">${escapeHtml(
+          T.groupDialogDescription || 'Sukurkite kortelę, parinkite jai spalvą ir dydį.',
+        )}</p>
+      </header>
+      <label class="group-form__field">
+        <span class="group-form__label">${escapeHtml(T.groupName)}</span>
+        <input name="name" required placeholder="pvz., „Pamaina“" autocomplete="off">
       </label>
+      <section class="group-form__field" aria-labelledby="groupColorLabel">
+        <div class="group-form__label-row">
+          <span id="groupColorLabel" class="group-form__label">${escapeHtml(
+            T.groupColor,
+          )}</span>
+          <span class="group-form__hint">${escapeHtml(
+            T.groupPaletteLabel || 'Švelni paletė',
+          )}</span>
+        </div>
+        <div class="group-form__color">
+          <div class="group-form__palette" role="listbox" aria-labelledby="groupColorLabel">
+            ${paletteButtons}
+          </div>
+          <label class="group-form__custom-color">
+            <span class="group-form__custom-label">${escapeHtml(
+              T.groupColorCustom || 'Pasirinktinė spalva',
+            )}</span>
+            <input name="color" type="color" value="#6ee7b7" aria-label="${escapeHtml(
+              T.groupColorCustom || 'Pasirinktinė spalva',
+            )}">
+          </label>
+        </div>
+      </section>
+      <fieldset class="group-form__field">
+        <legend class="group-form__label">${escapeHtml(T.groupSize)}</legend>
+        <div class="group-form__sizes" role="radiogroup">
+          <label class="group-form__size">
+            <input type="radio" name="size" value="sm">
+            <span>${escapeHtml(T.sizeSm)}</span>
+          </label>
+          <label class="group-form__size">
+            <input type="radio" name="size" value="md">
+            <span>${escapeHtml(T.sizeMd)}</span>
+          </label>
+          <label class="group-form__size">
+            <input type="radio" name="size" value="lg">
+            <span>${escapeHtml(T.sizeLg)}</span>
+          </label>
+        </div>
+      </fieldset>
+      <div class="group-form__preview" aria-hidden="true">
+        <span class="group-form__preview-label">${escapeHtml(
+          T.preview || 'Peržiūra',
+        )}</span>
+        <div class="group-form__preview-card" data-size="md">
+          <div class="group-form__preview-dot"></div>
+          <div class="group-form__preview-content">
+            <span class="group-form__preview-title">${escapeHtml(
+              T.groupPreviewPlaceholder || 'Kortelė',
+            )}</span>
+            <span class="group-form__preview-sub">${escapeHtml(
+              T.groupDialogDescription || 'Sukurkite kortelę, parinkite jai spalvą ir dydį.',
+            )}</span>
+          </div>
+        </div>
+      </div>
       <p class="error" id="groupErr" role="status" aria-live="polite"></p>
       <menu>
         <button type="button" data-act="cancel">${T.cancel}</button>
@@ -247,13 +324,120 @@ export function groupFormDialog(T, data = {}) {
     const form = dlg.querySelector('form');
     const err = dlg.querySelector('#groupErr');
     const cancel = form.querySelector('[data-act="cancel"]');
+    const defaultColor = data.color || '#6ee7b7';
+    const initialSize = data.size || 'md';
     form.name.value = data.name || '';
-    form.color.value = data.color || '#6ee7b7';
-    form.size.value = data.size || 'md';
+    form.color.value = defaultColor;
+    form.size.value = initialSize;
+    const palette = Array.from(
+      dlg.querySelectorAll('.group-form__palette button[data-color]'),
+    );
+    const previewCard = dlg.querySelector('.group-form__preview-card');
+    const previewTitle = dlg.querySelector('.group-form__preview-title');
+    const previewSub = dlg.querySelector('.group-form__preview-sub');
+    const sizeInputs = Array.from(form.querySelectorAll('input[name="size"]'));
+    sizeInputs.forEach((input) => {
+      input.checked = input.value === initialSize;
+    });
+
+    function updatePaletteSelection(value) {
+      palette.forEach((btn) => {
+        const selected = btn.dataset.color?.toLowerCase() === value.toLowerCase();
+        btn.setAttribute('aria-pressed', selected ? 'true' : 'false');
+      });
+    }
+
+    function updateSizeSelection() {
+      sizeInputs.forEach((input) => {
+        const label = input.closest('.group-form__size');
+        if (!label) return;
+        label.classList.toggle('group-form__size--selected', input.checked);
+      });
+    }
+
+    function updatePreview() {
+      if (!previewCard) return;
+      const color = form.color.value || '#6ee7b7';
+      previewCard.style.setProperty('--group-accent', color);
+      const name = form.name.value.trim();
+      if (previewTitle) {
+        previewTitle.textContent = name || (T.groupPreviewPlaceholder || 'Kortelė');
+      }
+      if (previewSub) {
+        previewSub.textContent = T.groupDialogDescription ||
+          'Sukurkite kortelę, parinkite jai spalvą ir dydį.';
+      }
+      previewCard.dataset.size = form.size.value || 'md';
+      updateSizeSelection();
+    }
+
+    function applyColor(value) {
+      if (!value) return;
+      form.color.value = value;
+      updatePaletteSelection(value);
+      updatePreview();
+    }
+
+    const paletteContainer = dlg.querySelector('.group-form__palette');
+
+    function handlePaletteClick(e) {
+      const btn = e.target.closest('button[data-color]');
+      if (!btn) return;
+      e.preventDefault();
+      applyColor(btn.dataset.color);
+      btn.focus();
+    }
+
+    function handlePaletteKeydown(e) {
+      if (!['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) {
+        return;
+      }
+      const current = document.activeElement;
+      const index = palette.indexOf(current);
+      if (index === -1) return;
+      e.preventDefault();
+      let nextIndex = index;
+      if (e.key === 'Home') nextIndex = 0;
+      else if (e.key === 'End') nextIndex = palette.length - 1;
+      else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') nextIndex = Math.min(palette.length - 1, index + 1);
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') nextIndex = Math.max(0, index - 1);
+      const next = palette[nextIndex];
+      next?.focus();
+      if (next?.dataset.color) {
+        applyColor(next.dataset.color);
+      }
+    }
+
+    function handleColorInput(e) {
+      applyColor(e.target.value);
+    }
+
+    function handleNameInput() {
+      updatePreview();
+    }
+
+    function handleSizeChange() {
+      updatePreview();
+    }
+
+    paletteContainer?.addEventListener('click', handlePaletteClick);
+    paletteContainer?.addEventListener('keydown', handlePaletteKeydown);
+    form.color.addEventListener('input', handleColorInput);
+    form.name.addEventListener('input', handleNameInput);
+    sizeInputs.forEach((input) => input.addEventListener('change', handleSizeChange));
+
+    updatePaletteSelection(defaultColor);
+    updatePreview();
+    updateSizeSelection();
 
     function cleanup() {
       form.removeEventListener('submit', submit);
       cancel.removeEventListener('click', close);
+      paletteContainer?.removeEventListener('click', handlePaletteClick);
+      paletteContainer?.removeEventListener('keydown', handlePaletteKeydown);
+      form.color.removeEventListener('input', handleColorInput);
+      form.name.removeEventListener('input', handleNameInput);
+      sizeInputs.forEach((input) => input.removeEventListener('change', handleSizeChange));
       dlg.remove();
       prevFocus?.focus();
     }
