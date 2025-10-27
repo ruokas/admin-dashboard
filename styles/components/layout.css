@@ -191,52 +191,49 @@ a.item {
 
 .icon-picker {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(56px, 1fr));
-  gap: var(--space-2);
+  grid-template-columns: repeat(auto-fit, minmax(44px, 1fr));
+  gap: var(--space-1-5);
   margin-top: var(--space-1);
-  max-width: none;
 }
 
 .icon-picker button {
-  width: 56px;
-  height: 56px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--surface-raised);
+  background: transparent;
   border: 1px solid var(--border-strong);
-  border-radius: var(--space-2);
+  border-radius: var(--space-1-5);
   cursor: pointer;
   color: var(--text);
-  transition: border-color 160ms ease, background 160ms ease,
-    transform 160ms ease;
+  transition: border-color 160ms ease, background 160ms ease;
 }
 
 .icon-picker button:hover,
 .icon-picker button:focus-visible {
   border-color: var(--accent);
-  background: rgba(16, 185, 129, 0.08);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
   outline: none;
 }
 
 .theme-light .icon-picker button:hover,
 .theme-light .icon-picker button:focus-visible {
-  background: rgba(14, 165, 233, 0.12);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 .icon-picker button.selected {
   border-color: var(--accent);
-  background: rgba(16, 185, 129, 0.12);
-  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
 .theme-light .icon-picker button.selected {
-  background: rgba(14, 165, 233, 0.18);
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .icon-picker svg {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
 }
 
 .embed {
@@ -283,18 +280,10 @@ dialog {
 }
 
 dialog.item-form-dialog {
-  width: min(640px, 92vw);
-  padding: clamp(var(--space-5), 4vw, var(--space-6));
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background:
-    linear-gradient(165deg, rgba(16, 185, 129, 0.12), transparent) var(--surface);
-  backdrop-filter: blur(10px);
-}
-
-.theme-light dialog.item-form-dialog {
-  border-color: rgba(12, 17, 22, 0.08);
-  background:
-    linear-gradient(165deg, rgba(14, 165, 233, 0.16), transparent) var(--surface);
+  width: min(560px, 92vw);
+  padding: clamp(var(--space-4), 4vw, var(--space-5));
+  max-height: min(88vh, 640px);
+  overflow: auto;
 }
 
 dialog.help-dialog {
@@ -311,7 +300,7 @@ dialog form {
 }
 
 dialog.item-form-dialog form {
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
 .group-form {
@@ -611,35 +600,25 @@ dialog.item-form-dialog .item-form__subtitle {
 
 dialog.item-form-dialog .item-form__grid {
   display: grid;
-  gap: var(--space-3);
+  gap: var(--space-2);
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
 dialog.item-form-dialog .item-form__field {
   display: grid;
   gap: var(--space-1);
-  padding: var(--space-2-5);
-  border-radius: var(--space-2);
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid transparent;
-  transition: border-color 160ms ease, box-shadow 160ms ease,
-    background 160ms ease;
 }
 
-.theme-light dialog.item-form-dialog .item-form__field {
-  background: rgba(12, 17, 22, 0.04);
-}
-
-dialog.item-form-dialog .item-form__field:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
-  background: var(--surface-raised);
+dialog.item-form-dialog .item-form__field:focus-within .item-form__label {
+  color: var(--accent);
 }
 
 dialog.item-form-dialog .item-form__label {
   font-weight: 600;
-  color: var(--text);
-  font-size: var(--font-sm);
+  color: var(--subtext-strong);
+  font-size: var(--font-xs);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 dialog.item-form-dialog .item-form__field--full {
@@ -649,10 +628,6 @@ dialog.item-form-dialog .item-form__field--full {
 dialog.item-form-dialog .item-form__actions {
   margin: 0;
   padding-top: var(--space-2);
-}
-
-dialog.item-form-dialog .item-form__actions .btn-outline {
-  border-color: var(--border-strong);
 }
 
 input:not([type='color']):not(.search-input),

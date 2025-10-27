@@ -517,7 +517,7 @@ export function itemFormDialog(T, data = {}) {
         : T.itemFormTitleCreate || T.addItem || 'Pridėti įrašą',
     );
     const formSubtitle = escapeHtml(
-      T.itemFormSubtitle || 'Užpildykite nuorodos detales ir pasirinkite ikoną.',
+      T.itemFormSubtitle || 'Įveskite nuorodos duomenis.',
     );
     dlg.innerHTML = `<form method="dialog" id="itemForm">
       <header class="item-form__header">

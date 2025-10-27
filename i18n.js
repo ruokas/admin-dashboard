@@ -97,7 +97,7 @@ export const Tlt = {
   itemNote: 'Pastaba (nebūtina)',
   itemFormTitleCreate: 'Naujas įrašas',
   itemFormTitleEdit: 'Redaguoti įrašą',
-  itemFormSubtitle: 'Užpildykite nuorodos informaciją ir pasirinkite ikoną.',
+  itemFormSubtitle: 'Įveskite nuorodos duomenis.',
   iconLabels: {
     none: 'Be piktogramos',
     globe: 'Interneto nuoroda',
