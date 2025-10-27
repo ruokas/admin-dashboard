@@ -475,36 +475,95 @@ export function itemFormDialog(T, data = {}) {
       'shield',
       'alert',
     ];
+    const iconLabels = {
+      none: 'Be piktogramos',
+      globe: 'Interneto nuoroda',
+      table: 'Lentelė',
+      chart: 'Diagrama',
+      puzzle: 'Integracija',
+      book: 'Gairės',
+      file: 'Dokumentas',
+      folder: 'Aplankas',
+      mail: 'El. paštas',
+      phone: 'Telefonas',
+      star: 'Svarbu',
+      home: 'Pagrindinis',
+      link: 'Nuoroda',
+      camera: 'Kamera',
+      calendar: 'Kalendorius',
+      clock: 'Laikmatis',
+      user: 'Kontaktas',
+      clipboard: 'Ataskaita',
+      chat: 'Pokalbis',
+      video: 'Vaizdo įrašas',
+      map: 'Žemėlapis',
+      shield: 'Sauga',
+      alert: 'Įspėjimas',
+      ...(T.iconLabels || {}),
+    };
     const iconButtons = iconKeys
-      .map(
-        (k) =>
-          `<button type="button" data-val="${k}" title="${k}">${I[k]}</button>`,
-      )
+      .map((k) => {
+        const label = escapeHtml(iconLabels[k] || k);
+        return `<button type="button" role="option" data-val="${k}" title="${label}" aria-label="${label}" aria-selected="false">${I[k]}</button>`;
+      })
       .join('');
     const prevFocus = document.activeElement;
     const dlg = document.createElement('dialog');
+    dlg.classList.add('item-form-dialog');
+    const isEditing = Boolean(data && Object.keys(data).length);
+    const formTitle = escapeHtml(
+      isEditing
+        ? T.itemFormTitleEdit || T.editItem || T.edit || 'Redaguoti įrašą'
+        : T.itemFormTitleCreate || T.addItem || 'Pridėti įrašą',
+    );
+    const formSubtitle = escapeHtml(
+      T.itemFormSubtitle || 'Užpildykite nuorodos detales ir pasirinkite ikoną.',
+    );
     dlg.innerHTML = `<form method="dialog" id="itemForm">
-      <label id="itemFormLabel">${T.itemType}<br>
-        <select name="type">
-          <option value="link">link</option>
-          <option value="sheet">sheet</option>
-          <option value="chart">chart</option>
-          <option value="embed">embed</option>
-        </select>
-      </label>
-      <label>${T.itemTitle}<br><input name="title" required></label>
-      <label>${T.itemUrl}<br><input name="url" type="url" required></label>
-      <label>${T.itemIcon}<br>
-        <div class="icon-picker">
-          <button type="button" data-val="">–</button>${iconButtons}
-          <input type="hidden" name="icon">
-        </div>
-      </label>
-      <label>${T.itemNote}<br><textarea name="note" rows="2"></textarea></label>
+      <header class="item-form__header">
+        <h2 class="item-form__title" id="itemFormLabel">${formTitle}</h2>
+        <p class="item-form__subtitle">${formSubtitle}</p>
+      </header>
+      <div class="item-form__grid">
+        <label class="item-form__field">
+          <span class="item-form__label">${escapeHtml(T.itemType)}</span>
+          <select name="type">
+            <option value="link">link</option>
+            <option value="sheet">sheet</option>
+            <option value="chart">chart</option>
+            <option value="embed">embed</option>
+          </select>
+        </label>
+        <label class="item-form__field">
+          <span class="item-form__label">${escapeHtml(T.itemTitle)}</span>
+          <input name="title" required>
+        </label>
+        <label class="item-form__field item-form__field--full">
+          <span class="item-form__label">${escapeHtml(T.itemUrl)}</span>
+          <input name="url" type="url" required>
+        </label>
+        <label class="item-form__field item-form__field--full">
+          <span class="item-form__label">${escapeHtml(T.itemIcon)}</span>
+          <div class="icon-picker" role="listbox">
+            <button type="button" role="option" data-val="" title="${escapeHtml(
+              (T.iconLabels && T.iconLabels.none) || iconLabels.none,
+            )}" aria-label="${escapeHtml(
+              (T.iconLabels && T.iconLabels.none) || iconLabels.none,
+            )}" aria-selected="false">–</button>${iconButtons}
+            <input type="hidden" name="icon">
+          </div>
+        </label>
+        <label class="item-form__field item-form__field--full">
+          <span class="item-form__label">${escapeHtml(T.itemNote)}</span>
+          <textarea name="note" rows="2"></textarea>
+        </label>
+      </div>
       <p class="error" id="itemErr" role="status" aria-live="polite"></p>
-      <menu>
-        <button type="button" data-act="cancel">${T.cancel}</button>
-        <button type="submit" class="btn-accent">${T.save}</button>
+      <menu class="item-form__actions">
+        <button type="button" class="btn-outline" data-act="cancel">${escapeHtml(
+          T.cancel,
+        )}</button>
+        <button type="submit" class="btn-accent">${escapeHtml(T.save)}</button>
       </menu>
     </form>`;
     dlg.setAttribute('aria-modal', 'true');
@@ -524,7 +583,16 @@ export function itemFormDialog(T, data = {}) {
     const initBtn = picker.querySelector(
       `button[data-val="${iconInput.value}"]`,
     );
-    if (initBtn) initBtn.classList.add('selected');
+    if (initBtn) {
+      initBtn.classList.add('selected');
+      initBtn.setAttribute('aria-selected', 'true');
+    }
+
+    picker
+      .querySelectorAll('button')
+      .forEach((btn) =>
+        btn.setAttribute('aria-selected', btn.classList.contains('selected') ? 'true' : 'false'),
+      );
 
     picker.addEventListener('click', (e) => {
       const btn = e.target.closest('button');
@@ -532,7 +600,11 @@ export function itemFormDialog(T, data = {}) {
       iconInput.value = btn.dataset.val;
       picker
         .querySelectorAll('button')
-        .forEach((b) => b.classList.toggle('selected', b === btn));
+        .forEach((b) => {
+          const isSelected = b === btn;
+          b.classList.toggle('selected', isSelected);
+          b.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+        });
     });
 
     function cleanup() {

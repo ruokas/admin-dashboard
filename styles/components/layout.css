@@ -191,31 +191,52 @@ a.item {
 
 .icon-picker {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
-  gap: var(--space-1-5);
+  grid-template-columns: repeat(auto-fit, minmax(56px, 1fr));
+  gap: var(--space-2);
   margin-top: var(--space-1);
-  max-width: 280px;
+  max-width: none;
 }
 
 .icon-picker button {
-  width: 48px;
-  height: 48px;
+  width: 56px;
+  height: 56px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--surface);
-  border: 1px solid var(--muted);
-  border-radius: var(--space-1-5);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--space-2);
   cursor: pointer;
+  color: var(--text);
+  transition: border-color 160ms ease, background 160ms ease,
+    transform 160ms ease;
+}
+
+.icon-picker button:hover,
+.icon-picker button:focus-visible {
+  border-color: var(--accent);
+  background: rgba(16, 185, 129, 0.08);
+  outline: none;
+}
+
+.theme-light .icon-picker button:hover,
+.theme-light .icon-picker button:focus-visible {
+  background: rgba(14, 165, 233, 0.12);
 }
 
 .icon-picker button.selected {
   border-color: var(--accent);
+  background: rgba(16, 185, 129, 0.12);
+  transform: translateY(-1px);
+}
+
+.theme-light .icon-picker button.selected {
+  background: rgba(14, 165, 233, 0.18);
 }
 
 .icon-picker svg {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
 }
 
 .embed {
@@ -261,6 +282,21 @@ dialog {
   box-shadow: var(--shadow);
 }
 
+dialog.item-form-dialog {
+  width: min(640px, 92vw);
+  padding: clamp(var(--space-5), 4vw, var(--space-6));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(165deg, rgba(16, 185, 129, 0.12), transparent) var(--surface);
+  backdrop-filter: blur(10px);
+}
+
+.theme-light dialog.item-form-dialog {
+  border-color: rgba(12, 17, 22, 0.08);
+  background:
+    linear-gradient(165deg, rgba(14, 165, 233, 0.16), transparent) var(--surface);
+}
+
 dialog.help-dialog {
   max-width: min(560px, 90vw);
 }
@@ -272,6 +308,10 @@ dialog::backdrop {
 dialog form {
   display: grid;
   gap: var(--space-3);
+}
+
+dialog.item-form-dialog form {
+  gap: var(--space-4);
 }
 
 .group-form {
@@ -527,7 +567,7 @@ dialog form {
 }
 
 #itemForm {
-  min-width: 320px;
+  min-width: min(560px, 100%);
 }
 
 #itemForm label {
@@ -550,6 +590,69 @@ dialog menu {
 dialog .error {
   color: var(--danger);
   font-size: 13px;
+}
+
+dialog.item-form-dialog .item-form__header {
+  display: grid;
+  gap: var(--space-1);
+}
+
+dialog.item-form-dialog .item-form__title {
+  margin: 0;
+  font-size: var(--font-lg);
+  font-weight: 600;
+}
+
+dialog.item-form-dialog .item-form__subtitle {
+  margin: 0;
+  color: var(--subtext);
+  font-size: var(--font-sm);
+}
+
+dialog.item-form-dialog .item-form__grid {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+dialog.item-form-dialog .item-form__field {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2-5);
+  border-radius: var(--space-2);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid transparent;
+  transition: border-color 160ms ease, box-shadow 160ms ease,
+    background 160ms ease;
+}
+
+.theme-light dialog.item-form-dialog .item-form__field {
+  background: rgba(12, 17, 22, 0.04);
+}
+
+dialog.item-form-dialog .item-form__field:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+  background: var(--surface-raised);
+}
+
+dialog.item-form-dialog .item-form__label {
+  font-weight: 600;
+  color: var(--text);
+  font-size: var(--font-sm);
+}
+
+dialog.item-form-dialog .item-form__field--full {
+  grid-column: 1 / -1;
+}
+
+dialog.item-form-dialog .item-form__actions {
+  margin: 0;
+  padding-top: var(--space-2);
+}
+
+dialog.item-form-dialog .item-form__actions .btn-outline {
+  border-color: var(--border-strong);
 }
 
 input:not([type='color']):not(.search-input),
