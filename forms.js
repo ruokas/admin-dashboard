@@ -525,7 +525,11 @@ export function itemFormDialog(T, data = {}) {
         <p class="item-form__subtitle">${formSubtitle}</p>
       </header>
       <div class="item-form__grid">
-        <label class="item-form__field">
+        <label class="item-form__field item-form__field--full">
+          <span class="item-form__label">${escapeHtml(T.itemTitle)}</span>
+          <input name="title" required>
+        </label>
+        <label class="item-form__field item-form__field--full">
           <span class="item-form__label">${escapeHtml(T.itemType)}</span>
           <select name="type">
             <option value="link">${escapeHtml(T.itemTypeLink || 'Nuoroda')}</option>
@@ -533,10 +537,6 @@ export function itemFormDialog(T, data = {}) {
             <option value="chart">${escapeHtml(T.itemTypeChart || 'Grafikas')}</option>
             <option value="embed">${escapeHtml(T.itemTypeEmbed || 'Įterptas turinys')}</option>
           </select>
-        </label>
-        <label class="item-form__field">
-          <span class="item-form__label">${escapeHtml(T.itemTitle)}</span>
-          <input name="title" required>
         </label>
         <label class="item-form__field item-form__field--full">
           <span class="item-form__label">${escapeHtml(T.itemUrl)}</span>

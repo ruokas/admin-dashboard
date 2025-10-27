@@ -565,6 +565,7 @@ dialog.item-form-dialog form {
 
 #itemForm input[name='title'],
 #itemForm input[name='url'],
+#itemForm select[name='type'],
 #itemForm textarea {
   width: 100%;
 }
