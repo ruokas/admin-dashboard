@@ -151,12 +151,25 @@ normaliseReminderState();
 
 pageTitleEl.textContent = state.title;
 updatePageIconPresentation();
-document.title = state.title;
+document.title = state.title || DEFAULT_TITLE;
 
 pageTitleEl.addEventListener('input', () => {
   if (!editing) return;
-  state.title = pageTitleEl.textContent.trim();
-  document.title = state.title;
+  const rawTitle = pageTitleEl.textContent;
+  const trimmedTitle = rawTitle.trim();
+  state.title = trimmedTitle;
+  if (!trimmedTitle) {
+    pageTitleEl.textContent = '';
+    const selection = window.getSelection();
+    if (selection) {
+      const range = document.createRange();
+      range.selectNodeContents(pageTitleEl);
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+  }
+  document.title = state.title || DEFAULT_TITLE;
   persistState();
 });
 pageIconEl.addEventListener('input', () => {
@@ -1046,14 +1059,21 @@ function updateUI() {
   updateEditingUI(editing, state, T, I, renderAll);
   pageTitleEl.contentEditable = editing;
   if (!editing) {
-    state.title = pageTitleEl.textContent.trim();
+    const trimmedTitle = pageTitleEl.textContent.trim();
+    state.title = trimmedTitle;
+    if (!trimmedTitle) {
+      pageTitleEl.textContent = '';
+    }
     if (!state.iconImage) {
       state.icon = pageIconEl.textContent.trim();
     }
-    document.title = state.title;
+    document.title = state.title || DEFAULT_TITLE;
     updatePageIconPresentation({ preserveTextSelection: false });
     persistState();
   } else {
+    if (!pageTitleEl.textContent.trim()) {
+      pageTitleEl.textContent = '';
+    }
     const preserveSelection = document.activeElement === pageIconEl;
     updatePageIconPresentation({ preserveTextSelection: preserveSelection });
   }

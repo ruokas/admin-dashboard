@@ -208,16 +208,41 @@ body.is-editing .page-icon-action:focus-visible .page-icon-action-label {
   margin: 0;
   font-size: clamp(18px, 3.5vw, var(--font-xl));
   letter-spacing: 0.2px;
+  line-height: 1.25;
 }
 
-.title h1[contenteditable='true']:empty::before {
+body.is-editing .title h1 {
+  display: inline-block;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--space-3);
+  border: 1px dashed rgba(255, 255, 255, 0.28);
+  cursor: text;
+  min-height: calc(1.25em + (var(--space-1) * 2));
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+body.is-editing .title h1:hover {
+  border-color: var(--subtext);
+}
+
+body.is-editing .title h1:focus-visible {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+body.is-editing .title h1[contenteditable='true']:empty::before {
   content: 'Įveskite pavadinimą';
   color: var(--subtext);
+  pointer-events: none;
 }
 
-.title h1[contenteditable='true']:focus {
-  outline: 1px dashed var(--muted);
-  padding: var(--space-1) var(--space-2);
+.theme-light body.is-editing .title h1 {
+  border-color: rgba(12, 17, 22, 0.2);
+}
+
+.theme-light body.is-editing .title h1:hover {
+  border-color: rgba(12, 17, 22, 0.32);
 }
 
 .title .badge {
