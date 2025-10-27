@@ -191,31 +191,49 @@ a.item {
 
 .icon-picker {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(44px, 1fr));
   gap: var(--space-1-5);
   margin-top: var(--space-1);
-  max-width: 280px;
 }
 
 .icon-picker button {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--surface);
-  border: 1px solid var(--muted);
+  background: transparent;
+  border: 1px solid var(--border-strong);
   border-radius: var(--space-1-5);
   cursor: pointer;
+  color: var(--text);
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.icon-picker button:hover,
+.icon-picker button:focus-visible {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  outline: none;
+}
+
+.theme-light .icon-picker button:hover,
+.theme-light .icon-picker button:focus-visible {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 .icon-picker button.selected {
   border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.theme-light .icon-picker button.selected {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .icon-picker svg {
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
 }
 
 .embed {
@@ -261,6 +279,13 @@ dialog {
   box-shadow: var(--shadow);
 }
 
+dialog.item-form-dialog {
+  width: min(560px, 92vw);
+  padding: clamp(var(--space-4), 4vw, var(--space-5));
+  max-height: min(88vh, 640px);
+  overflow: auto;
+}
+
 dialog.help-dialog {
   max-width: min(560px, 90vw);
 }
@@ -271,6 +296,10 @@ dialog::backdrop {
 
 dialog form {
   display: grid;
+  gap: var(--space-3);
+}
+
+dialog.item-form-dialog form {
   gap: var(--space-3);
 }
 
@@ -527,7 +556,7 @@ dialog form {
 }
 
 #itemForm {
-  min-width: 320px;
+  min-width: min(560px, 100%);
 }
 
 #itemForm label {
@@ -536,6 +565,7 @@ dialog form {
 
 #itemForm input[name='title'],
 #itemForm input[name='url'],
+#itemForm select[name='type'],
 #itemForm textarea {
   width: 100%;
 }
@@ -550,6 +580,55 @@ dialog menu {
 dialog .error {
   color: var(--danger);
   font-size: 13px;
+}
+
+dialog.item-form-dialog .item-form__header {
+  display: grid;
+  gap: var(--space-1);
+}
+
+dialog.item-form-dialog .item-form__title {
+  margin: 0;
+  font-size: var(--font-lg);
+  font-weight: 600;
+}
+
+dialog.item-form-dialog .item-form__subtitle {
+  margin: 0;
+  color: var(--subtext);
+  font-size: var(--font-sm);
+}
+
+dialog.item-form-dialog .item-form__grid {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+dialog.item-form-dialog .item-form__field {
+  display: grid;
+  gap: var(--space-1);
+}
+
+dialog.item-form-dialog .item-form__field:focus-within .item-form__label {
+  color: var(--accent);
+}
+
+dialog.item-form-dialog .item-form__label {
+  font-weight: 600;
+  color: var(--subtext-strong);
+  font-size: var(--font-xs);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+dialog.item-form-dialog .item-form__field--full {
+  grid-column: 1 / -1;
+}
+
+dialog.item-form-dialog .item-form__actions {
+  margin: 0;
+  padding-top: var(--space-2);
 }
 
 input:not([type='color']):not(.search-input),
