@@ -372,15 +372,15 @@ dialog form {
   display: grid;
   justify-items: center;
   gap: var(--space-1);
-  min-width: 92px;
+  min-width: 44px;
 }
 
 .group-form__custom-color input[type='color'] {
   --custom-swatch: var(--accent);
   -webkit-appearance: none;
   appearance: none;
-  width: 52px;
-  height: 52px;
+  width: 44px;
+  height: 44px;
   border-radius: var(--space-2);
   border: 1px solid color-mix(in srgb, var(--custom-swatch) 35%, transparent);
   background: var(--custom-swatch);
