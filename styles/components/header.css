@@ -40,19 +40,26 @@ header > .title {
 }
 
 .page-icon-action {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-1) var(--space-2);
+  justify-content: center;
+  width: calc((var(--space-2-5) * 2) + 16px);
+  height: calc((var(--space-2-5) * 2) + 16px);
+  padding: 0;
   border-radius: var(--space-3);
   border: 1px dashed var(--muted);
   background: transparent;
   color: var(--subtext);
   font-size: var(--font-xs);
   font-weight: 600;
-  line-height: 1.2;
+  line-height: 1;
   box-shadow: none;
-  transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
 }
 
 .page-icon-action:hover,
@@ -61,6 +68,7 @@ header > .title {
   border-color: var(--accent);
   color: var(--text);
   background: rgba(16, 185, 129, 0.08);
+  transform: translateY(-1px);
 }
 
 .page-icon-action:focus-visible {
@@ -69,22 +77,43 @@ header > .title {
 }
 
 .page-icon-action svg {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
 }
 
 .page-icon-action .page-icon-action-label {
+  position: absolute;
+  inset-inline-start: 50%;
+  bottom: calc(100% + var(--space-1));
+  transform: translate(-50%, 4px);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--space-2);
+  background: rgba(8, 13, 18, 0.92);
+  color: var(--text);
+  font-size: var(--font-xs);
   line-height: 1.2;
   white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease, transform 160ms ease;
+  z-index: 6;
 }
 
-body.is-editing .page-icon-action .page-icon-action-label {
-  display: none;
+.page-icon-action .page-icon-action-label::after {
+  content: '';
+  position: absolute;
+  inset-inline-start: 50%;
+  top: 100%;
+  transform: translateX(-50%);
+  border-width: 6px 6px 0 6px;
+  border-style: solid;
+  border-color: rgba(8, 13, 18, 0.92) transparent transparent transparent;
 }
 
 body.is-editing .page-icon-action:hover .page-icon-action-label,
 body.is-editing .page-icon-action:focus-visible .page-icon-action-label {
-  display: inline;
+  opacity: 1;
+  transform: translate(-50%, 0);
 }
 
 .page-icon-action--remove {
@@ -117,6 +146,14 @@ body.is-editing .page-icon-action:focus-visible .page-icon-action-label {
 .theme-light .page-icon-action--remove:hover,
 .theme-light .page-icon-action--remove:focus-visible {
   background: rgba(216, 58, 58, 0.12);
+}
+
+.theme-light .page-icon-action .page-icon-action-label {
+  background: rgba(12, 17, 22, 0.92);
+}
+
+.theme-light .page-icon-action .page-icon-action-label::after {
+  border-color: rgba(12, 17, 22, 0.92) transparent transparent transparent;
 }
 
 .primary-actions {

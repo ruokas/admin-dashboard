@@ -202,12 +202,14 @@ const updateSearchClearVisibility = () => {
 
 function applyPageIconActionLabels() {
   if (pageIconImageBtn) {
-    pageIconImageBtn.innerHTML = `${I.camera} <span class="page-icon-action-label">${T.pageIconImage}</span>`;
+    pageIconImageBtn.innerHTML = `${I.camera} <span class="page-icon-action-label" aria-hidden="true">${T.pageIconImage}</span>`;
     pageIconImageBtn.querySelector('svg')?.setAttribute('aria-hidden', 'true');
+    pageIconImageBtn.setAttribute('aria-label', T.pageIconImage);
   }
   if (pageIconClearBtn) {
-    pageIconClearBtn.innerHTML = `${I.close} <span class="page-icon-action-label">${T.pageIconClear}</span>`;
+    pageIconClearBtn.innerHTML = `${I.close} <span class="page-icon-action-label" aria-hidden="true">${T.pageIconClear}</span>`;
     pageIconClearBtn.querySelector('svg')?.setAttribute('aria-hidden', 'true');
+    pageIconClearBtn.setAttribute('aria-label', T.pageIconClear);
   }
 }
 
