@@ -1,5 +1,4 @@
 import { SIZE_MAP, sizeFromWidth, sizeFromHeight } from './sizes.js';
-import { countGroupItems } from './stats.js';
 
 let currentState;
 let persist;
@@ -52,18 +51,8 @@ function createGroupStructure(type, id) {
   return { section, header, content, footer };
 }
 
-export function renderStats(state) {
-  const statsEl = document.getElementById('stats');
-  if (!statsEl) return;
-  const groups = Array.isArray(state?.groups) ? state.groups : [];
-  const totalGroups = groups.length;
-  const totalItems = countGroupItems(groups);
-  statsEl.textContent = `${totalGroups} grupės • ${totalItems} įrašai`;
-}
-
 export function render(state, editing, T, I, handlers, saveFn) {
   renderGroups(state, editing, T, I, handlers, saveFn);
-  renderStats(state);
 }
 
 function prefersReducedMotion() {
