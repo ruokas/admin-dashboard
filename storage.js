@@ -6,6 +6,8 @@ const NOTE_DEFAULT_FONT = 20;
 const NOTE_DEFAULT_PADDING = 20;
 const DEFAULT_CARD_WIDTH = 360;
 const DEFAULT_CARD_HEIGHT = 360;
+const MAX_ICON_IMAGE_BYTES = 200 * 1024;
+const MAX_ICON_IMAGE_LENGTH = Math.ceil((MAX_ICON_IMAGE_BYTES / 3) * 4) + 512;
 
 function makeId(prefix = 'note') {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -32,6 +34,14 @@ function sanitizeTimestamp(value) {
     if (Number.isFinite(parsed)) return Math.round(parsed);
   }
   return null;
+}
+
+function sanitizeIconImage(value) {
+  if (typeof value !== 'string') return '';
+  const trimmed = value.trim();
+  if (!trimmed.startsWith('data:image/')) return '';
+  if (trimmed.length > MAX_ICON_IMAGE_LENGTH) return '';
+  return trimmed;
 }
 
 function normalizeDimensionPair(width, height, wSize, hSize) {
@@ -229,7 +239,12 @@ export function load() {
       delete data.notesReminderAt;
 
       data.title = typeof data.title === 'string' ? data.title : '';
-      data.icon = typeof data.icon === 'string' ? data.icon : '';
+      data.iconImage = sanitizeIconImage(data.iconImage || '');
+      data.icon = data.iconImage
+        ? ''
+        : typeof data.icon === 'string'
+          ? data.icon
+          : '';
 
       if (!Array.isArray(data.customReminders)) data.customReminders = [];
       else
@@ -356,6 +371,7 @@ export function seed() {
     customReminders: [],
     title: '',
     icon: '',
+    iconImage: '',
   };
   save(data);
   return data;

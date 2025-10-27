@@ -14,7 +14,30 @@
   <body>
     <header>
       <div class="title" data-zone="title">
-        <span id="pageIcon" class="page-icon" aria-hidden="true"></span>
+        <div class="page-icon-wrapper">
+          <span id="pageIcon" class="page-icon" aria-hidden="true"></span>
+          <div class="page-icon-actions" data-editing-visible>
+            <button
+              id="pageIconImageBtn"
+              class="page-icon-action"
+              type="button"
+              aria-label="Paveikslėlis"
+            >
+              <span aria-hidden="true">🖼</span>
+              <span class="page-icon-action-label" aria-hidden="true">Paveikslėlis</span>
+            </button>
+            <button
+              id="pageIconClearBtn"
+              class="page-icon-action page-icon-action--remove"
+              type="button"
+              hidden
+              aria-label="Pašalinti"
+            >
+              <span aria-hidden="true">✕</span>
+              <span class="page-icon-action-label" aria-hidden="true">Pašalinti</span>
+            </button>
+          </div>
+        </div>
         <h1 id="pageTitle"></h1>
       </div>
       <div class="primary-actions" data-zone="primary-actions">
@@ -149,6 +172,12 @@
     </main>
 
     <input type="file" id="fileInput" accept="application/json" hidden />
+    <input
+      type="file"
+      id="pageIconFile"
+      accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
+      hidden
+    />
 
     <script src="app.js" type="module"></script>
   </body>

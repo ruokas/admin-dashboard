@@ -38,7 +38,7 @@ export function helpDialog(T) {
     const intro = T.helpIntro ||
       'Kelios gairės, kaip greitai pradėti dirbti su skydeliu.';
     const quickItems = toArray(T.helpQuickItems, [
-      'Paspauskite „Redaguoti“, kad įjungtumėte kortelių tvarkymą.',
+      'Paspauskite „Redaguoti“, kad keistumėte pavadinimą, ikoną ir įjungtumėte kortelių tvarkymą.',
       'Sukurkite grupes (pvz., „Pamaina“, „Formos“) ir įrašus su nuorodomis ar įterpimais.',
       'Korteles galite tempti ir keisti jų dydį – laikykite Shift, kad pažymėtumėte kelias.',
       'Įjunkite priminimų kortelę ir naudokite laikmačius dažniausioms užduotims.',
@@ -54,6 +54,7 @@ export function helpDialog(T) {
     const tips = toArray(T.helpTips, [
       'Eksportuokite JSON failą prieš dalindamiesi skydeliu – turėsite atsarginę kopiją.',
       'Tema keičiama viršuje esančiu mėnulio/saulės mygtuku.',
+      'Mygtukas „🖼 Paveikslėlis“ leidžia įkelti logotipą, „✕ Pašalinti“ – išvalyti ikoną.',
     ]);
     const quickHtml = quickItems
       .map((item) => `<li>${escapeHtml(item)}</li>`)
