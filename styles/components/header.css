@@ -175,6 +175,99 @@ body.is-editing .page-icon-action:focus-visible .page-icon-action-label {
   width: 100%;
 }
 
+.help-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 999px;
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(12, 17, 22, 0.35);
+  backdrop-filter: blur(6px);
+  color: var(--text);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  flex: none;
+}
+
+.help-btn svg,
+.help-btn .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.help-btn::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + var(--space-2));
+  inset-inline-start: 50%;
+  transform: translate(-50%, 4px);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--space-2);
+  background: rgba(8, 13, 18, 0.92);
+  color: var(--text);
+  font-size: var(--font-xs);
+  line-height: 1.2;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease, transform 160ms ease;
+  z-index: 1;
+}
+
+.help-btn::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + var(--space-2) - 4px);
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  border-width: 0 6px 6px 6px;
+  border-style: solid;
+  border-color: transparent transparent rgba(8, 13, 18, 0.92) transparent;
+  opacity: 0;
+  transition: opacity 160ms ease;
+  z-index: 1;
+}
+
+.help-btn:hover::after,
+.help-btn:focus-visible::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.help-btn:hover::before,
+.help-btn:focus-visible::before {
+  opacity: 1;
+}
+
+.help-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.theme-light .help-btn {
+  border-color: rgba(12, 17, 22, 0.18);
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.18);
+}
+
+.theme-light .help-btn::after {
+  background: rgba(12, 17, 22, 0.92);
+}
+
+.theme-light .help-btn::before {
+  border-color: transparent transparent rgba(12, 17, 22, 0.92) transparent;
+}
+
+@media (max-width: 640px) {
+  .help-btn {
+    width: 36px;
+    height: 36px;
+  }
+}
+
 #remindersBtn {
   display: inline-flex;
   align-items: center;

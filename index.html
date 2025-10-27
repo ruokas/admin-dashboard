@@ -117,11 +117,15 @@
         <!-- Fallback labels so buttons are visible before JS initializes -->
         <button
           id="helpBtn"
-          class="btn-outline"
+          class="btn-outline help-btn"
           type="button"
+          aria-label="Pagalba"
           aria-keyshortcuts="?"
+          title="Pagalba (?)"
+          data-tooltip="Pagalba (?)"
         >
-          Pagalba
+          <span aria-hidden="true">?</span>
+          <span class="sr-only">Pagalba</span>
         </button>
         <button id="editBtn" class="btn-outline" type="button">
           Redaguoti

@@ -1614,8 +1614,9 @@ document.getElementById('fileInput').addEventListener('change', (e) => {
 });
 
 if (helpBtn) {
-  helpBtn.innerHTML = `${I.help} <span>${T.help}</span>`;
+  helpBtn.innerHTML = `${I.help}<span class="sr-only">${T.help}</span>`;
   helpBtn.setAttribute('aria-label', `${T.help} (?)`);
+  helpBtn.setAttribute('data-tooltip', `${T.help} (?)`);
   helpBtn.title = `${T.help} (?)`;
   helpBtn.addEventListener('click', () => openHelp());
 }
