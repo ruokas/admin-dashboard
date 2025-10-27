@@ -1086,7 +1086,7 @@ function findNoteById(id) {
 async function addGroup() {
   const res = await groupFormDialog(T);
   if (!res) return;
-  const dims = SIZE_MAP[res.size] ?? SIZE_MAP.md;
+  const dims = SIZE_MAP.md;
   const width = Number.isFinite(dims.width) ? dims.width : SIZE_MAP.md.width;
   const height = Number.isFinite(dims.height) ? dims.height : SIZE_MAP.md.height;
   const group = {
@@ -1121,14 +1121,12 @@ async function editGroup(gid) {
   const res = await groupFormDialog(T, {
     name: g.name,
     color: g.color,
-    size: sizeFromWidth(g.width ?? 360),
   });
   if (!res) return;
   g.name = res.name;
   g.color = res.color;
-  const dims2 = SIZE_MAP[res.size] ?? SIZE_MAP.md;
-  const width = Number.isFinite(dims2.width) ? dims2.width : g.width;
-  const height = Number.isFinite(dims2.height) ? dims2.height : g.height;
+  const width = Number.isFinite(g.width) ? g.width : SIZE_MAP.md.width;
+  const height = Number.isFinite(g.height) ? g.height : SIZE_MAP.md.height;
   g.width = width;
   g.height = height;
   g.wSize = sizeFromWidth(width);

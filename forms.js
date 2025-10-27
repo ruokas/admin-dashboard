@@ -223,18 +223,121 @@ export function remindersDialog(T, entries = [], onAction = () => {}) {
 
 export function groupFormDialog(T, data = {}) {
   return new Promise((resolve) => {
+    const HEX_COLOR_RE = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
+    const DEFAULT_GROUP_COLOR = '#10b981';
+
+    function expandHex(hex) {
+      if (!HEX_COLOR_RE.test(hex)) return null;
+      const lower = hex.toLowerCase();
+      if (lower.length === 4) {
+        return (
+          '#' +
+          lower
+            .slice(1)
+            .split('')
+            .map((ch) => ch + ch)
+            .join('')
+        );
+      }
+      return lower;
+    }
+
+    function hexToRgb(hex) {
+      const normalized = expandHex(hex);
+      if (!normalized) return null;
+      return {
+        r: Number.parseInt(normalized.slice(1, 3), 16),
+        g: Number.parseInt(normalized.slice(3, 5), 16),
+        b: Number.parseInt(normalized.slice(5, 7), 16),
+      };
+    }
+
+    function toHexChannel(n) {
+      return Math.max(0, Math.min(255, Math.round(n)))
+        .toString(16)
+        .padStart(2, '0');
+    }
+
+    function mixHex(base, target, ratio) {
+      const src = hexToRgb(base);
+      const dst = hexToRgb(target);
+      if (!src || !dst) return base;
+      const clampRatio = Math.max(0, Math.min(1, Number(ratio)));
+      const r = src.r + (dst.r - src.r) * clampRatio;
+      const g = src.g + (dst.g - src.g) * clampRatio;
+      const b = src.b + (dst.b - src.b) * clampRatio;
+      return `#${toHexChannel(r)}${toHexChannel(g)}${toHexChannel(b)}`;
+    }
+
+    function normalizeHex(hex, fallback = DEFAULT_GROUP_COLOR) {
+      const expanded = expandHex(hex);
+      if (expanded) return expanded;
+      if (HEX_COLOR_RE.test(hex)) return hex.toLowerCase();
+      return fallback;
+    }
+
+    function makeAutoGradient(hex) {
+      const normalized = expandHex(hex);
+      if (!normalized) {
+        return `linear-gradient(135deg, ${hex}, ${hex})`;
+      }
+      const bright = mixHex(normalized, '#ffffff', 0.38);
+      const mid = mixHex(normalized, '#ffffff', 0.12);
+      const deep = mixHex(normalized, '#000000', 0.18);
+      return `linear-gradient(135deg, ${bright}, ${mid}, ${deep})`;
+    }
+
+    const paletteColors = [
+      { value: DEFAULT_GROUP_COLOR, label: 'Ryški žalia' },
+      { value: '#0ea5e9', label: 'Ryški žydra' },
+      { value: '#6366f1', label: 'Gilus mėlynas' },
+      { value: '#a855f7', label: 'Sodri violetinė' },
+      { value: '#ec4899', label: 'Ryški avietinė' },
+      { value: '#f97316', label: 'Ryški oranžinė' },
+      { value: '#ef4444', label: 'Sodri raudona' },
+      { value: '#facc15', label: 'Ryški gelsva' },
+    ];
     const prevFocus = document.activeElement;
     const dlg = document.createElement('dialog');
-    dlg.innerHTML = `<form method="dialog" id="groupForm">
-      <label id="groupFormLabel">${T.groupName}<br><input name="name" required></label>
-      <label>${T.groupColor}<br><input name="color" type="color" value="#6ee7b7"></label>
-      <label>${T.groupSize}<br>
-        <select name="size">
-          <option value="sm">${T.sizeSm}</option>
-          <option value="md">${T.sizeMd}</option>
-          <option value="lg">${T.sizeLg}</option>
-        </select>
+    const paletteButtons = paletteColors
+      .map((c) => {
+        const norm = normalizeHex(c.value);
+        const gradient = makeAutoGradient(norm);
+        return `<button type="button" data-color="${norm}" style="--swatch:${norm};--swatch-gradient:${gradient}" aria-label="${escapeHtml(
+          c.label,
+        )}" aria-pressed="false"></button>`;
+      })
+      .join('');
+    dlg.innerHTML = `<form method="dialog" id="groupForm" class="group-form">
+      <header class="group-form__header">
+        <h2 id="groupFormLabel">${escapeHtml(
+          T.groupDialogTitle || 'Nauja kortelė',
+        )}</h2>
+      </header>
+      <label class="group-form__field">
+        <span class="group-form__label">${escapeHtml(T.groupName)}</span>
+        <input name="name" required autocomplete="off">
       </label>
+      <section class="group-form__field" aria-labelledby="groupColorLabel">
+        <div class="group-form__label-row">
+          <span id="groupColorLabel" class="group-form__label">${escapeHtml(
+            T.groupColor,
+          )}</span>
+        </div>
+        <div class="group-form__color">
+          <div class="group-form__palette" role="listbox" aria-labelledby="groupColorLabel">
+            ${paletteButtons}
+          </div>
+          <label class="group-form__custom-color">
+            <input name="color" type="color" value="${DEFAULT_GROUP_COLOR}" aria-label="${escapeHtml(
+              T.groupColorCustom || 'Pasirinktinė spalva',
+            )}">
+            <span class="group-form__custom-label">${escapeHtml(
+              T.groupColorCustom || 'Pasirinktinė spalva',
+            )}</span>
+          </label>
+        </div>
+      </section>
       <p class="error" id="groupErr" role="status" aria-live="polite"></p>
       <menu>
         <button type="button" data-act="cancel">${T.cancel}</button>
@@ -247,13 +350,73 @@ export function groupFormDialog(T, data = {}) {
     const form = dlg.querySelector('form');
     const err = dlg.querySelector('#groupErr');
     const cancel = form.querySelector('[data-act="cancel"]');
+    const defaultColor = normalizeHex(data.color || DEFAULT_GROUP_COLOR);
     form.name.value = data.name || '';
-    form.color.value = data.color || '#6ee7b7';
-    form.size.value = data.size || 'md';
+    form.color.value = defaultColor;
+    const palette = Array.from(
+      dlg.querySelectorAll('.group-form__palette button[data-color]'),
+    );
+    function updatePaletteSelection(value) {
+      palette.forEach((btn) => {
+        const selected = btn.dataset.color?.toLowerCase() === value.toLowerCase();
+        btn.setAttribute('aria-pressed', selected ? 'true' : 'false');
+      });
+    }
+
+    function applyColor(value) {
+      if (!value) return;
+      const normalized = normalizeHex(value);
+      form.color.value = normalized;
+      form.color.style.setProperty('--custom-swatch', normalized);
+      updatePaletteSelection(normalized);
+    }
+
+    const paletteContainer = dlg.querySelector('.group-form__palette');
+
+    function handlePaletteClick(e) {
+      const btn = e.target.closest('button[data-color]');
+      if (!btn) return;
+      e.preventDefault();
+      applyColor(btn.dataset.color);
+      btn.focus();
+    }
+
+    function handlePaletteKeydown(e) {
+      if (!['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) {
+        return;
+      }
+      const current = document.activeElement;
+      const index = palette.indexOf(current);
+      if (index === -1) return;
+      e.preventDefault();
+      let nextIndex = index;
+      if (e.key === 'Home') nextIndex = 0;
+      else if (e.key === 'End') nextIndex = palette.length - 1;
+      else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') nextIndex = Math.min(palette.length - 1, index + 1);
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') nextIndex = Math.max(0, index - 1);
+      const next = palette[nextIndex];
+      next?.focus();
+      if (next?.dataset.color) {
+        applyColor(next.dataset.color);
+      }
+    }
+
+    function handleColorInput(e) {
+      applyColor(e.target.value);
+    }
+
+    paletteContainer?.addEventListener('click', handlePaletteClick);
+    paletteContainer?.addEventListener('keydown', handlePaletteKeydown);
+    form.color.addEventListener('input', handleColorInput);
+
+    applyColor(defaultColor);
 
     function cleanup() {
       form.removeEventListener('submit', submit);
       cancel.removeEventListener('click', close);
+      paletteContainer?.removeEventListener('click', handlePaletteClick);
+      paletteContainer?.removeEventListener('keydown', handlePaletteKeydown);
+      form.color.removeEventListener('input', handleColorInput);
       dlg.remove();
       prevFocus?.focus();
     }
@@ -265,7 +428,8 @@ export function groupFormDialog(T, data = {}) {
         err.textContent = T.required;
         return;
       }
-      resolve({ name, color: form.color.value, size: form.size.value });
+      const normalized = normalizeHex(form.color.value || DEFAULT_GROUP_COLOR);
+      resolve({ name, color: normalized });
       cleanup();
     }
 

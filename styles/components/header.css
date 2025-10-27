@@ -1,4 +1,4 @@
-header {
+.page-header {
   position: sticky;
   top: 0;
   z-index: 3;
@@ -17,7 +17,7 @@ header {
     'secondary';
 }
 
-header > .title {
+.page-header > .title {
   grid-area: title;
   display: flex;
   align-items: center;
@@ -432,7 +432,7 @@ body.is-editing .title h1[contenteditable='true']:empty::before {
 }
 
 @media (min-width: 600px) {
-  header {
+  .page-header {
     grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-areas: 'title primary secondary';
     align-items: center;
@@ -444,7 +444,7 @@ body.is-editing .title h1[contenteditable='true']:empty::before {
 }
 
 @media (min-width: 960px) {
-  header {
+  .page-header {
     gap: var(--space-3);
   }
 }
