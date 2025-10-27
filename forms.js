@@ -224,7 +224,7 @@ export function remindersDialog(T, entries = [], onAction = () => {}) {
 export function groupFormDialog(T, data = {}) {
   return new Promise((resolve) => {
     const HEX_COLOR_RE = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
-    const DEFAULT_GROUP_COLOR = '#f97316';
+    const DEFAULT_GROUP_COLOR = '#10b981';
 
     function expandHex(hex) {
       if (!HEX_COLOR_RE.test(hex)) return null;
@@ -288,13 +288,13 @@ export function groupFormDialog(T, data = {}) {
     }
 
     const paletteColors = [
-      { value: DEFAULT_GROUP_COLOR, label: 'Ryški oranžinė' },
-      { value: '#ef4444', label: 'Sodri raudona' },
-      { value: '#ec4899', label: 'Ryški avietinė' },
-      { value: '#a855f7', label: 'Sodri violetinė' },
+      { value: DEFAULT_GROUP_COLOR, label: 'Ryški žalia' },
+      { value: '#0ea5e9', label: 'Ryški žydra' },
       { value: '#6366f1', label: 'Gilus mėlynas' },
-      { value: '#22d3ee', label: 'Ryški žydra' },
-      { value: '#34d399', label: 'Sodri žalia' },
+      { value: '#a855f7', label: 'Sodri violetinė' },
+      { value: '#ec4899', label: 'Ryški avietinė' },
+      { value: '#f97316', label: 'Ryški oranžinė' },
+      { value: '#ef4444', label: 'Sodri raudona' },
       { value: '#facc15', label: 'Ryški gelsva' },
     ];
     const prevFocus = document.activeElement;
@@ -313,21 +313,15 @@ export function groupFormDialog(T, data = {}) {
         <h2 id="groupFormLabel">${escapeHtml(
           T.groupDialogTitle || 'Nauja kortelė',
         )}</h2>
-        <p class="group-form__description">${escapeHtml(
-          T.groupDialogDescription || 'Sukurkite kortelę ir parinkite ryškią spalvą.',
-        )}</p>
       </header>
       <label class="group-form__field">
         <span class="group-form__label">${escapeHtml(T.groupName)}</span>
-        <input name="name" required placeholder="pvz., „Pamaina“" autocomplete="off">
+        <input name="name" required autocomplete="off">
       </label>
       <section class="group-form__field" aria-labelledby="groupColorLabel">
         <div class="group-form__label-row">
           <span id="groupColorLabel" class="group-form__label">${escapeHtml(
             T.groupColor,
-          )}</span>
-          <span class="group-form__hint">${escapeHtml(
-            T.groupPaletteLabel || 'Ryški gradiento paletė',
           )}</span>
         </div>
         <div class="group-form__color">
@@ -355,7 +349,7 @@ export function groupFormDialog(T, data = {}) {
               T.groupPreviewPlaceholder || 'Kortelė',
             )}</span>
             <span class="group-form__preview-sub">${escapeHtml(
-              T.groupDialogDescription || 'Sukurkite kortelę ir parinkite ryškią spalvą.',
+              T.groupPreviewHint || '',
             )}</span>
           </div>
         </div>
@@ -400,8 +394,7 @@ export function groupFormDialog(T, data = {}) {
         previewTitle.textContent = name || (T.groupPreviewPlaceholder || 'Kortelė');
       }
       if (previewSub) {
-        previewSub.textContent = T.groupDialogDescription ||
-          'Sukurkite kortelę ir parinkite ryškią spalvą.';
+        previewSub.textContent = T.groupPreviewHint || '';
       }
     }
 
