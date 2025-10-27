@@ -187,7 +187,6 @@ body {
 
 .page-icon--image {
   border-style: solid;
-  background: var(--surface);
 }
 
 .page-icon--image::after {
@@ -199,6 +198,20 @@ body {
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+body.is-editing .page-icon--image {
+  background: var(--surface);
+}
+
+body:not(.is-editing) .page-icon--image {
+  border-color: transparent;
+  background: transparent;
+}
+
+.theme-light body:not(.is-editing) .page-icon--image {
+  border-color: transparent;
+  background: transparent;
 }
 
 .theme-light .page-icon {

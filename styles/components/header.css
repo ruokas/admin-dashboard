@@ -75,6 +75,16 @@ header > .title {
 
 .page-icon-action .page-icon-action-label {
   line-height: 1.2;
+  white-space: nowrap;
+}
+
+body.is-editing .page-icon-action .page-icon-action-label {
+  display: none;
+}
+
+body.is-editing .page-icon-action:hover .page-icon-action-label,
+body.is-editing .page-icon-action:focus-visible .page-icon-action-label {
+  display: inline;
 }
 
 .page-icon-action--remove {
