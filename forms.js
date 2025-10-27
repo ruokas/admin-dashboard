@@ -329,31 +329,15 @@ export function groupFormDialog(T, data = {}) {
             ${paletteButtons}
           </div>
           <label class="group-form__custom-color">
-            <span class="group-form__custom-label">${escapeHtml(
-              T.groupColorCustom || 'Pasirinktinė spalva',
-            )}</span>
             <input name="color" type="color" value="${DEFAULT_GROUP_COLOR}" aria-label="${escapeHtml(
               T.groupColorCustom || 'Pasirinktinė spalva',
             )}">
+            <span class="group-form__custom-label">${escapeHtml(
+              T.groupColorCustom || 'Pasirinktinė spalva',
+            )}</span>
           </label>
         </div>
       </section>
-      <div class="group-form__preview" aria-hidden="true">
-        <span class="group-form__preview-label">${escapeHtml(
-          T.preview || 'Peržiūra',
-        )}</span>
-        <div class="group-form__preview-card">
-          <div class="group-form__preview-dot"></div>
-          <div class="group-form__preview-content">
-            <span class="group-form__preview-title">${escapeHtml(
-              T.groupPreviewPlaceholder || 'Kortelė',
-            )}</span>
-            <span class="group-form__preview-sub">${escapeHtml(
-              T.groupPreviewHint || '',
-            )}</span>
-          </div>
-        </div>
-      </div>
       <p class="error" id="groupErr" role="status" aria-live="polite"></p>
       <menu>
         <button type="button" data-act="cancel">${T.cancel}</button>
@@ -372,10 +356,6 @@ export function groupFormDialog(T, data = {}) {
     const palette = Array.from(
       dlg.querySelectorAll('.group-form__palette button[data-color]'),
     );
-    const previewCard = dlg.querySelector('.group-form__preview-card');
-    const previewTitle = dlg.querySelector('.group-form__preview-title');
-    const previewSub = dlg.querySelector('.group-form__preview-sub');
-
     function updatePaletteSelection(value) {
       palette.forEach((btn) => {
         const selected = btn.dataset.color?.toLowerCase() === value.toLowerCase();
@@ -383,27 +363,12 @@ export function groupFormDialog(T, data = {}) {
       });
     }
 
-    function updatePreview() {
-      if (!previewCard) return;
-      const color = normalizeHex(form.color.value || DEFAULT_GROUP_COLOR);
-      const gradient = makeAutoGradient(color);
-      previewCard.style.setProperty('--group-accent', color);
-      previewCard.style.setProperty('--group-accent-gradient', gradient);
-      const name = form.name.value.trim();
-      if (previewTitle) {
-        previewTitle.textContent = name || (T.groupPreviewPlaceholder || 'Kortelė');
-      }
-      if (previewSub) {
-        previewSub.textContent = T.groupPreviewHint || '';
-      }
-    }
-
     function applyColor(value) {
       if (!value) return;
       const normalized = normalizeHex(value);
       form.color.value = normalized;
+      form.color.style.setProperty('--custom-swatch', normalized);
       updatePaletteSelection(normalized);
-      updatePreview();
     }
 
     const paletteContainer = dlg.querySelector('.group-form__palette');
@@ -440,17 +405,11 @@ export function groupFormDialog(T, data = {}) {
       applyColor(e.target.value);
     }
 
-    function handleNameInput() {
-      updatePreview();
-    }
-
     paletteContainer?.addEventListener('click', handlePaletteClick);
     paletteContainer?.addEventListener('keydown', handlePaletteKeydown);
     form.color.addEventListener('input', handleColorInput);
-    form.name.addEventListener('input', handleNameInput);
 
-    updatePaletteSelection(defaultColor);
-    updatePreview();
+    applyColor(defaultColor);
 
     function cleanup() {
       form.removeEventListener('submit', submit);
@@ -458,7 +417,6 @@ export function groupFormDialog(T, data = {}) {
       paletteContainer?.removeEventListener('click', handlePaletteClick);
       paletteContainer?.removeEventListener('keydown', handlePaletteKeydown);
       form.color.removeEventListener('input', handleColorInput);
-      form.name.removeEventListener('input', handleNameInput);
       dlg.remove();
       prevFocus?.focus();
     }

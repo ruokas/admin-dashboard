@@ -89,8 +89,6 @@ export const Tlt = {
   groupName: 'Grupės pavadinimas',
   groupDialogTitle: 'Nauja kortelė',
   groupColorCustom: 'Pasirinktinė spalva',
-  groupPreviewPlaceholder: 'Kortelė',
-  groupPreviewHint: '',
   groupColor: 'Akcento spalva',
   renameGroup: 'Pervadinti grupę',
   itemTitle: 'Pavadinimas',
