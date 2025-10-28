@@ -1927,21 +1927,62 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
         : Number.isFinite(g.h)
           ? g.h
           : null;
-      const baseHeight = clampHeight(baseHeightRaw) ?? clampHeight(fallbackCardHeight);
-      const scale = clampScale(g.scale);
+      let baseHeight =
+        clampHeight(baseHeightRaw) ?? clampHeight(fallbackCardHeight) ?? clampHeight(480);
+      const defaultScale = clampScale(g.scale);
+      let scale = defaultScale;
 
-      if (baseHeight) {
-        const displayHeight = Math.max(120, Math.round(baseHeight * scale));
+      const applySizing = () => {
+        const safeBase =
+          clampHeight(baseHeight) ?? clampHeight(fallbackCardHeight) ?? clampHeight(480);
+        const displayHeight = Math.max(120, Math.round(safeBase * scale));
         emb.style.minHeight = `${displayHeight}px`;
         frameWrap.style.height = `${displayHeight}px`;
-        iframe.style.height = `${baseHeight}px`;
+        iframe.style.height = `${safeBase}px`;
         iframe.style.width = scale === 1 ? '100%' : `${(100 / scale).toFixed(2)}%`;
         iframe.style.transform = scale === 1 ? 'none' : `scale(${scale})`;
         iframe.style.transformOrigin = 'top left';
-        if (Number.isFinite(g.frameHeight) || Number.isFinite(g.h)) {
-          iframe.style.aspectRatio = 'auto';
+        iframe.dataset.baseHeight = String(safeBase);
+        iframe.dataset.scale = String(scale);
+        iframe.style.aspectRatio = 'auto';
+      };
+
+      const measureHeight = () => {
+        try {
+          const doc = iframe.contentDocument;
+          if (!doc) return null;
+          const body = doc.body ? doc.body.scrollHeight : 0;
+          const root = doc.documentElement ? doc.documentElement.scrollHeight : 0;
+          const measured = Math.max(body, root);
+          if (!Number.isFinite(measured) || measured <= 0) return null;
+          return clampHeight(measured);
+        } catch {
+          return null;
         }
-      }
+      };
+
+      const syncMeasuredHeight = () => {
+        const measured = measureHeight();
+        if (!measured) return;
+        if (!baseHeight || Math.abs(measured - baseHeight) > 2) {
+          baseHeight = measured;
+          g.frameHeight = measured;
+          g.h = measured;
+          applySizing();
+          if (typeof persist === 'function') {
+            persist();
+          }
+        }
+      };
+
+      applySizing();
+
+      iframe.addEventListener('load', () => {
+        scale = clampScale(g.scale ?? defaultScale);
+        applySizing();
+        syncMeasuredHeight();
+        window.setTimeout(syncMeasuredHeight, 400);
+      });
 
       frameWrap.appendChild(iframe);
       emb.appendChild(frameWrap);

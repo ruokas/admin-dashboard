@@ -401,12 +401,6 @@ dialog form {
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.chart-preview__frame--resizing {
-  border-style: solid;
-  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
-}
-
 .chart-preview__frame[data-state='loading'] {
   border-style: solid;
   border-color: color-mix(in srgb, var(--accent) 55%, transparent);
@@ -417,57 +411,6 @@ dialog form {
   border-style: solid;
   border-color: color-mix(in srgb, var(--danger) 60%, transparent);
   background: color-mix(in srgb, var(--danger) 14%, transparent);
-}
-
-.chart-preview__resize-handle {
-  position: absolute;
-  background: color-mix(in srgb, var(--surface-raised) 70%, var(--border-strong));
-  border-radius: var(--space-1);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--border-strong) 40%, transparent);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s ease;
-}
-
-.chart-preview__resize-handle::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-}
-
-.chart-preview__resize-handle--right {
-  top: var(--space-2);
-  bottom: var(--space-2);
-  right: -6px;
-  width: 12px;
-  cursor: ew-resize;
-}
-
-.chart-preview__resize-handle--bottom {
-  left: var(--space-2);
-  right: var(--space-2);
-  bottom: -6px;
-  height: 12px;
-  cursor: ns-resize;
-}
-
-.chart-preview__resize-handle--corner {
-  width: 14px;
-  height: 14px;
-  right: -6px;
-  bottom: -6px;
-  cursor: nwse-resize;
-}
-
-.chart-preview__frame[data-state='ready'] .chart-preview__resize-handle,
-.chart-preview__frame[data-state='loading'] .chart-preview__resize-handle {
-  pointer-events: auto;
-}
-
-.chart-preview__frame:hover .chart-preview__resize-handle,
-.chart-preview__frame--resizing .chart-preview__resize-handle {
-  opacity: 1;
 }
 
 .chart-preview__placeholder {

@@ -1148,12 +1148,19 @@ async function addChart() {
     name: res.title,
     url: res.url,
     scale: Number.isFinite(res.scale) ? Number(res.scale) : 1,
-    frameHeight: Number.isFinite(res.height) ? Math.round(res.height) : undefined,
+    frameHeight: Number.isFinite(res.frameHeight)
+      ? Math.round(res.frameHeight)
+      : Number.isFinite(res.height)
+        ? Math.round(res.height)
+        : undefined,
     width,
     height,
     wSize: sizeFromWidth(width),
     hSize: sizeFromHeight(height),
   };
+  if (Number.isFinite(chart.frameHeight)) {
+    chart.h = chart.frameHeight;
+  }
   applySizeMetadata(chart, width, height);
   state.groups.push(chart);
   persistState();
@@ -1234,7 +1241,7 @@ async function editChart(gid) {
     title: g.name,
     url: g.url,
     scale: Number.isFinite(g.scale) ? g.scale : 1,
-    height: Number.isFinite(g.frameHeight)
+    frameHeight: Number.isFinite(g.frameHeight)
       ? g.frameHeight
       : Number.isFinite(g.h)
         ? g.h
@@ -1244,9 +1251,14 @@ async function editChart(gid) {
   g.name = res.title;
   g.url = res.url;
   g.scale = Number.isFinite(res.scale) ? Number(res.scale) : 1;
-  if (Number.isFinite(res.height)) {
-    g.frameHeight = Math.round(res.height);
-    g.h = g.frameHeight;
+  const nextHeight = Number.isFinite(res.frameHeight)
+    ? Math.round(res.frameHeight)
+    : Number.isFinite(res.height)
+      ? Math.round(res.height)
+      : null;
+  if (Number.isFinite(nextHeight)) {
+    g.frameHeight = nextHeight;
+    g.h = nextHeight;
   } else {
     delete g.frameHeight;
     delete g.h;

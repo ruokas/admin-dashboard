@@ -654,9 +654,8 @@ export function chartFormDialog(T, data = {}) {
     const MIN_SCALE_PERCENT = 50;
     const MAX_SCALE_PERCENT = 200;
     const DEFAULT_PREVIEW_HEIGHT = 480;
-    const MIN_HEIGHT = 120;
-    const MAX_HEIGHT = 2000;
-    const SCALE_DRAG_SENSITIVITY = 0.35;
+    const MIN_AUTO_HEIGHT = 120;
+    const MAX_AUTO_HEIGHT = 2000;
 
     const dlg = document.createElement('dialog');
     dlg.innerHTML = `<form method="dialog" id="chartForm">
@@ -672,13 +671,10 @@ export function chartFormDialog(T, data = {}) {
             <input type="range" name="scale" min="${MIN_SCALE_PERCENT}" max="${MAX_SCALE_PERCENT}" step="5">
             <span class="chart-form__scale-value" data-chart-scale-value>100%</span>
           </label>
-          <label class="chart-form__height">${T.chartHeight || 'Iframe aukštis (px)'}
-            <input type="number" name="height" min="${MIN_HEIGHT}" max="${MAX_HEIGHT}" step="10" inputmode="numeric" pattern="[0-9]*" placeholder="${DEFAULT_PREVIEW_HEIGHT}">
-          </label>
         </div>
         <p class="hint">${
           T.chartHint ||
-          'Pateikite iframe nuorodą arba įterpimo kodą. Mastelis leidžia pritaikyti grafiką kortelės aukščiui.'
+          'Įveskite iframe nuorodą ar kodą. Kortelės aukštis prisitaiko automatiškai, mastelį keiskite slankikliu.'
         }</p>
       </fieldset>
       <section class="chart-preview" aria-live="polite">
@@ -692,9 +688,6 @@ export function chartFormDialog(T, data = {}) {
           </p>
         </header>
         <div class="chart-preview__frame" data-state="empty">
-          <div class="chart-preview__resize-handle chart-preview__resize-handle--right" data-chart-resize="x" aria-hidden="true"></div>
-          <div class="chart-preview__resize-handle chart-preview__resize-handle--bottom" data-chart-resize="y" aria-hidden="true"></div>
-          <div class="chart-preview__resize-handle chart-preview__resize-handle--corner" data-chart-resize="xy" aria-hidden="true"></div>
           <div class="chart-preview__placeholder" data-chart-placeholder>${
             T.chartPreviewPlaceholder || 'Įveskite nuorodą, kad pamatytumėte grafiką.'
           }</div>
@@ -705,7 +698,7 @@ export function chartFormDialog(T, data = {}) {
         <p class="chart-preview__status" data-chart-status></p>
         <p class="chart-preview__hint">${
           T.chartDragHint ||
-          'Tempkite peržiūrą, kad keistumėte mastelį (į šoną) ir aukštį (žemyn).'
+          'Reguliuokite mastelį slankikliu aukščiau – kortelės aukštis prisitaikys automatiškai.'
         }</p>
       </section>
       <p class="error" id="chartErr" role="status" aria-live="polite"></p>
@@ -724,7 +717,6 @@ export function chartFormDialog(T, data = {}) {
     const urlField = form.elements.url;
     const titleField = form.elements.title;
     const scaleField = form.elements.scale;
-    const heightField = form.elements.height;
     const scaleValue = form.querySelector('[data-chart-scale-value]');
     const scaleLabel = form.querySelector('[data-chart-scale-label]');
     const heightLabel = form.querySelector('[data-chart-height-label]');
@@ -732,17 +724,16 @@ export function chartFormDialog(T, data = {}) {
     const previewFrame = previewWrap.querySelector('iframe');
     const previewPlaceholder = form.querySelector('[data-chart-placeholder]');
     const previewStatus = form.querySelector('[data-chart-status]');
-    const resizeHandles = form.querySelectorAll('[data-chart-resize]');
 
     const initialScale = Number.isFinite(data.scale)
       ? Math.round(Number(data.scale) * 100)
       : DEFAULT_SCALE_PERCENT;
-    const initialHeight = [data.height, data.frameHeight, data.h]
+    const initialHeight = [data.frameHeight, data.height, data.h]
       .map((val) => Number(val))
       .find((val) => Number.isFinite(val));
 
     let derivedHeight = Number.isFinite(initialHeight)
-      ? Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, initialHeight))
+      ? Math.max(MIN_AUTO_HEIGHT, Math.min(MAX_AUTO_HEIGHT, initialHeight))
       : null;
     let currentSrc = '';
     let hasLoaded = false;
@@ -756,14 +747,10 @@ export function chartFormDialog(T, data = {}) {
     const clampHeight = (value) => {
       const numeric = Number.parseInt(value, 10);
       if (!Number.isFinite(numeric)) return null;
-      return Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, numeric));
+      return Math.min(MAX_AUTO_HEIGHT, Math.max(MIN_AUTO_HEIGHT, numeric));
     };
 
-    const normaliseScale = (value) => clampPercent(value) / 100;
-
     const computeBaseHeight = () => {
-      const manual = clampHeight(heightField.value);
-      if (manual) return manual;
       if (derivedHeight) return derivedHeight;
       return DEFAULT_PREVIEW_HEIGHT;
     };
@@ -820,6 +807,20 @@ export function chartFormDialog(T, data = {}) {
       previewWrap.dataset.height = String(baseHeight);
     };
 
+    const measureFrameHeight = () => {
+      try {
+        const doc = previewFrame.contentDocument;
+        if (!doc) return null;
+        const body = doc.body ? doc.body.scrollHeight : 0;
+        const root = doc.documentElement ? doc.documentElement.scrollHeight : 0;
+        const size = Math.max(body, root);
+        if (!Number.isFinite(size) || size <= 0) return null;
+        return clampHeight(size);
+      } catch {
+        return null;
+      }
+    };
+
     const updatePreview = () => {
       err.textContent = '';
       const raw = urlField.value.trim();
@@ -851,14 +852,15 @@ export function chartFormDialog(T, data = {}) {
       previewWrap.dataset.state = currentSrc === src && hasLoaded ? 'ready' : 'loading';
       previewStatus.textContent = currentSrc === src && hasLoaded ? '' : T.chartPreviewLoading || 'Kraunama…';
       previewPlaceholder.hidden = true;
-      if (height && !heightField.value) {
-        derivedHeight = clampHeight(height);
-        if (derivedHeight) heightField.value = derivedHeight;
-      } else if (height) {
-        derivedHeight = clampHeight(height);
+      if (height) {
+        const clamped = clampHeight(height);
+        if (clamped) {
+          derivedHeight = clamped;
+        }
       }
       if (currentSrc !== src) {
         currentSrc = src;
+        hasLoaded = false;
         previewFrame.src = src;
       } else {
         applySizing();
@@ -870,97 +872,20 @@ export function chartFormDialog(T, data = {}) {
       if (!currentSrc) return;
       previewWrap.dataset.state = 'ready';
       previewStatus.textContent = '';
+      const measured = measureFrameHeight();
+      if (measured) {
+        derivedHeight = measured;
+      }
       applySizing();
     };
     previewFrame.addEventListener('load', handlePreviewLoad);
-
-    let stopActiveResize = null;
-
-    const startResize = (type, startEvent) => {
-      if (startEvent.button !== 0 && startEvent.pointerType !== 'touch' && startEvent.pointerType !== 'pen') {
-        return;
-      }
-      if (typeof stopActiveResize === 'function') {
-        stopActiveResize();
-      }
-      startEvent.preventDefault();
-      const pointerId = startEvent.pointerId;
-      const startX = startEvent.clientX;
-      const startY = startEvent.clientY;
-      const startPercent = clampPercent(scaleField.value || DEFAULT_SCALE_PERCENT);
-      const startHeight = computeBaseHeight();
-      previewWrap.dataset.resizing = type;
-      previewWrap.classList.add('chart-preview__frame--resizing');
-      const originalUserSelect = document.body.style.userSelect;
-      document.body.style.userSelect = 'none';
-
-      const handleMove = (moveEvent) => {
-        if (moveEvent.pointerId !== pointerId) return;
-        moveEvent.preventDefault();
-        const deltaX = moveEvent.clientX - startX;
-        const deltaY = moveEvent.clientY - startY;
-        if (type === 'x' || type === 'xy') {
-          const nextPercent = clampPercent(
-            Math.round(startPercent + deltaX * SCALE_DRAG_SENSITIVITY),
-          );
-          if (nextPercent !== clampPercent(scaleField.value || startPercent)) {
-            scaleField.value = nextPercent;
-          }
-        }
-        if (type === 'y' || type === 'xy') {
-          const proposedHeight = Math.round(startHeight + deltaY);
-          const nextHeight = clampHeight(proposedHeight);
-          if (Number.isFinite(nextHeight)) {
-            heightField.value = nextHeight;
-          }
-        }
-        applySizing();
-      };
-
-      const finishResize = () => {
-        previewWrap.classList.remove('chart-preview__frame--resizing');
-        delete previewWrap.dataset.resizing;
-        document.body.style.userSelect = originalUserSelect;
-        window.removeEventListener('pointermove', handleMove);
-        window.removeEventListener('pointerup', handleEnd);
-        window.removeEventListener('pointercancel', handleEnd);
-        try {
-          startEvent.target.releasePointerCapture(pointerId);
-        } catch {
-          /* ignore */
-        }
-        stopActiveResize = null;
-      };
-
-      const handleEnd = (endEvent) => {
-        if (pointerId && endEvent.pointerId !== pointerId) return;
-        finishResize();
-      };
-
-      window.addEventListener('pointermove', handleMove);
-      window.addEventListener('pointerup', handleEnd);
-      window.addEventListener('pointercancel', handleEnd);
-      try {
-        startEvent.target.setPointerCapture(pointerId);
-      } catch {
-        /* ignore */
-      }
-      stopActiveResize = finishResize;
-    };
 
     function cleanup() {
       form.removeEventListener('submit', submit);
       cancel.removeEventListener('click', close);
       urlField.removeEventListener('input', handleUrlInput);
       scaleField.removeEventListener('input', handleScaleInput);
-      heightField.removeEventListener('input', handleHeightInput);
       previewFrame.removeEventListener('load', handlePreviewLoad);
-      resizeHandles.forEach((handle) => {
-        handle.removeEventListener('pointerdown', handleResizePointerDown);
-      });
-      if (typeof stopActiveResize === 'function') {
-        stopActiveResize();
-      }
       dlg.remove();
       prevFocus?.focus();
     }
@@ -974,20 +899,6 @@ export function chartFormDialog(T, data = {}) {
       applySizing();
     };
 
-    const handleHeightInput = () => {
-      const manual = clampHeight(heightField.value);
-      if (manual) {
-        heightField.value = manual;
-      }
-      applySizing();
-    };
-
-    const handleResizePointerDown = (event) => {
-      const type = event.currentTarget?.dataset?.chartResize;
-      if (!type) return;
-      startResize(type, event);
-    };
-
     function submit(e) {
       e.preventDefault();
       const title = titleField.value.trim();
@@ -996,20 +907,19 @@ export function chartFormDialog(T, data = {}) {
         err.textContent = T.required;
         return;
       }
-      const { src, height } = parseEmbed(rawUrl);
+      const { src } = parseEmbed(rawUrl);
       if (!isValidUrl(src)) {
         err.textContent = T.invalidUrl;
         return;
       }
       const percent = clampPercent(scaleField.value || DEFAULT_SCALE_PERCENT);
-      const scale = percent / 100;
-      const manualHeight = clampHeight(heightField.value);
-      const finalHeight = manualHeight ?? (height ? clampHeight(height) : null);
+      const baseHeight = computeBaseHeight();
       resolve({
         title,
         url: src,
-        scale,
-        height: finalHeight ?? null,
+        scale: percent / 100,
+        frameHeight: baseHeight,
+        height: baseHeight,
       });
       cleanup();
     }
@@ -1022,19 +932,12 @@ export function chartFormDialog(T, data = {}) {
     titleField.value = data.title || '';
     urlField.value = data.url || '';
     scaleField.value = clampPercent(initialScale || DEFAULT_SCALE_PERCENT);
-    if (derivedHeight) {
-      heightField.value = derivedHeight;
-    }
 
     form.addEventListener('submit', submit);
     cancel.addEventListener('click', close);
     dlg.addEventListener('cancel', close);
     urlField.addEventListener('input', handleUrlInput);
     scaleField.addEventListener('input', handleScaleInput);
-    heightField.addEventListener('input', handleHeightInput);
-    resizeHandles.forEach((handle) => {
-      handle.addEventListener('pointerdown', handleResizePointerDown);
-    });
 
     dlg.showModal();
     const first = dlg.querySelector(
