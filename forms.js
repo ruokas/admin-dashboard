@@ -715,49 +715,411 @@ export function notesDialog(
   },
 ) {
   return new Promise((resolve) => {
+    const HEX_COLOR_RE = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
+    const DEFAULT_NOTE_COLOR = '#fef08a';
+
+    const TEMPLATE_OPTIONS = [
+      {
+        id: 'handover',
+        label: T.noteTemplateHandover || 'Perdavimo santrauka',
+        body: `Pacientai:
+- ..
+- ..
+
+Rizikos/veiksmai:
+- ..
+
+Papildomi komentarai:
+- ..`,
+      },
+      {
+        id: 'shift',
+        label: T.noteTemplateShift || 'Pamainos užduotys',
+        body: `Pradžia:
+- ..
+
+Vidurys:
+- ..
+
+Pabaiga:
+- ..`,
+      },
+      {
+        id: 'checklist',
+        label: T.noteTemplateChecklist || 'Check-list forma',
+        body: `☐ Vaistų papildymas
+☐ Technika patikrinta
+☐ Skambinti konsiliui`,
+      },
+    ];
+
+    function expandHex(hex) {
+      if (!HEX_COLOR_RE.test(hex)) return null;
+      const lower = hex.toLowerCase();
+      if (lower.length === 4) {
+        return (
+          '#' +
+          lower
+            .slice(1)
+            .split('')
+            .map((ch) => ch + ch)
+            .join('')
+        );
+      }
+      return lower;
+    }
+
+    function hexToRgb(hex) {
+      const normalized = expandHex(hex);
+      if (!normalized) return null;
+      return {
+        r: Number.parseInt(normalized.slice(1, 3), 16),
+        g: Number.parseInt(normalized.slice(3, 5), 16),
+        b: Number.parseInt(normalized.slice(5, 7), 16),
+      };
+    }
+
+    function mixHex(base, target, ratio) {
+      const src = hexToRgb(base);
+      const dst = hexToRgb(target);
+      if (!src || !dst) return base;
+      const clampRatio = Math.max(0, Math.min(1, Number(ratio)));
+      const r = src.r + (dst.r - src.r) * clampRatio;
+      const g = src.g + (dst.g - src.g) * clampRatio;
+      const b = src.b + (dst.b - src.b) * clampRatio;
+      const toHex = (n) =>
+        Math.max(0, Math.min(255, Math.round(n)))
+          .toString(16)
+          .padStart(2, '0');
+      return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+    }
+
+    function normalizeHex(hex, fallback = DEFAULT_NOTE_COLOR) {
+      if (typeof hex !== 'string') return fallback;
+      const trimmed = hex.trim();
+      if (HEX_COLOR_RE.test(trimmed)) {
+        return expandHex(trimmed) || fallback;
+      }
+      return fallback;
+    }
+
+    function getContrastColor(hex) {
+      const rgb = hexToRgb(hex);
+      if (!rgb) return '#1f2937';
+      const toLinear = (val) => {
+        const channel = val / 255;
+        return channel <= 0.03928
+          ? channel / 12.92
+          : Math.pow((channel + 0.055) / 1.055, 2.4);
+      };
+      const l =
+        0.2126 * toLinear(rgb.r) +
+        0.7152 * toLinear(rgb.g) +
+        0.0722 * toLinear(rgb.b);
+      return l > 0.6 ? '#1f2937' : '#f9fafb';
+    }
+
+    function makeAutoGradient(hex) {
+      const normalized = expandHex(hex);
+      if (!normalized) {
+        return `linear-gradient(135deg, ${hex}, ${hex})`;
+      }
+      const bright = mixHex(normalized, '#ffffff', 0.35);
+      const deep = mixHex(normalized, '#000000', 0.15);
+      return `linear-gradient(135deg, ${bright}, ${normalized}, ${deep})`;
+    }
+
+    const paletteColors = [
+      { value: DEFAULT_NOTE_COLOR, label: 'Ryški gelsva' },
+      { value: '#bae6fd', label: 'Rami žydra' },
+      { value: '#bbf7d0', label: 'Švelni žalia' },
+      { value: '#fde68a', label: 'Šilta geltona' },
+      { value: '#fecaca', label: 'Švelni rožinė' },
+      { value: '#c7d2fe', label: 'Levandų' },
+      { value: '#fbcfe8', label: 'Sodri rožinė' },
+      { value: '#e0f2fe', label: 'Šviesi mėlyna' },
+    ];
+
     const prevFocus = document.activeElement;
     const dlg = document.createElement('dialog');
-    dlg.innerHTML = `<form method="dialog" id="notesForm">
-      <label id="notesFormLabel">${T.noteTitle}<br><input name="title" type="text"></label>
-      <label>${T.notes}<br><textarea name="note" rows="8"></textarea></label>
-      <label>${T.noteSize}<br><input name="size" type="number" min="10" max="48"></label>
-      <label>${T.notePadding}<br><input name="padding" type="number" min="0" max="100"></label>
-      <label>${T.noteColor}<br><input name="color" type="color"></label>
+    const paletteButtons = paletteColors
+      .map((c) => {
+        const norm = normalizeHex(c.value);
+        const gradient = makeAutoGradient(norm);
+        return `<button type="button" data-color="${norm}" class="note-form__palette-btn" style="--swatch:${norm};--swatch-gradient:${gradient}" aria-label="${escapeHtml(
+          c.label,
+        )}" aria-pressed="false"></button>`;
+      })
+      .join('');
+
+    const templateButtons = TEMPLATE_OPTIONS.map(
+      (tpl) =>
+        `<button type="button" class="note-form__template" data-template="${tpl.id}">${escapeHtml(
+          tpl.label,
+        )}</button>`,
+    ).join('');
+
+    const clearTemplateBtn = `<button type="button" class="note-form__template note-form__template--clear" data-template="clear">${escapeHtml(
+      T.noteTemplateClear || 'Išvalyti tekstą',
+    )}</button>`;
+
+    const subtitle = escapeHtml(
+      T.noteDialogSubtitle || 'Aprašykite svarbiausius veiksmus ar priminimus vienoje vietoje.',
+    );
+
+    dlg.innerHTML = `<form method="dialog" id="notesForm" class="group-form note-form">
+      <header class="group-form__header note-form__header">
+        <h2 id="notesFormLabel">${escapeHtml(
+          T.noteDialogTitle || T.addNote || 'Nauja pastabų kortelė',
+        )}</h2>
+        <p class="group-form__description">${subtitle}</p>
+      </header>
+      <section class="group-form__field">
+        <label class="group-form__label" for="noteTitleInput">${escapeHtml(
+          T.noteTitle || 'Pastabų pavadinimas',
+        )}</label>
+        <input id="noteTitleInput" name="title" type="text" autocomplete="off" placeholder="${escapeHtml(
+          T.noteTitleHint || '',
+        )}">
+      </section>
+      <section class="group-form__field note-form__field">
+        <div class="group-form__label-row">
+          <label class="group-form__label" for="noteBodyInput">${escapeHtml(
+            T.notes || 'Pastabos',
+          )}</label>
+          <span class="group-form__hint" data-note-char-count>0</span>
+        </div>
+        <textarea id="noteBodyInput" name="note" rows="8" placeholder="${escapeHtml(
+          T.noteContentPlaceholder || '',
+        )}"></textarea>
+        <div class="note-form__templates" aria-label="${escapeHtml(
+          T.noteTemplatesTitle || 'Greiti šablonai',
+        )}">
+          <span class="note-form__templates-label">${escapeHtml(
+            T.noteTemplatesTitle || 'Greitos užpildymo parinktys',
+          )}</span>
+          <div class="note-form__templates-actions">
+            ${templateButtons}${clearTemplateBtn}
+          </div>
+        </div>
+      </section>
+      <section class="group-form__field">
+        <span class="group-form__label">${escapeHtml(
+          T.noteAppearanceTitle || 'Išvaizda',
+        )}</span>
+        <div class="note-form__slider">
+          <label for="noteSizeInput">${escapeHtml(T.noteFontLabel || 'Šrifto dydis')}</label>
+          <div class="note-form__slider-row">
+            <input id="noteSizeInput" name="size" type="range" min="12" max="36" step="1">
+            <output data-note-size-value>0px</output>
+          </div>
+        </div>
+        <div class="note-form__slider">
+          <label for="notePaddingInput">${escapeHtml(
+            T.notePaddingLabel || 'Kortelės paraštės',
+          )}</label>
+          <div class="note-form__slider-row">
+            <input id="notePaddingInput" name="padding" type="range" min="8" max="60" step="2">
+            <output data-note-padding-value>0px</output>
+          </div>
+        </div>
+      </section>
+      <section class="group-form__field" aria-labelledby="noteColorLabel">
+        <div class="group-form__label-row">
+          <span id="noteColorLabel" class="group-form__label">${escapeHtml(
+            T.noteColor || 'Kortelės spalva',
+          )}</span>
+        </div>
+        <div class="note-form__colors">
+          <div class="note-form__palette" role="listbox" aria-labelledby="noteColorLabel">
+            ${paletteButtons}
+          </div>
+          <label class="group-form__custom-color note-form__custom-color">
+            <input name="color" type="color" aria-label="${escapeHtml(
+              T.groupColorCustom || 'Pasirinktinė spalva',
+            )}">
+            <span class="group-form__custom-label">${escapeHtml(
+              T.groupColorCustom || 'Pasirinktinė spalva',
+            )}</span>
+          </label>
+        </div>
+      </section>
+      <section class="group-form__field note-form__preview">
+        <span class="group-form__label">${escapeHtml(T.notePreviewTitle || T.preview || 'Peržiūra')}</span>
+        <article class="note-preview" data-note-preview>
+          <h3 data-note-preview-title></h3>
+          <p data-note-preview-text>${escapeHtml(
+            T.notePreviewPlaceholder || 'Čia matysite, kaip atrodys kortelė.',
+          )}</p>
+        </article>
+      </section>
       <menu>
         <button type="button" data-act="cancel">${T.cancel}</button>
         <button type="submit" class="btn-accent">${T.save}</button>
       </menu>
     </form>`;
+
     dlg.setAttribute('aria-modal', 'true');
     dlg.setAttribute('aria-labelledby', 'notesFormLabel');
     document.body.appendChild(dlg);
+
     const form = dlg.querySelector('form');
     const cancel = form.querySelector('[data-act="cancel"]');
-    form.title.value = data.title || '';
-    form.note.value = data.text || '';
-    const initSize = Number.parseInt(data.size, 10);
-    const initPadding = Number.parseInt(data.padding, 10);
-    form.size.value = Number.isFinite(initSize) ? initSize : 20;
-    form.padding.value = Number.isFinite(initPadding) ? initPadding : 20;
-    form.color.value = data.color || '#fef08a';
+    const noteInput = form.note;
+    const titleInput = form.title;
+    const sizeInput = form.size;
+    const paddingInput = form.padding;
+    const colorInput = form.color;
+    const charCountEl = form.querySelector('[data-note-char-count]');
+    const sizeOutput = form.querySelector('[data-note-size-value]');
+    const paddingOutput = form.querySelector('[data-note-padding-value]');
+    const previewCard = form.querySelector('[data-note-preview]');
+    const previewTitle = form.querySelector('[data-note-preview-title]');
+    const previewText = form.querySelector('[data-note-preview-text]');
+    const templateContainer = form.querySelector('.note-form__templates-actions');
+    const paletteContainer = form.querySelector('.note-form__palette');
+    const paletteButtonsEls = Array.from(
+      form.querySelectorAll('.note-form__palette button[data-color]'),
+    );
+
+    const initialSize = Number.isFinite(Number.parseInt(data.size, 10))
+      ? Number.parseInt(data.size, 10)
+      : 20;
+    const initialPadding = Number.isFinite(Number.parseInt(data.padding, 10))
+      ? Number.parseInt(data.padding, 10)
+      : 20;
+    const initialColor = normalizeHex(data.color || DEFAULT_NOTE_COLOR);
+
+    titleInput.value = data.title || '';
+    noteInput.value = data.text || '';
+    sizeInput.value = initialSize;
+    paddingInput.value = initialPadding;
+    colorInput.value = initialColor;
+
+    function updateCharCount() {
+      const count = noteInput.value.length;
+      const template = T.noteCharCount || '{count} simbolių';
+      charCountEl.textContent = template.replace('{count}', count.toString());
+    }
+
+    function updatePaletteSelection(value) {
+      paletteButtonsEls.forEach((btn) => {
+        const selected = btn.dataset.color?.toLowerCase() === value.toLowerCase();
+        btn.setAttribute('aria-pressed', selected ? 'true' : 'false');
+      });
+    }
+
+    function applyColor(value) {
+      if (!value) return;
+      const normalized = normalizeHex(value, DEFAULT_NOTE_COLOR);
+      colorInput.value = normalized;
+      colorInput.style.setProperty('--custom-swatch', normalized);
+      previewCard.style.setProperty('--note-preview-bg', normalized);
+      previewCard.style.setProperty('--note-preview-text', getContrastColor(normalized));
+      updatePaletteSelection(normalized);
+    }
+
+    function updatePreview() {
+      const title = titleInput.value.trim() || T.notes || 'Pastabos';
+      const body = noteInput.value.trim();
+      previewTitle.textContent = title;
+      previewText.textContent = body || T.notePreviewPlaceholder || 'Čia matysite, kaip atrodys kortelė.';
+      const sizeVal = Number.parseInt(sizeInput.value, 10);
+      const paddingVal = Number.parseInt(paddingInput.value, 10);
+      previewCard.style.setProperty('--note-preview-font', `${
+        Number.isFinite(sizeVal) ? sizeVal : 20
+      }px`);
+      previewCard.style.setProperty('--note-preview-padding', `${
+        Number.isFinite(paddingVal) ? paddingVal : 20
+      }px`);
+      sizeOutput.textContent = `${Number.isFinite(sizeVal) ? sizeVal : 20}px`;
+      paddingOutput.textContent = `${Number.isFinite(paddingVal) ? paddingVal : 20}px`;
+    }
+
+    function insertTemplate(templateId) {
+      if (templateId === 'clear') {
+        noteInput.value = '';
+        noteInput.dispatchEvent(new Event('input', { bubbles: true }));
+        return;
+      }
+      const tpl = TEMPLATE_OPTIONS.find((t) => t.id === templateId);
+      if (!tpl) return;
+      const existing = noteInput.value.trim();
+      noteInput.value = existing ? `${existing}\n\n${tpl.body}` : tpl.body;
+      noteInput.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    function handleTemplateClick(e) {
+      const btn = e.target.closest('[data-template]');
+      if (!btn) return;
+      e.preventDefault();
+      insertTemplate(btn.dataset.template);
+    }
+
+    function handlePaletteClick(e) {
+      const btn = e.target.closest('button[data-color]');
+      if (!btn) return;
+      e.preventDefault();
+      applyColor(btn.dataset.color);
+      btn.focus();
+    }
+
+    function handlePaletteKeydown(e) {
+      if (!['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) {
+        return;
+      }
+      const current = document.activeElement;
+      const index = paletteButtonsEls.indexOf(current);
+      if (index === -1) return;
+      e.preventDefault();
+      let nextIndex = index;
+      if (e.key === 'Home') nextIndex = 0;
+      else if (e.key === 'End') nextIndex = paletteButtonsEls.length - 1;
+      else if (e.key === 'ArrowRight' || e.key === 'ArrowDown')
+        nextIndex = Math.min(paletteButtonsEls.length - 1, index + 1);
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp')
+        nextIndex = Math.max(0, index - 1);
+      const next = paletteButtonsEls[nextIndex];
+      next?.focus();
+      if (next?.dataset.color) {
+        applyColor(next.dataset.color);
+      }
+    }
+
+    function handleColorInput(e) {
+      applyColor(e.target.value);
+    }
 
     function cleanup() {
       form.removeEventListener('submit', submit);
       cancel.removeEventListener('click', close);
+      templateContainer?.removeEventListener('click', handleTemplateClick);
+      paletteContainer?.removeEventListener('click', handlePaletteClick);
+      paletteContainer?.removeEventListener('keydown', handlePaletteKeydown);
+      noteInput.removeEventListener('input', handleInputChange);
+      titleInput.removeEventListener('input', handleInputChange);
+      sizeInput.removeEventListener('input', handleInputChange);
+      paddingInput.removeEventListener('input', handleInputChange);
+      colorInput.removeEventListener('input', handleColorInput);
       dlg.remove();
       prevFocus?.focus();
     }
 
+    function handleInputChange() {
+      updateCharCount();
+      updatePreview();
+    }
+
     function submit(e) {
       e.preventDefault();
-      const sizeVal = Number.parseInt(form.size.value, 10);
-      const paddingVal = Number.parseInt(form.padding.value, 10);
+      const sizeVal = Number.parseInt(sizeInput.value, 10);
+      const paddingVal = Number.parseInt(paddingInput.value, 10);
       resolve({
-        title: form.title.value.trim(),
-        text: form.note.value.trim(),
+        title: titleInput.value.trim(),
+        text: noteInput.value.trim(),
         size: Number.isFinite(sizeVal) ? sizeVal : 20,
         padding: Number.isFinite(paddingVal) ? paddingVal : 20,
-        color: form.color.value || '#fef08a',
+        color: colorInput.value || DEFAULT_NOTE_COLOR,
       });
       cleanup();
     }
@@ -767,9 +1129,22 @@ export function notesDialog(
       cleanup();
     }
 
+    templateContainer?.addEventListener('click', handleTemplateClick);
+    paletteContainer?.addEventListener('click', handlePaletteClick);
+    paletteContainer?.addEventListener('keydown', handlePaletteKeydown);
+    colorInput.addEventListener('input', handleColorInput);
+    noteInput.addEventListener('input', handleInputChange);
+    titleInput.addEventListener('input', handleInputChange);
+    sizeInput.addEventListener('input', handleInputChange);
+    paddingInput.addEventListener('input', handleInputChange);
     form.addEventListener('submit', submit);
     cancel.addEventListener('click', close);
     dlg.addEventListener('cancel', close);
+
+    applyColor(initialColor);
+    updateCharCount();
+    updatePreview();
+
     dlg.showModal();
     const first = dlg.querySelector(
       'input, select, textarea, button, [href], [tabindex]:not([tabindex="-1"])',
