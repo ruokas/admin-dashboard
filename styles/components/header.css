@@ -201,7 +201,7 @@ body.is-editing .page-icon-action:focus-visible .page-icon-action-label {
 .help-btn::after {
   content: attr(data-tooltip);
   position: absolute;
-  bottom: calc(100% + var(--space-2));
+  top: calc(100% + var(--space-2));
   inset-inline-start: 50%;
   transform: translate(-50%, 4px);
   padding: var(--space-1) var(--space-2);
@@ -220,12 +220,12 @@ body.is-editing .page-icon-action:focus-visible .page-icon-action-label {
 .help-btn::before {
   content: '';
   position: absolute;
-  bottom: calc(100% + var(--space-2) - 4px);
+  top: calc(100% + var(--space-2) - 4px);
   inset-inline-start: 50%;
   transform: translateX(-50%);
-  border-width: 0 6px 6px 6px;
+  border-width: 6px 6px 0 6px;
   border-style: solid;
-  border-color: transparent transparent rgba(8, 13, 18, 0.92) transparent;
+  border-color: rgba(8, 13, 18, 0.92) transparent transparent transparent;
   opacity: 0;
   transition: opacity 160ms ease;
   z-index: 1;
@@ -258,7 +258,7 @@ body.is-editing .page-icon-action:focus-visible .page-icon-action-label {
 }
 
 .theme-light .help-btn::before {
-  border-color: transparent transparent rgba(12, 17, 22, 0.92) transparent;
+  border-color: rgba(12, 17, 22, 0.92) transparent transparent transparent;
 }
 
 @media (max-width: 640px) {
