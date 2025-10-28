@@ -477,20 +477,29 @@ dialog.item-form-dialog form {
   font-weight: 600;
 }
 
-.note-form__option select {
-  width: 100%;
-  padding: var(--space-1) var(--space-1-5);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-strong);
-  background: var(--surface);
-  color: var(--text);
-  font-size: var(--font-sm);
-  line-height: 1.4;
+.note-form__slider {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-1);
+  align-items: center;
 }
 
-.note-form__option select:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+.note-form__slider input[type='range'] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.note-form__slider input[type='range']:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 70%, transparent);
+  border-radius: 999px;
+}
+
+.note-form__slider output {
+  font-size: var(--font-xs);
+  color: var(--subtext);
+  min-width: 48px;
+  text-align: right;
 }
 
 .note-form__colors {
@@ -502,38 +511,6 @@ dialog.item-form-dialog form {
 
 .note-form__custom-color {
   min-width: 36px;
-}
-
-.note-form__preview {
-  gap: var(--space-1);
-}
-
-.note-preview {
-  --note-preview-bg: #facc15;
-  --note-preview-text: #1f2937;
-  --note-preview-font: 20px;
-  --note-preview-padding: 20px;
-  background: var(--note-preview-bg);
-  color: var(--note-preview-text);
-  border-radius: var(--radius-lg);
-  padding: var(--note-preview-padding);
-  display: grid;
-  gap: var(--space-0-75);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, black 6%, transparent);
-  max-height: 240px;
-  overflow: auto;
-}
-
-.note-preview h3 {
-  margin: 0;
-  font-size: calc(var(--note-preview-font) * 0.9);
-  font-weight: 700;
-}
-
-.note-preview p {
-  margin: 0;
-  font-size: var(--note-preview-font);
-  white-space: pre-wrap;
 }
 
 .help-dialog__form {

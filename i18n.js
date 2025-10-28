@@ -35,8 +35,6 @@ export const Tlt = {
   noteAppearanceTitle: 'Išvaizda',
   noteFontLabel: 'Šrifto dydis',
   notePaddingLabel: 'Kortelės paraštės',
-  notePreviewTitle: 'Peržiūra',
-  notePreviewPlaceholder: 'Čia matysite, kaip atrodys kortelė.',
   noteCharCount: '{count} simbolių',
   reminderMinutes: 'Priminimas po (min)',
   reminderMode: 'Priminimo tipas',

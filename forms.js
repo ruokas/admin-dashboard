@@ -768,22 +768,6 @@ export function notesDialog(
       return fallback;
     }
 
-    function getContrastColor(hex) {
-      const rgb = hexToRgb(hex);
-      if (!rgb) return '#1f2937';
-      const toLinear = (val) => {
-        const channel = val / 255;
-        return channel <= 0.03928
-          ? channel / 12.92
-          : Math.pow((channel + 0.055) / 1.055, 2.4);
-      };
-      const l =
-        0.2126 * toLinear(rgb.r) +
-        0.7152 * toLinear(rgb.g) +
-        0.0722 * toLinear(rgb.b);
-      return l > 0.6 ? '#1f2937' : '#f9fafb';
-    }
-
     function makeAutoGradient(hex) {
       const normalized = expandHex(hex);
       if (!normalized) {
@@ -805,8 +789,10 @@ export function notesDialog(
       { value: DEFAULT_NOTE_COLOR, label: 'Ryški gelsva' },
     ];
 
-    const sizeChoices = [16, 18, 20, 22, 24];
-    const paddingChoices = [12, 16, 20, 24, 28];
+    const SIZE_MIN = 14;
+    const SIZE_MAX = 36;
+    const PADDING_MIN = 8;
+    const PADDING_MAX = 48;
 
     const prevFocus = document.activeElement;
     const dlg = document.createElement('dialog');
@@ -857,11 +843,33 @@ export function notesDialog(
         <div class="note-form__options">
           <label class="note-form__option" for="noteSizeInput">
             <span>${escapeHtml(T.noteFontLabel || 'Šrifto dydis')}</span>
-            <select id="noteSizeInput" name="size"></select>
+            <div class="note-form__slider">
+              <input
+                id="noteSizeInput"
+                name="size"
+                type="range"
+                min="14"
+                max="36"
+                step="1"
+                aria-describedby="noteSizeValue"
+              >
+              <output id="noteSizeValue" data-note-size-output aria-live="polite"></output>
+            </div>
           </label>
           <label class="note-form__option" for="notePaddingInput">
             <span>${escapeHtml(T.notePaddingLabel || 'Kortelės paraštės')}</span>
-            <select id="notePaddingInput" name="padding"></select>
+            <div class="note-form__slider">
+              <input
+                id="notePaddingInput"
+                name="padding"
+                type="range"
+                min="8"
+                max="48"
+                step="1"
+                aria-describedby="notePaddingValue"
+              >
+              <output id="notePaddingValue" data-note-padding-output aria-live="polite"></output>
+            </div>
           </label>
         </div>
       </section>
@@ -885,15 +893,6 @@ export function notesDialog(
           </label>
         </div>
       </section>
-      <section class="group-form__field note-form__preview">
-        <span class="group-form__label">${escapeHtml(T.notePreviewTitle || T.preview || 'Peržiūra')}</span>
-        <article class="note-preview" data-note-preview>
-          <h3 data-note-preview-title></h3>
-          <p data-note-preview-text>${escapeHtml(
-            T.notePreviewPlaceholder || 'Čia matysite, kaip atrodys kortelė.',
-          )}</p>
-        </article>
-      </section>
       <menu>
         <button type="button" data-act="cancel">${T.cancel}</button>
         <button type="submit" class="btn-accent">${T.save}</button>
@@ -908,13 +907,12 @@ export function notesDialog(
     const cancel = form.querySelector('[data-act="cancel"]');
     const noteInput = form.note;
     const titleInput = form.title;
-    const sizeSelect = form.size;
-    const paddingSelect = form.padding;
+    const sizeSlider = form.size;
+    const paddingSlider = form.padding;
     const colorInput = form.color;
     const charCountEl = form.querySelector('[data-note-char-count]');
-    const previewCard = form.querySelector('[data-note-preview]');
-    const previewTitle = form.querySelector('[data-note-preview-title]');
-    const previewText = form.querySelector('[data-note-preview-text]');
+    const sizeOutput = form.querySelector('[data-note-size-output]');
+    const paddingOutput = form.querySelector('[data-note-padding-output]');
     const paletteContainer = form.querySelector('.group-form__palette');
     const paletteButtonsEls = Array.from(
       form.querySelectorAll('.group-form__palette button[data-color]'),
@@ -928,34 +926,47 @@ export function notesDialog(
       : 20;
     const initialColor = normalizeHex(data.color || DEFAULT_NOTE_COLOR);
 
-    if (!sizeChoices.includes(initialSize)) {
-      sizeChoices.push(initialSize);
-      sizeChoices.sort((a, b) => a - b);
-    }
-
-    if (!paddingChoices.includes(initialPadding)) {
-      paddingChoices.push(initialPadding);
-      paddingChoices.sort((a, b) => a - b);
-    }
-
-    function renderSelectOptions(selectEl, values) {
-      selectEl.innerHTML = values
-        .map((val) => `<option value="${val}">${val}px</option>`)
-        .join('');
-    }
+    const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+    const initialSizeValue = clamp(initialSize, SIZE_MIN, SIZE_MAX);
+    const initialPaddingValue = clamp(initialPadding, PADDING_MIN, PADDING_MAX);
 
     titleInput.value = data.title || '';
     noteInput.value = data.text || '';
-    renderSelectOptions(sizeSelect, sizeChoices);
-    renderSelectOptions(paddingSelect, paddingChoices);
-    sizeSelect.value = initialSize.toString();
-    paddingSelect.value = initialPadding.toString();
+    sizeSlider.min = SIZE_MIN.toString();
+    sizeSlider.max = SIZE_MAX.toString();
+    paddingSlider.min = PADDING_MIN.toString();
+    paddingSlider.max = PADDING_MAX.toString();
+    sizeSlider.value = initialSizeValue.toString();
+    paddingSlider.value = initialPaddingValue.toString();
     colorInput.value = initialColor;
 
     function updateCharCount() {
       const count = noteInput.value.length;
       const template = T.noteCharCount || '{count} simbolių';
       charCountEl.textContent = template.replace('{count}', count.toString());
+    }
+
+    function updateSliderOutput(slider, output, fallback) {
+      if (!output) return;
+      const value = Number.parseInt(slider.value, 10);
+      const min = Number.parseInt(slider.min, 10);
+      const max = Number.parseInt(slider.max, 10);
+      const safeValue = Number.isFinite(value)
+        ? clamp(
+            value,
+            Number.isFinite(min) ? min : value,
+            Number.isFinite(max) ? max : value,
+          )
+        : fallback;
+      output.textContent = `${safeValue} px`;
+    }
+
+    function handleSizeSliderInput() {
+      updateSliderOutput(sizeSlider, sizeOutput, initialSizeValue);
+    }
+
+    function handlePaddingSliderInput() {
+      updateSliderOutput(paddingSlider, paddingOutput, initialPaddingValue);
     }
 
     function updatePaletteSelection(value) {
@@ -970,24 +981,7 @@ export function notesDialog(
       const normalized = normalizeHex(value, DEFAULT_NOTE_COLOR);
       colorInput.value = normalized;
       colorInput.style.setProperty('--custom-swatch', normalized);
-      previewCard.style.setProperty('--note-preview-bg', normalized);
-      previewCard.style.setProperty('--note-preview-text', getContrastColor(normalized));
       updatePaletteSelection(normalized);
-    }
-
-    function updatePreview() {
-      const title = titleInput.value.trim() || T.notes || 'Pastabos';
-      const body = noteInput.value.trim();
-      previewTitle.textContent = title;
-      previewText.textContent = body || T.notePreviewPlaceholder || 'Čia matysite, kaip atrodys kortelė.';
-      const sizeVal = Number.parseInt(sizeSelect.value, 10);
-      const paddingVal = Number.parseInt(paddingSelect.value, 10);
-      previewCard.style.setProperty('--note-preview-font', `${
-        Number.isFinite(sizeVal) ? sizeVal : 20
-      }px`);
-      previewCard.style.setProperty('--note-preview-padding', `${
-        Number.isFinite(paddingVal) ? paddingVal : 20
-      }px`);
     }
 
     function handlePaletteClick(e) {
@@ -1029,29 +1023,27 @@ export function notesDialog(
       cancel.removeEventListener('click', close);
       paletteContainer?.removeEventListener('click', handlePaletteClick);
       paletteContainer?.removeEventListener('keydown', handlePaletteKeydown);
-      noteInput.removeEventListener('input', handleInputChange);
-      titleInput.removeEventListener('input', handleInputChange);
-      sizeSelect.removeEventListener('change', handleInputChange);
-      paddingSelect.removeEventListener('change', handleInputChange);
+      noteInput.removeEventListener('input', updateCharCount);
+      sizeSlider.removeEventListener('input', handleSizeSliderInput);
+      paddingSlider.removeEventListener('input', handlePaddingSliderInput);
       colorInput.removeEventListener('input', handleColorInput);
       dlg.remove();
       prevFocus?.focus();
     }
 
-    function handleInputChange() {
-      updateCharCount();
-      updatePreview();
-    }
-
     function submit(e) {
       e.preventDefault();
-      const sizeVal = Number.parseInt(sizeSelect.value, 10);
-      const paddingVal = Number.parseInt(paddingSelect.value, 10);
+      const sizeVal = Number.parseInt(sizeSlider.value, 10);
+      const paddingVal = Number.parseInt(paddingSlider.value, 10);
       resolve({
         title: titleInput.value.trim(),
         text: noteInput.value.trim(),
-        size: Number.isFinite(sizeVal) ? sizeVal : 20,
-        padding: Number.isFinite(paddingVal) ? paddingVal : 20,
+        size: Number.isFinite(sizeVal)
+          ? clamp(sizeVal, SIZE_MIN, SIZE_MAX)
+          : initialSizeValue,
+        padding: Number.isFinite(paddingVal)
+          ? clamp(paddingVal, PADDING_MIN, PADDING_MAX)
+          : initialPaddingValue,
         color: colorInput.value || DEFAULT_NOTE_COLOR,
       });
       cleanup();
@@ -1065,17 +1057,17 @@ export function notesDialog(
     paletteContainer?.addEventListener('click', handlePaletteClick);
     paletteContainer?.addEventListener('keydown', handlePaletteKeydown);
     colorInput.addEventListener('input', handleColorInput);
-    noteInput.addEventListener('input', handleInputChange);
-    titleInput.addEventListener('input', handleInputChange);
-    sizeSelect.addEventListener('change', handleInputChange);
-    paddingSelect.addEventListener('change', handleInputChange);
+    noteInput.addEventListener('input', updateCharCount);
+    sizeSlider.addEventListener('input', handleSizeSliderInput);
+    paddingSlider.addEventListener('input', handlePaddingSliderInput);
     form.addEventListener('submit', submit);
     cancel.addEventListener('click', close);
     dlg.addEventListener('cancel', close);
 
     applyColor(initialColor);
     updateCharCount();
-    updatePreview();
+    updateSliderOutput(sizeSlider, sizeOutput, initialSizeValue);
+    updateSliderOutput(paddingSlider, paddingOutput, initialPaddingValue);
 
     dlg.showModal();
     const first = dlg.querySelector(
