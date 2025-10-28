@@ -41,6 +41,19 @@ const NOTE_DEFAULT_PADDING = 20;
 const MAX_ICON_IMAGE_BYTES = 200 * 1024; // 200 KB
 const MAX_ICON_IMAGE_LENGTH = Math.ceil((MAX_ICON_IMAGE_BYTES / 3) * 4) + 512;
 const ICON_IMAGE_ACCEPT_PREFIX = 'data:image/';
+const HEADER_CLOCK_INTERVAL_MS = 30 * 1000;
+
+const headerDateFormatter = new Intl.DateTimeFormat('lt-LT', {
+  weekday: 'long',
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+});
+
+const headerTimeFormatter = new Intl.DateTimeFormat('lt-LT', {
+  hour: '2-digit',
+  minute: '2-digit',
+});
 
 function sanitizeIconImage(value) {
   if (typeof value !== 'string') return '';
@@ -48,6 +61,33 @@ function sanitizeIconImage(value) {
   if (!trimmed || !trimmed.startsWith(ICON_IMAGE_ACCEPT_PREFIX)) return '';
   if (trimmed.length > MAX_ICON_IMAGE_LENGTH) return '';
   return trimmed;
+}
+
+function capitaliseFirstLetter(value) {
+  if (typeof value !== 'string' || !value) return value;
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function updateHeaderDateTime() {
+  if (!headerDateEl && !headerClockEl) return;
+  const now = new Date();
+  if (headerDateEl) {
+    const rawDate = headerDateFormatter.format(now);
+    headerDateEl.textContent = capitaliseFirstLetter(rawDate);
+    headerDateEl.setAttribute('datetime', now.toISOString());
+  }
+  if (headerClockEl) {
+    headerClockEl.textContent = headerTimeFormatter.format(now);
+  }
+}
+
+function startHeaderClock() {
+  if (!headerDateEl && !headerClockEl) return;
+  updateHeaderDateTime();
+  if (headerClockTimer) {
+    window.clearInterval(headerClockTimer);
+  }
+  headerClockTimer = window.setInterval(updateHeaderDateTime, HEADER_CLOCK_INTERVAL_MS);
 }
 
 function formatDateTimeLocal(ts) {
@@ -119,9 +159,14 @@ const searchClearBtn = document.getElementById('searchClear');
 const pageIconImageBtn = document.getElementById('pageIconImageBtn');
 const pageIconClearBtn = document.getElementById('pageIconClearBtn');
 const pageIconFileInput = document.getElementById('pageIconFile');
+const headerDateEl = document.getElementById('headerDate');
+const headerClockEl = document.getElementById('headerClock');
 let pageIconImageEl = null;
+let headerClockTimer = null;
 
 applyPageIconActionLabels();
+
+startHeaderClock();
 
 if (addMenu && !addMenu.dataset.open) {
   addMenu.dataset.open = '0';
@@ -186,6 +231,12 @@ if (pageIconImageBtn && pageIconFileInput) {
     pageIconFileInput.click();
   });
 }
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    updateHeaderDateTime();
+  }
+});
 
 if (pageIconClearBtn) {
   pageIconClearBtn.addEventListener('click', () => {

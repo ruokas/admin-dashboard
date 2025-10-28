@@ -114,6 +114,16 @@
         </div>
       </div>
       <div class="secondary-actions" data-zone="secondary-actions">
+        <div class="header-datetime" aria-live="polite">
+          <div class="header-datetime__item">
+            <span class="header-datetime__icon" aria-hidden="true">📅</span>
+            <time id="headerDate" class="header-datetime__value" datetime="">Įkeliama…</time>
+          </div>
+          <div class="header-datetime__item">
+            <span class="header-datetime__icon" aria-hidden="true">🕒</span>
+            <span id="headerClock" class="header-datetime__value">--:--</span>
+          </div>
+        </div>
         <!-- Fallback labels so buttons are visible before JS initializes -->
         <button id="editBtn" class="btn-outline" type="button">
           Redaguoti

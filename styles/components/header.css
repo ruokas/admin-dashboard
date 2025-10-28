@@ -175,6 +175,57 @@ body.is-editing .page-icon-action:focus-visible .page-icon-action-label {
   width: 100%;
 }
 
+.header-datetime {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-1-5) var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(12, 17, 22, 0.35);
+  color: var(--subtext);
+  font-size: var(--font-sm);
+  font-weight: 500;
+  line-height: 1.3;
+  flex-wrap: wrap;
+  min-height: 40px;
+}
+
+.header-datetime__item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  white-space: nowrap;
+}
+
+.header-datetime__icon {
+  font-size: var(--font-lg);
+  line-height: 1;
+}
+
+.header-datetime__value {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.theme-light .header-datetime {
+  border-color: rgba(12, 17, 22, 0.12);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--muted);
+}
+
+.theme-light .header-datetime__value {
+  color: var(--text);
+}
+
+@media (max-width: 720px) {
+  .header-datetime {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
 .help-btn {
   position: relative;
   display: inline-flex;
