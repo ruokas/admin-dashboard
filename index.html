@@ -115,14 +115,6 @@
       </div>
       <div class="secondary-actions" data-zone="secondary-actions">
         <!-- Fallback labels so buttons are visible before JS initializes -->
-        <button
-          id="helpBtn"
-          class="btn-outline"
-          type="button"
-          aria-keyshortcuts="?"
-        >
-          Pagalba
-        </button>
         <button id="editBtn" class="btn-outline" type="button">
           Redaguoti
         </button>
@@ -162,6 +154,18 @@
           <svg class="icon" viewBox="0 0 24 24">
             <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
           </svg>
+        </button>
+        <button
+          id="helpBtn"
+          class="btn-outline help-btn"
+          type="button"
+          aria-label="Pagalba"
+          aria-keyshortcuts="?"
+          title="Pagalba"
+          data-tooltip="Pagalba"
+        >
+          <span aria-hidden="true">?</span>
+          <span class="sr-only">Pagalba</span>
         </button>
         <span id="syncStatus" role="status" aria-live="polite"></span>
       </div>
