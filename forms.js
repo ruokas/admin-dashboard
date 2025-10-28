@@ -650,10 +650,56 @@ export function itemFormDialog(T, data = {}) {
 export function chartFormDialog(T, data = {}) {
   return new Promise((resolve) => {
     const prevFocus = document.activeElement;
+    const DEFAULT_SCALE_PERCENT = 100;
+    const MIN_SCALE_PERCENT = 50;
+    const MAX_SCALE_PERCENT = 200;
+    const DEFAULT_PREVIEW_HEIGHT = 480;
+    const MIN_HEIGHT = 120;
+    const MAX_HEIGHT = 2000;
+
     const dlg = document.createElement('dialog');
     dlg.innerHTML = `<form method="dialog" id="chartForm">
-      <label id="chartFormLabel">${T.itemTitle}<br><input name="title" required></label>
-      <label>${T.itemUrl}<br><input name="url" required></label>
+      <fieldset class="form-section">
+        <legend>${T.chartBasics || 'Pagrindiniai nustatymai'}</legend>
+        <label id="chartFormLabel">${T.itemTitle}<br><input name="title" required></label>
+        <label>${T.itemUrl}<br><textarea name="url" rows="3" required></textarea></label>
+      </fieldset>
+      <fieldset class="form-section">
+        <legend>${T.chartDisplay || 'Atvaizdavimo parametrai'}</legend>
+        <div class="chart-form__grid">
+          <label class="chart-form__scale">${T.chartScale || 'Mastelis'}
+            <input type="range" name="scale" min="${MIN_SCALE_PERCENT}" max="${MAX_SCALE_PERCENT}" step="5">
+            <span class="chart-form__scale-value" data-chart-scale-value>100%</span>
+          </label>
+          <label class="chart-form__height">${T.chartHeight || 'Iframe aukštis (px)'}
+            <input type="number" name="height" min="${MIN_HEIGHT}" max="${MAX_HEIGHT}" step="10" inputmode="numeric" pattern="[0-9]*" placeholder="${DEFAULT_PREVIEW_HEIGHT}">
+          </label>
+        </div>
+        <p class="hint">${
+          T.chartHint ||
+          'Pateikite iframe nuorodą arba įterpimo kodą. Mastelis leidžia pritaikyti grafiką kortelės aukščiui.'
+        }</p>
+      </fieldset>
+      <section class="chart-preview" aria-live="polite">
+        <header class="chart-preview__header">
+          <h3>${T.chartPreview || 'Gyva peržiūra'}</h3>
+          <p class="chart-preview__meta">
+            <span>${T.chartPreviewScale || 'Mastelis'}: <strong data-chart-scale-label>100%</strong></span>
+            <span>${
+              T.chartPreviewHeight || 'Rodymo aukštis'
+            }: <strong data-chart-height-label>${DEFAULT_PREVIEW_HEIGHT}px</strong></span>
+          </p>
+        </header>
+        <div class="chart-preview__frame" data-state="empty">
+          <div class="chart-preview__placeholder" data-chart-placeholder>${
+            T.chartPreviewPlaceholder || 'Įveskite nuorodą, kad pamatytumėte grafiką.'
+          }</div>
+          <iframe title="${
+            T.chartPreviewFrameTitle || 'Grafiko peržiūra'
+          }" loading="lazy" referrerpolicy="no-referrer" sandbox="allow-same-origin allow-scripts allow-forms"></iframe>
+        </div>
+        <p class="chart-preview__status" data-chart-status></p>
+      </section>
       <p class="error" id="chartErr" role="status" aria-live="polite"></p>
       <menu>
         <button type="button" data-act="cancel">${T.cancel}</button>
@@ -663,28 +709,211 @@ export function chartFormDialog(T, data = {}) {
     dlg.setAttribute('aria-modal', 'true');
     dlg.setAttribute('aria-labelledby', 'chartFormLabel');
     document.body.appendChild(dlg);
+
     const form = dlg.querySelector('form');
     const err = dlg.querySelector('#chartErr');
     const cancel = form.querySelector('[data-act="cancel"]');
-    form.title.value = data.title || '';
-    form.url.value = data.url || '';
+    const urlField = form.elements.url;
+    const titleField = form.elements.title;
+    const scaleField = form.elements.scale;
+    const heightField = form.elements.height;
+    const scaleValue = form.querySelector('[data-chart-scale-value]');
+    const scaleLabel = form.querySelector('[data-chart-scale-label]');
+    const heightLabel = form.querySelector('[data-chart-height-label]');
+    const previewWrap = form.querySelector('.chart-preview__frame');
+    const previewFrame = previewWrap.querySelector('iframe');
+    const previewPlaceholder = form.querySelector('[data-chart-placeholder]');
+    const previewStatus = form.querySelector('[data-chart-status]');
+
+    const initialScale = Number.isFinite(data.scale)
+      ? Math.round(Number(data.scale) * 100)
+      : DEFAULT_SCALE_PERCENT;
+    const initialHeight = [data.height, data.frameHeight, data.h]
+      .map((val) => Number(val))
+      .find((val) => Number.isFinite(val));
+
+    let derivedHeight = Number.isFinite(initialHeight)
+      ? Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, initialHeight))
+      : null;
+    let currentSrc = '';
+    let hasLoaded = false;
+
+    const clampPercent = (value) => {
+      const numeric = Number.parseInt(value, 10);
+      if (!Number.isFinite(numeric)) return DEFAULT_SCALE_PERCENT;
+      return Math.min(MAX_SCALE_PERCENT, Math.max(MIN_SCALE_PERCENT, numeric));
+    };
+
+    const clampHeight = (value) => {
+      const numeric = Number.parseInt(value, 10);
+      if (!Number.isFinite(numeric)) return null;
+      return Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, numeric));
+    };
+
+    const normaliseScale = (value) => clampPercent(value) / 100;
+
+    const parseEmbed = (value) => {
+      const raw = typeof value === 'string' ? value.trim() : '';
+      if (!raw) return { src: '', height: null };
+      if (/<iframe/i.test(raw)) {
+        try {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(raw, 'text/html');
+          const iframe = doc.querySelector('iframe');
+          if (iframe) {
+            const srcAttr = iframe.getAttribute('src');
+            const heightAttr = iframe.getAttribute('height');
+            const parsedHeight = heightAttr ? Number.parseInt(heightAttr, 10) : null;
+            return {
+              src: srcAttr ? srcAttr.trim() : '',
+              height: Number.isFinite(parsedHeight) ? parsedHeight : null,
+            };
+          }
+        } catch {
+          /* noop */
+        }
+      }
+      return { src: raw, height: null };
+    };
+
+    const isValidUrl = (value) => {
+      if (!value) return false;
+      try {
+        const u = new URL(value);
+        return u.protocol === 'https:' || u.protocol === 'http:';
+      } catch {
+        return false;
+      }
+    };
+
+    const applySizing = () => {
+      const percent = clampPercent(scaleField.value || DEFAULT_SCALE_PERCENT);
+      scaleField.value = percent;
+      const scale = percent / 100;
+      const baseHeight = (() => {
+        const manual = clampHeight(heightField.value);
+        if (manual) return manual;
+        if (derivedHeight) return derivedHeight;
+        return DEFAULT_PREVIEW_HEIGHT;
+      })();
+      const displayHeight = Math.round(baseHeight * scale);
+      scaleValue.textContent = `${percent}%`;
+      scaleLabel.textContent = `${percent}%`;
+      heightLabel.textContent = `${displayHeight}px`;
+      previewFrame.style.height = `${baseHeight}px`;
+      previewFrame.style.width = scale === 1 ? '100%' : `${(100 / scale).toFixed(2)}%`;
+      previewFrame.style.transform = scale === 1 ? 'none' : `scale(${scale})`;
+      previewFrame.style.transformOrigin = 'top left';
+      previewWrap.style.height = `${displayHeight}px`;
+      previewWrap.dataset.scale = String(scale);
+      previewWrap.dataset.height = String(baseHeight);
+    };
+
+    const updatePreview = () => {
+      err.textContent = '';
+      const raw = urlField.value.trim();
+      const { src, height } = parseEmbed(raw);
+      if (!raw) {
+        currentSrc = '';
+        previewFrame.removeAttribute('src');
+        previewWrap.dataset.state = 'empty';
+        previewStatus.textContent = '';
+        previewPlaceholder.hidden = false;
+        hasLoaded = false;
+        derivedHeight = null;
+        applySizing();
+        return;
+      }
+
+      if (!isValidUrl(src)) {
+        currentSrc = '';
+        previewFrame.removeAttribute('src');
+        previewWrap.dataset.state = 'error';
+        previewStatus.textContent = T.invalidUrl;
+        previewPlaceholder.hidden = true;
+        hasLoaded = false;
+        derivedHeight = null;
+        applySizing();
+        return;
+      }
+
+      previewWrap.dataset.state = currentSrc === src && hasLoaded ? 'ready' : 'loading';
+      previewStatus.textContent = currentSrc === src && hasLoaded ? '' : T.chartPreviewLoading || 'Kraunama…';
+      previewPlaceholder.hidden = true;
+      if (height && !heightField.value) {
+        derivedHeight = clampHeight(height);
+        if (derivedHeight) heightField.value = derivedHeight;
+      } else if (height) {
+        derivedHeight = clampHeight(height);
+      }
+      if (currentSrc !== src) {
+        currentSrc = src;
+        previewFrame.src = src;
+      } else {
+        applySizing();
+      }
+    };
+
+    const handlePreviewLoad = () => {
+      hasLoaded = true;
+      if (!currentSrc) return;
+      previewWrap.dataset.state = 'ready';
+      previewStatus.textContent = '';
+      applySizing();
+    };
+    previewFrame.addEventListener('load', handlePreviewLoad);
 
     function cleanup() {
       form.removeEventListener('submit', submit);
       cancel.removeEventListener('click', close);
+      urlField.removeEventListener('input', handleUrlInput);
+      scaleField.removeEventListener('input', handleScaleInput);
+      heightField.removeEventListener('input', handleHeightInput);
+      previewFrame.removeEventListener('load', handlePreviewLoad);
       dlg.remove();
       prevFocus?.focus();
     }
 
+    const handleUrlInput = () => {
+      previewStatus.textContent = '';
+      updatePreview();
+    };
+
+    const handleScaleInput = () => {
+      applySizing();
+    };
+
+    const handleHeightInput = () => {
+      const manual = clampHeight(heightField.value);
+      if (manual) {
+        heightField.value = manual;
+      }
+      applySizing();
+    };
+
     function submit(e) {
       e.preventDefault();
-      const title = form.title.value.trim();
-      const url = form.url.value.trim();
-      if (!title || !url) {
+      const title = titleField.value.trim();
+      const rawUrl = urlField.value.trim();
+      if (!title || !rawUrl) {
         err.textContent = T.required;
         return;
       }
-      resolve({ title, url });
+      const { src, height } = parseEmbed(rawUrl);
+      if (!isValidUrl(src)) {
+        err.textContent = T.invalidUrl;
+        return;
+      }
+      const percent = clampPercent(scaleField.value || DEFAULT_SCALE_PERCENT);
+      const scale = percent / 100;
+      const manualHeight = clampHeight(heightField.value);
+      const finalHeight = manualHeight ?? (height ? clampHeight(height) : null);
+      resolve({
+        title,
+        url: src,
+        scale,
+        height: finalHeight ?? null,
+      });
       cleanup();
     }
 
@@ -693,14 +922,27 @@ export function chartFormDialog(T, data = {}) {
       cleanup();
     }
 
+    titleField.value = data.title || '';
+    urlField.value = data.url || '';
+    scaleField.value = clampPercent(initialScale || DEFAULT_SCALE_PERCENT);
+    if (derivedHeight) {
+      heightField.value = derivedHeight;
+    }
+
     form.addEventListener('submit', submit);
     cancel.addEventListener('click', close);
     dlg.addEventListener('cancel', close);
+    urlField.addEventListener('input', handleUrlInput);
+    scaleField.addEventListener('input', handleScaleInput);
+    heightField.addEventListener('input', handleHeightInput);
+
     dlg.showModal();
     const first = dlg.querySelector(
       'input, select, textarea, button, [href], [tabindex]:not([tabindex="-1"])',
     );
     first?.focus();
+    applySizing();
+    updatePreview();
   });
 }
 

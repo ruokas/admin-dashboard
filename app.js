@@ -1139,7 +1139,6 @@ async function editGroup(gid) {
 async function addChart() {
   const res = await chartFormDialog(T);
   if (!res) return;
-  const parsed = parseIframe(res.url);
   const cDims = SIZE_MAP.md;
   const width = Number.isFinite(cDims.width) ? cDims.width : SIZE_MAP.md.width;
   const height = Number.isFinite(cDims.height) ? cDims.height : SIZE_MAP.md.height;
@@ -1147,8 +1146,9 @@ async function addChart() {
     id: uid(),
     type: 'chart',
     name: res.title,
-    url: parsed.src,
-    h: parsed.height ? parsed.height + 56 : undefined,
+    url: res.url,
+    scale: Number.isFinite(res.scale) ? Number(res.scale) : 1,
+    frameHeight: Number.isFinite(res.height) ? Math.round(res.height) : undefined,
     width,
     height,
     wSize: sizeFromWidth(width),
@@ -1230,13 +1230,26 @@ async function removeNoteCard(noteId) {
 async function editChart(gid) {
   const g = state.groups.find((x) => x.id === gid && x.type === 'chart');
   if (!g) return;
-  const res = await chartFormDialog(T, { title: g.name, url: g.url });
+  const res = await chartFormDialog(T, {
+    title: g.name,
+    url: g.url,
+    scale: Number.isFinite(g.scale) ? g.scale : 1,
+    height: Number.isFinite(g.frameHeight)
+      ? g.frameHeight
+      : Number.isFinite(g.h)
+        ? g.h
+        : null,
+  });
   if (!res) return;
-  const parsed = parseIframe(res.url);
   g.name = res.title;
-  g.url = parsed.src;
-  if (parsed.height) {
-    g.h = parsed.height + 56;
+  g.url = res.url;
+  g.scale = Number.isFinite(res.scale) ? Number(res.scale) : 1;
+  if (Number.isFinite(res.height)) {
+    g.frameHeight = Math.round(res.height);
+    g.h = g.frameHeight;
+  } else {
+    delete g.frameHeight;
+    delete g.h;
   }
   persistState();
   renderAll();

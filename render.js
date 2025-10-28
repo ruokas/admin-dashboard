@@ -1898,7 +1898,53 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
       emb.dataset.custom = '1';
       emb.style.flex = '1';
       emb.style.resize = 'none';
-      emb.innerHTML = `<iframe src="${g.url}" loading="lazy" referrerpolicy="no-referrer"></iframe>`;
+
+      const frameWrap = document.createElement('div');
+      frameWrap.className = 'chart-frame';
+      const iframe = document.createElement('iframe');
+      iframe.src = g.url;
+      iframe.loading = 'lazy';
+      iframe.referrerPolicy = 'no-referrer';
+      iframe.allowFullscreen = true;
+      iframe.title = g.name ? `${g.name}` : T.chartFrameTitle || 'Grafikas';
+
+      const clampScale = (value) => {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return 1;
+        return Math.min(2, Math.max(0.5, numeric));
+      };
+      const clampHeight = (value) => {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return null;
+        return Math.min(2000, Math.max(120, Math.round(numeric)));
+      };
+
+      const fallbackCardHeight = Number.isFinite(g.height)
+        ? g.height
+        : SIZE_MAP[g.hSize ?? 'md']?.height ?? SIZE_MAP.md.height;
+      const baseHeightRaw = Number.isFinite(g.frameHeight)
+        ? g.frameHeight
+        : Number.isFinite(g.h)
+          ? g.h
+          : null;
+      const baseHeight = clampHeight(baseHeightRaw) ?? clampHeight(fallbackCardHeight);
+      const scale = clampScale(g.scale);
+
+      if (baseHeight) {
+        const displayHeight = Math.max(120, Math.round(baseHeight * scale));
+        emb.style.minHeight = `${displayHeight}px`;
+        frameWrap.style.height = `${displayHeight}px`;
+        iframe.style.height = `${baseHeight}px`;
+        iframe.style.width = scale === 1 ? '100%' : `${(100 / scale).toFixed(2)}%`;
+        iframe.style.transform = scale === 1 ? 'none' : `scale(${scale})`;
+        iframe.style.transformOrigin = 'top left';
+        if (Number.isFinite(g.frameHeight) || Number.isFinite(g.h)) {
+          iframe.style.aspectRatio = 'auto';
+        }
+      }
+
+      frameWrap.appendChild(iframe);
+      emb.appendChild(frameWrap);
       content.appendChild(emb);
       fragment.appendChild(grp);
       activeCardIds.add(g.id);
