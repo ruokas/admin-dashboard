@@ -654,8 +654,11 @@ export function chartFormDialog(T, data = {}) {
     const MIN_SCALE_PERCENT = 50;
     const MAX_SCALE_PERCENT = 200;
     const DEFAULT_PREVIEW_HEIGHT = 480;
+    const DEFAULT_PREVIEW_WIDTH = 640;
     const MIN_AUTO_HEIGHT = 120;
     const MAX_AUTO_HEIGHT = 2000;
+    const MIN_AUTO_WIDTH = 200;
+    const MAX_AUTO_WIDTH = 2400;
 
     const dlg = document.createElement('dialog');
     dlg.innerHTML = `<form method="dialog" id="chartForm">
@@ -674,7 +677,7 @@ export function chartFormDialog(T, data = {}) {
         </div>
         <p class="hint">${
           T.chartHint ||
-          'Įveskite iframe nuorodą ar kodą. Kortelės aukštis prisitaiko automatiškai, mastelį keiskite slankikliu.'
+          'Įveskite iframe nuorodą ar kodą. Kortelės plotis ir aukštis prisitaiko automatiškai, mastelį keiskite slankikliu.'
         }</p>
       </fieldset>
       <section class="chart-preview" aria-live="polite">
@@ -682,6 +685,9 @@ export function chartFormDialog(T, data = {}) {
           <h3>${T.chartPreview || 'Gyva peržiūra'}</h3>
           <p class="chart-preview__meta">
             <span>${T.chartPreviewScale || 'Mastelis'}: <strong data-chart-scale-label>100%</strong></span>
+            <span>${
+              T.chartPreviewWidth || 'Rodymo plotis'
+            }: <strong data-chart-width-label>${DEFAULT_PREVIEW_WIDTH}px</strong></span>
             <span>${
               T.chartPreviewHeight || 'Rodymo aukštis'
             }: <strong data-chart-height-label>${DEFAULT_PREVIEW_HEIGHT}px</strong></span>
@@ -698,7 +704,7 @@ export function chartFormDialog(T, data = {}) {
         <p class="chart-preview__status" data-chart-status></p>
         <p class="chart-preview__hint">${
           T.chartDragHint ||
-          'Reguliuokite mastelį slankikliu aukščiau – kortelės aukštis prisitaikys automatiškai.'
+          'Reguliuokite mastelį slankikliu aukščiau – kortelės dydis prisitaikys automatiškai.'
         }</p>
       </section>
       <p class="error" id="chartErr" role="status" aria-live="polite"></p>
@@ -719,6 +725,7 @@ export function chartFormDialog(T, data = {}) {
     const scaleField = form.elements.scale;
     const scaleValue = form.querySelector('[data-chart-scale-value]');
     const scaleLabel = form.querySelector('[data-chart-scale-label]');
+    const widthLabel = form.querySelector('[data-chart-width-label]');
     const heightLabel = form.querySelector('[data-chart-height-label]');
     const previewWrap = form.querySelector('.chart-preview__frame');
     const previewFrame = previewWrap.querySelector('iframe');
@@ -731,9 +738,15 @@ export function chartFormDialog(T, data = {}) {
     const initialHeight = [data.frameHeight, data.height, data.h]
       .map((val) => Number(val))
       .find((val) => Number.isFinite(val));
+    const initialWidth = [data.frameWidth, data.width, data.w]
+      .map((val) => Number(val))
+      .find((val) => Number.isFinite(val));
 
     let derivedHeight = Number.isFinite(initialHeight)
       ? Math.max(MIN_AUTO_HEIGHT, Math.min(MAX_AUTO_HEIGHT, initialHeight))
+      : null;
+    let derivedWidth = Number.isFinite(initialWidth)
+      ? Math.max(MIN_AUTO_WIDTH, Math.min(MAX_AUTO_WIDTH, initialWidth))
       : null;
     let currentSrc = '';
     let hasLoaded = false;
@@ -750,14 +763,25 @@ export function chartFormDialog(T, data = {}) {
       return Math.min(MAX_AUTO_HEIGHT, Math.max(MIN_AUTO_HEIGHT, numeric));
     };
 
+    const clampWidth = (value) => {
+      const numeric = Number.parseInt(value, 10);
+      if (!Number.isFinite(numeric)) return null;
+      return Math.min(MAX_AUTO_WIDTH, Math.max(MIN_AUTO_WIDTH, numeric));
+    };
+
     const computeBaseHeight = () => {
       if (derivedHeight) return derivedHeight;
       return DEFAULT_PREVIEW_HEIGHT;
     };
 
+    const computeBaseWidth = () => {
+      if (derivedWidth) return derivedWidth;
+      return DEFAULT_PREVIEW_WIDTH;
+    };
+
     const parseEmbed = (value) => {
       const raw = typeof value === 'string' ? value.trim() : '';
-      if (!raw) return { src: '', height: null };
+      if (!raw) return { src: '', height: null, width: null };
       if (/<iframe/i.test(raw)) {
         try {
           const parser = new DOMParser();
@@ -766,17 +790,20 @@ export function chartFormDialog(T, data = {}) {
           if (iframe) {
             const srcAttr = iframe.getAttribute('src');
             const heightAttr = iframe.getAttribute('height');
+            const widthAttr = iframe.getAttribute('width');
             const parsedHeight = heightAttr ? Number.parseInt(heightAttr, 10) : null;
+            const parsedWidth = widthAttr ? Number.parseInt(widthAttr, 10) : null;
             return {
               src: srcAttr ? srcAttr.trim() : '',
               height: Number.isFinite(parsedHeight) ? parsedHeight : null,
+              width: Number.isFinite(parsedWidth) ? parsedWidth : null,
             };
           }
         } catch {
           /* noop */
         }
       }
-      return { src: raw, height: null };
+      return { src: raw, height: null, width: null };
     };
 
     const isValidUrl = (value) => {
@@ -794,28 +821,51 @@ export function chartFormDialog(T, data = {}) {
       scaleField.value = percent;
       const scale = percent / 100;
       const baseHeight = computeBaseHeight();
+      const baseWidth = computeBaseWidth();
       const displayHeight = Math.round(baseHeight * scale);
+      const displayWidth = Math.round(baseWidth * scale);
       scaleValue.textContent = `${percent}%`;
       scaleLabel.textContent = `${percent}%`;
+      if (widthLabel) {
+        widthLabel.textContent = `${displayWidth}px`;
+      }
       heightLabel.textContent = `${displayHeight}px`;
       previewFrame.style.height = `${baseHeight}px`;
-      previewFrame.style.width = scale === 1 ? '100%' : `${(100 / scale).toFixed(2)}%`;
+      previewFrame.style.width = `${baseWidth}px`;
       previewFrame.style.transform = scale === 1 ? 'none' : `scale(${scale})`;
       previewFrame.style.transformOrigin = 'top left';
       previewWrap.style.height = `${displayHeight}px`;
+      previewWrap.style.width = `${displayWidth}px`;
       previewWrap.dataset.scale = String(scale);
       previewWrap.dataset.height = String(baseHeight);
+      previewWrap.dataset.width = String(baseWidth);
     };
 
-    const measureFrameHeight = () => {
+    const measureFrameSize = () => {
       try {
         const doc = previewFrame.contentDocument;
         if (!doc) return null;
-        const body = doc.body ? doc.body.scrollHeight : 0;
-        const root = doc.documentElement ? doc.documentElement.scrollHeight : 0;
-        const size = Math.max(body, root);
-        if (!Number.isFinite(size) || size <= 0) return null;
-        return clampHeight(size);
+        const body = doc.body;
+        const root = doc.documentElement;
+        const bodyHeight = body ? Math.max(body.scrollHeight, body.offsetHeight) : 0;
+        const rootHeight = root ? Math.max(root.scrollHeight, root.offsetHeight) : 0;
+        const bodyWidth = body ? Math.max(body.scrollWidth, body.offsetWidth) : 0;
+        const rootWidth = root ? Math.max(root.scrollWidth, root.offsetWidth) : 0;
+        const measuredHeight = Math.max(bodyHeight, rootHeight);
+        const measuredWidth = Math.max(bodyWidth, rootWidth);
+        const safeHeight =
+          Number.isFinite(measuredHeight) && measuredHeight > 0
+            ? clampHeight(measuredHeight)
+            : null;
+        const safeWidth =
+          Number.isFinite(measuredWidth) && measuredWidth > 0
+            ? clampWidth(measuredWidth)
+            : null;
+        if (!safeHeight && !safeWidth) return null;
+        return {
+          height: safeHeight,
+          width: safeWidth,
+        };
       } catch {
         return null;
       }
@@ -824,7 +874,7 @@ export function chartFormDialog(T, data = {}) {
     const updatePreview = () => {
       err.textContent = '';
       const raw = urlField.value.trim();
-      const { src, height } = parseEmbed(raw);
+      const { src, height, width } = parseEmbed(raw);
       if (!raw) {
         currentSrc = '';
         previewFrame.removeAttribute('src');
@@ -833,6 +883,7 @@ export function chartFormDialog(T, data = {}) {
         previewPlaceholder.hidden = false;
         hasLoaded = false;
         derivedHeight = null;
+        derivedWidth = null;
         applySizing();
         return;
       }
@@ -845,6 +896,7 @@ export function chartFormDialog(T, data = {}) {
         previewPlaceholder.hidden = true;
         hasLoaded = false;
         derivedHeight = null;
+        derivedWidth = null;
         applySizing();
         return;
       }
@@ -856,6 +908,12 @@ export function chartFormDialog(T, data = {}) {
         const clamped = clampHeight(height);
         if (clamped) {
           derivedHeight = clamped;
+        }
+      }
+      if (width) {
+        const clampedW = clampWidth(width);
+        if (clampedW) {
+          derivedWidth = clampedW;
         }
       }
       if (currentSrc !== src) {
@@ -872,9 +930,14 @@ export function chartFormDialog(T, data = {}) {
       if (!currentSrc) return;
       previewWrap.dataset.state = 'ready';
       previewStatus.textContent = '';
-      const measured = measureFrameHeight();
+      const measured = measureFrameSize();
       if (measured) {
-        derivedHeight = measured;
+        if (Number.isFinite(measured.height)) {
+          derivedHeight = measured.height;
+        }
+        if (Number.isFinite(measured.width)) {
+          derivedWidth = measured.width;
+        }
       }
       applySizing();
     };
@@ -914,12 +977,15 @@ export function chartFormDialog(T, data = {}) {
       }
       const percent = clampPercent(scaleField.value || DEFAULT_SCALE_PERCENT);
       const baseHeight = computeBaseHeight();
+      const baseWidth = computeBaseWidth();
       resolve({
         title,
         url: src,
         scale: percent / 100,
         frameHeight: baseHeight,
         height: baseHeight,
+        frameWidth: baseWidth,
+        width: baseWidth,
       });
       cleanup();
     }

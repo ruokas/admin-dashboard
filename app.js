@@ -1142,26 +1142,44 @@ async function addChart() {
   const cDims = SIZE_MAP.md;
   const width = Number.isFinite(cDims.width) ? cDims.width : SIZE_MAP.md.width;
   const height = Number.isFinite(cDims.height) ? cDims.height : SIZE_MAP.md.height;
+  const scale = Number.isFinite(res.scale) ? Number(res.scale) : 1;
+  const baseHeight = Number.isFinite(res.frameHeight)
+    ? Math.round(res.frameHeight)
+    : Number.isFinite(res.height)
+      ? Math.round(res.height)
+      : null;
+  const baseWidth = Number.isFinite(res.frameWidth)
+    ? Math.round(res.frameWidth)
+    : Number.isFinite(res.width)
+      ? Math.round(res.width)
+      : null;
+  const scaledHeight = Number.isFinite(baseHeight)
+    ? Math.max(120, Math.round(baseHeight * scale))
+    : height;
+  const scaledWidth = Number.isFinite(baseWidth)
+    ? Math.max(200, Math.round(baseWidth * scale))
+    : width;
+
   const chart = {
     id: uid(),
     type: 'chart',
     name: res.title,
     url: res.url,
-    scale: Number.isFinite(res.scale) ? Number(res.scale) : 1,
-    frameHeight: Number.isFinite(res.frameHeight)
-      ? Math.round(res.frameHeight)
-      : Number.isFinite(res.height)
-        ? Math.round(res.height)
-        : undefined,
-    width,
-    height,
-    wSize: sizeFromWidth(width),
-    hSize: sizeFromHeight(height),
+    scale,
+    frameHeight: Number.isFinite(baseHeight) ? baseHeight : undefined,
+    frameWidth: Number.isFinite(baseWidth) ? baseWidth : undefined,
+    width: scaledWidth,
+    height: scaledHeight,
+    wSize: sizeFromWidth(scaledWidth),
+    hSize: sizeFromHeight(scaledHeight),
   };
   if (Number.isFinite(chart.frameHeight)) {
     chart.h = chart.frameHeight;
   }
-  applySizeMetadata(chart, width, height);
+  if (Number.isFinite(chart.frameWidth)) {
+    chart.w = chart.frameWidth;
+  }
+  applySizeMetadata(chart, chart.width, chart.height);
   state.groups.push(chart);
   persistState();
   renderAll();
@@ -1246,6 +1264,14 @@ async function editChart(gid) {
       : Number.isFinite(g.h)
         ? g.h
         : null,
+    frameWidth: Number.isFinite(g.frameWidth)
+      ? g.frameWidth
+      : Number.isFinite(g.w)
+        ? g.w
+        : Number.isFinite(g.width) && Number.isFinite(g.scale) && g.scale
+          ? Math.round(g.width / g.scale)
+          : null,
+    width: Number.isFinite(g.width) ? g.width : null,
   });
   if (!res) return;
   g.name = res.title;
@@ -1256,6 +1282,11 @@ async function editChart(gid) {
     : Number.isFinite(res.height)
       ? Math.round(res.height)
       : null;
+  const nextWidth = Number.isFinite(res.frameWidth)
+    ? Math.round(res.frameWidth)
+    : Number.isFinite(res.width)
+      ? Math.round(res.width)
+      : null;
   if (Number.isFinite(nextHeight)) {
     g.frameHeight = nextHeight;
     g.h = nextHeight;
@@ -1263,6 +1294,33 @@ async function editChart(gid) {
     delete g.frameHeight;
     delete g.h;
   }
+  if (Number.isFinite(nextWidth)) {
+    g.frameWidth = nextWidth;
+    g.w = nextWidth;
+  } else {
+    delete g.frameWidth;
+    delete g.w;
+  }
+  const scale = Number.isFinite(g.scale) ? g.scale : 1;
+  const fallbackWidth =
+    Number.isFinite(g.width)
+      ? g.width
+      : SIZE_MAP[g.wSize ?? 'md']?.width ?? SIZE_MAP.md.width;
+  const fallbackHeight =
+    Number.isFinite(g.height)
+      ? g.height
+      : SIZE_MAP[g.hSize ?? 'md']?.height ?? SIZE_MAP.md.height;
+  const scaledWidth = Number.isFinite(nextWidth)
+    ? Math.max(200, Math.round(nextWidth * scale))
+    : fallbackWidth;
+  const scaledHeight = Number.isFinite(nextHeight)
+    ? Math.max(120, Math.round(nextHeight * scale))
+    : fallbackHeight;
+  g.width = scaledWidth;
+  g.height = scaledHeight;
+  g.wSize = sizeFromWidth(scaledWidth);
+  g.hSize = sizeFromHeight(scaledHeight);
+  applySizeMetadata(g, g.width, g.height);
   persistState();
   renderAll();
 }

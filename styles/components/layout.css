@@ -394,8 +394,8 @@ dialog form {
   border-radius: var(--space-3);
   min-height: 220px;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: flex-start;
+  justify-content: flex-start;
   overflow: hidden;
   background: var(--surface);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;

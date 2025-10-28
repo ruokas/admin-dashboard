@@ -1918,56 +1918,113 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
         if (!Number.isFinite(numeric)) return null;
         return Math.min(2000, Math.max(120, Math.round(numeric)));
       };
+      const clampWidth = (value) => {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return null;
+        return Math.min(2400, Math.max(200, Math.round(numeric)));
+      };
 
       const fallbackCardHeight = Number.isFinite(g.height)
         ? g.height
         : SIZE_MAP[g.hSize ?? 'md']?.height ?? SIZE_MAP.md.height;
+      const fallbackCardWidth = Number.isFinite(g.width)
+        ? g.width
+        : SIZE_MAP[g.wSize ?? 'md']?.width ?? SIZE_MAP.md.width;
       const baseHeightRaw = Number.isFinite(g.frameHeight)
         ? g.frameHeight
         : Number.isFinite(g.h)
           ? g.h
           : null;
+      const baseWidthRaw = Number.isFinite(g.frameWidth)
+        ? g.frameWidth
+        : Number.isFinite(g.w)
+          ? g.w
+          : null;
       let baseHeight =
         clampHeight(baseHeightRaw) ?? clampHeight(fallbackCardHeight) ?? clampHeight(480);
+      let baseWidth =
+        clampWidth(baseWidthRaw) ?? clampWidth(fallbackCardWidth) ?? clampWidth(640);
       const defaultScale = clampScale(g.scale);
       let scale = defaultScale;
+      const MIN_DISPLAY_HEIGHT = 120;
+      const MIN_DISPLAY_WIDTH = 200;
 
       const applySizing = () => {
-        const safeBase =
+        const safeBaseHeight =
           clampHeight(baseHeight) ?? clampHeight(fallbackCardHeight) ?? clampHeight(480);
-        const displayHeight = Math.max(120, Math.round(safeBase * scale));
+        const safeBaseWidth =
+          clampWidth(baseWidth) ?? clampWidth(fallbackCardWidth) ?? clampWidth(640);
+        const displayHeight = Math.max(MIN_DISPLAY_HEIGHT, Math.round(safeBaseHeight * scale));
+        const displayWidth = Math.max(MIN_DISPLAY_WIDTH, Math.round(safeBaseWidth * scale));
         emb.style.minHeight = `${displayHeight}px`;
+        emb.style.minWidth = `${displayWidth}px`;
         frameWrap.style.height = `${displayHeight}px`;
-        iframe.style.height = `${safeBase}px`;
-        iframe.style.width = scale === 1 ? '100%' : `${(100 / scale).toFixed(2)}%`;
+        frameWrap.style.width = `${displayWidth}px`;
+        iframe.style.height = `${safeBaseHeight}px`;
+        iframe.style.width = `${safeBaseWidth}px`;
         iframe.style.transform = scale === 1 ? 'none' : `scale(${scale})`;
         iframe.style.transformOrigin = 'top left';
-        iframe.dataset.baseHeight = String(safeBase);
+        iframe.dataset.baseHeight = String(safeBaseHeight);
+        iframe.dataset.baseWidth = String(safeBaseWidth);
         iframe.dataset.scale = String(scale);
         iframe.style.aspectRatio = 'auto';
+        g.width = displayWidth;
+        g.height = displayHeight;
+        g.wSize = sizeFromWidth(displayWidth);
+        g.hSize = sizeFromHeight(displayHeight);
+        applySize(grp, displayWidth, displayHeight, g.wSize, g.hSize);
       };
 
-      const measureHeight = () => {
+      const measureSize = () => {
         try {
           const doc = iframe.contentDocument;
           if (!doc) return null;
-          const body = doc.body ? doc.body.scrollHeight : 0;
-          const root = doc.documentElement ? doc.documentElement.scrollHeight : 0;
-          const measured = Math.max(body, root);
-          if (!Number.isFinite(measured) || measured <= 0) return null;
-          return clampHeight(measured);
+          const body = doc.body;
+          const root = doc.documentElement;
+          const bodyHeight = body ? Math.max(body.scrollHeight, body.offsetHeight) : 0;
+          const rootHeight = root ? Math.max(root.scrollHeight, root.offsetHeight) : 0;
+          const bodyWidth = body ? Math.max(body.scrollWidth, body.offsetWidth) : 0;
+          const rootWidth = root ? Math.max(root.scrollWidth, root.offsetWidth) : 0;
+          const measuredHeight = Math.max(bodyHeight, rootHeight);
+          const measuredWidth = Math.max(bodyWidth, rootWidth);
+          const safeHeight =
+            Number.isFinite(measuredHeight) && measuredHeight > 0
+              ? clampHeight(measuredHeight)
+              : null;
+          const safeWidth =
+            Number.isFinite(measuredWidth) && measuredWidth > 0
+              ? clampWidth(measuredWidth)
+              : null;
+          if (!safeHeight && !safeWidth) return null;
+          return { height: safeHeight, width: safeWidth };
         } catch {
           return null;
         }
       };
 
-      const syncMeasuredHeight = () => {
-        const measured = measureHeight();
+      const syncMeasuredSize = () => {
+        const measured = measureSize();
         if (!measured) return;
-        if (!baseHeight || Math.abs(measured - baseHeight) > 2) {
-          baseHeight = measured;
-          g.frameHeight = measured;
-          g.h = measured;
+        let changed = false;
+        if (
+          Number.isFinite(measured.height) &&
+          (!baseHeight || Math.abs(measured.height - baseHeight) > 2)
+        ) {
+          baseHeight = measured.height;
+          g.frameHeight = measured.height;
+          g.h = measured.height;
+          changed = true;
+        }
+        if (
+          Number.isFinite(measured.width) &&
+          (!baseWidth || Math.abs(measured.width - baseWidth) > 2)
+        ) {
+          baseWidth = measured.width;
+          g.frameWidth = measured.width;
+          g.w = measured.width;
+          changed = true;
+        }
+        if (changed) {
           applySizing();
           if (typeof persist === 'function') {
             persist();
@@ -1980,8 +2037,9 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
       iframe.addEventListener('load', () => {
         scale = clampScale(g.scale ?? defaultScale);
         applySizing();
-        syncMeasuredHeight();
-        window.setTimeout(syncMeasuredHeight, 400);
+        syncMeasuredSize();
+        window.setTimeout(syncMeasuredSize, 400);
+        window.setTimeout(syncMeasuredSize, 1200);
       });
 
       frameWrap.appendChild(iframe);
