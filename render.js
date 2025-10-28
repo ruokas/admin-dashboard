@@ -1987,16 +1987,20 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
         clampWidth(baseWidthRaw) ?? clampWidth(fallbackCardWidth) ?? clampWidth(640);
       const defaultScale = clampScale(g.scale);
       let scale = defaultScale;
-      const MIN_DISPLAY_HEIGHT = 120;
-      const MIN_DISPLAY_WIDTH = 200;
+
+      const computeDisplaySize = (base, currentScale) => {
+        if (!Number.isFinite(base) || base <= 0) return null;
+        const scaled = Math.round(base * currentScale);
+        return Math.max(1, scaled);
+      };
 
       const applySizing = () => {
         const safeBaseHeight =
           clampHeight(baseHeight) ?? clampHeight(fallbackCardHeight) ?? clampHeight(480);
         const safeBaseWidth =
           clampWidth(baseWidth) ?? clampWidth(fallbackCardWidth) ?? clampWidth(640);
-        const displayHeight = Math.max(MIN_DISPLAY_HEIGHT, Math.round(safeBaseHeight * scale));
-        const displayWidth = Math.max(MIN_DISPLAY_WIDTH, Math.round(safeBaseWidth * scale));
+        const displayHeight = computeDisplaySize(safeBaseHeight, scale) ?? safeBaseHeight;
+        const displayWidth = computeDisplaySize(safeBaseWidth, scale) ?? safeBaseWidth;
         emb.style.minHeight = `${displayHeight}px`;
         emb.style.minWidth = `${displayWidth}px`;
         frameWrap.style.height = `${displayHeight}px`;
