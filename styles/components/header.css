@@ -180,16 +180,9 @@ body.is-editing .page-icon-action:focus-visible .page-icon-action-label {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  padding: 0;
-  border-radius: 999px;
-  border-color: rgba(255, 255, 255, 0.18);
-  background: rgba(12, 17, 22, 0.35);
-  backdrop-filter: blur(6px);
-  color: var(--text);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
-  flex: none;
+  gap: var(--space-1);
+  min-height: 0;
+  padding-inline: var(--space-2);
 }
 
 .help-btn svg,
@@ -207,7 +200,7 @@ body.is-editing .page-icon-action:focus-visible .page-icon-action-label {
   padding: var(--space-1) var(--space-2);
   border-radius: var(--space-2);
   background: rgba(8, 13, 18, 0.92);
-  color: var(--text);
+  color: var(--btn-accent-text);
   font-size: var(--font-xs);
   line-height: 1.2;
   white-space: nowrap;
@@ -247,12 +240,6 @@ body.is-editing .page-icon-action:focus-visible .page-icon-action-label {
   outline-offset: 2px;
 }
 
-.theme-light .help-btn {
-  border-color: rgba(12, 17, 22, 0.18);
-  background: rgba(255, 255, 255, 0.85);
-  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.18);
-}
-
 .theme-light .help-btn::after {
   background: rgba(12, 17, 22, 0.92);
 }
@@ -263,8 +250,7 @@ body.is-editing .page-icon-action:focus-visible .page-icon-action-label {
 
 @media (max-width: 640px) {
   .help-btn {
-    width: 36px;
-    height: 36px;
+    padding-inline: var(--space-1-5);
   }
 }
 
