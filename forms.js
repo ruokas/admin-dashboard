@@ -839,6 +839,8 @@ export function chartFormDialog(T, data = {}) {
       previewWrap.dataset.scale = String(scale);
       previewWrap.dataset.height = String(baseHeight);
       previewWrap.dataset.width = String(baseWidth);
+      previewWrap.dataset.displayHeight = String(displayHeight);
+      previewWrap.dataset.displayWidth = String(displayWidth);
     };
 
     const measureFrameSize = () => {

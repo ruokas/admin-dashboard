@@ -153,6 +153,44 @@ function measureIntrinsicContentSize(cardEl, innerEl = findCardInnerElement(card
   }
 
   const host = ensureMeasureHost();
+  const adjustChartMeasurement = (currentWidth, currentHeight, widthExtra = 0, heightExtra = 0) => {
+    if (!cardEl?.classList?.contains('group--chart')) {
+      return { width: currentWidth, height: currentHeight };
+    }
+    const frame = cardEl.querySelector('.chart-frame');
+    if (!frame) {
+      return { width: currentWidth, height: currentHeight };
+    }
+    const parseNumeric = (value) => {
+      const numeric = Number.parseFloat(value);
+      return Number.isFinite(numeric) ? numeric : null;
+    };
+    const storedDisplayWidth = parseNumeric(frame.dataset?.displayWidth);
+    const storedDisplayHeight = parseNumeric(frame.dataset?.displayHeight);
+    const baseWidth = parseNumeric(frame.dataset?.width);
+    const baseHeight = parseNumeric(frame.dataset?.height);
+    const scale = parseNumeric(frame.dataset?.scale);
+    const computedWidth = Number.isFinite(storedDisplayWidth)
+      ? storedDisplayWidth
+      : Number.isFinite(baseWidth) && Number.isFinite(scale)
+        ? baseWidth * scale
+        : null;
+    const computedHeight = Number.isFinite(storedDisplayHeight)
+      ? storedDisplayHeight
+      : Number.isFinite(baseHeight) && Number.isFinite(scale)
+        ? baseHeight * scale
+        : null;
+    const extraWidth = Number.isFinite(widthExtra) ? widthExtra : 0;
+    const extraHeight = Number.isFinite(heightExtra) ? heightExtra : 0;
+    const nextWidth = Number.isFinite(computedWidth)
+      ? Math.max(currentWidth, Math.round(computedWidth + extraWidth))
+      : currentWidth;
+    const nextHeight = Number.isFinite(computedHeight)
+      ? Math.max(currentHeight, Math.round(computedHeight + extraHeight))
+      : currentHeight;
+    return { width: nextWidth, height: nextHeight };
+  };
+
   if (host) {
     const clone = cardEl.cloneNode(true);
     clone.removeAttribute('id');
@@ -184,14 +222,15 @@ function measureIntrinsicContentSize(cardEl, innerEl = findCardInnerElement(card
     host.appendChild(clone);
     const rect = clone.getBoundingClientRect();
     const innerRect = cloneInner ? cloneInner.getBoundingClientRect() : null;
-    const width = Number.isFinite(rect.width) ? Math.ceil(rect.width) : 0;
-    const height = Number.isFinite(rect.height) ? Math.ceil(rect.height) : 0;
+    let width = Number.isFinite(rect.width) ? Math.ceil(rect.width) : 0;
+    let height = Number.isFinite(rect.height) ? Math.ceil(rect.height) : 0;
     const widthExtra = innerRect
       ? Math.max(0, Math.ceil(rect.width - innerRect.width))
       : 0;
     const heightExtra = innerRect
       ? Math.max(0, Math.ceil(rect.height - innerRect.height))
       : 0;
+    ({ width, height } = adjustChartMeasurement(width, height, widthExtra, heightExtra));
     host.removeChild(clone);
     return { width, height, widthExtra, heightExtra };
   }
@@ -250,8 +289,10 @@ function measureIntrinsicContentSize(cardEl, innerEl = findCardInnerElement(card
   const widthCandidate = Math.max(cardScrollWidth + borderX, innerScrollWidth + widthExtra);
   const heightCandidate = Math.max(cardScrollHeight + borderY, innerScrollHeight + heightExtra);
 
-  const width = Number.isFinite(widthCandidate) ? Math.ceil(widthCandidate) : 0;
-  const height = Number.isFinite(heightCandidate) ? Math.ceil(heightCandidate) : 0;
+  let width = Number.isFinite(widthCandidate) ? Math.ceil(widthCandidate) : 0;
+  let height = Number.isFinite(heightCandidate) ? Math.ceil(heightCandidate) : 0;
+
+  ({ width, height } = adjustChartMeasurement(width, height, widthExtra, heightExtra));
 
   cardEl.style.width = prevCard.width;
   cardEl.style.minWidth = prevCard.minWidth;
@@ -1960,6 +2001,11 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
         emb.style.minWidth = `${displayWidth}px`;
         frameWrap.style.height = `${displayHeight}px`;
         frameWrap.style.width = `${displayWidth}px`;
+        frameWrap.dataset.height = String(safeBaseHeight);
+        frameWrap.dataset.width = String(safeBaseWidth);
+        frameWrap.dataset.scale = String(scale);
+        frameWrap.dataset.displayHeight = String(displayHeight);
+        frameWrap.dataset.displayWidth = String(displayWidth);
         iframe.style.height = `${safeBaseHeight}px`;
         iframe.style.width = `${safeBaseWidth}px`;
         iframe.style.transform = scale === 1 ? 'none' : `scale(${scale})`;
