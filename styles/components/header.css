@@ -254,19 +254,6 @@ body.is-editing .page-icon-action:focus-visible .page-icon-action-label {
   }
 }
 
-#remindersBtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-1-5);
-  position: relative;
-}
-
-#remindersBtn .icon {
-  width: 18px;
-  height: 18px;
-}
-
 .reminder-badge {
   display: inline-flex;
   align-items: center;
