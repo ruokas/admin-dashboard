@@ -656,6 +656,7 @@ export function chartFormDialog(T, data = {}) {
     const DEFAULT_PREVIEW_HEIGHT = 480;
     const MIN_HEIGHT = 120;
     const MAX_HEIGHT = 2000;
+    const SCALE_DRAG_SENSITIVITY = 0.35;
 
     const dlg = document.createElement('dialog');
     dlg.innerHTML = `<form method="dialog" id="chartForm">
@@ -691,6 +692,9 @@ export function chartFormDialog(T, data = {}) {
           </p>
         </header>
         <div class="chart-preview__frame" data-state="empty">
+          <div class="chart-preview__resize-handle chart-preview__resize-handle--right" data-chart-resize="x" aria-hidden="true"></div>
+          <div class="chart-preview__resize-handle chart-preview__resize-handle--bottom" data-chart-resize="y" aria-hidden="true"></div>
+          <div class="chart-preview__resize-handle chart-preview__resize-handle--corner" data-chart-resize="xy" aria-hidden="true"></div>
           <div class="chart-preview__placeholder" data-chart-placeholder>${
             T.chartPreviewPlaceholder || 'Įveskite nuorodą, kad pamatytumėte grafiką.'
           }</div>
@@ -699,6 +703,10 @@ export function chartFormDialog(T, data = {}) {
           }" loading="lazy" referrerpolicy="no-referrer" sandbox="allow-same-origin allow-scripts allow-forms"></iframe>
         </div>
         <p class="chart-preview__status" data-chart-status></p>
+        <p class="chart-preview__hint">${
+          T.chartDragHint ||
+          'Tempkite peržiūrą, kad keistumėte mastelį (į šoną) ir aukštį (žemyn).'
+        }</p>
       </section>
       <p class="error" id="chartErr" role="status" aria-live="polite"></p>
       <menu>
@@ -724,6 +732,7 @@ export function chartFormDialog(T, data = {}) {
     const previewFrame = previewWrap.querySelector('iframe');
     const previewPlaceholder = form.querySelector('[data-chart-placeholder]');
     const previewStatus = form.querySelector('[data-chart-status]');
+    const resizeHandles = form.querySelectorAll('[data-chart-resize]');
 
     const initialScale = Number.isFinite(data.scale)
       ? Math.round(Number(data.scale) * 100)
@@ -751,6 +760,13 @@ export function chartFormDialog(T, data = {}) {
     };
 
     const normaliseScale = (value) => clampPercent(value) / 100;
+
+    const computeBaseHeight = () => {
+      const manual = clampHeight(heightField.value);
+      if (manual) return manual;
+      if (derivedHeight) return derivedHeight;
+      return DEFAULT_PREVIEW_HEIGHT;
+    };
 
     const parseEmbed = (value) => {
       const raw = typeof value === 'string' ? value.trim() : '';
@@ -790,12 +806,7 @@ export function chartFormDialog(T, data = {}) {
       const percent = clampPercent(scaleField.value || DEFAULT_SCALE_PERCENT);
       scaleField.value = percent;
       const scale = percent / 100;
-      const baseHeight = (() => {
-        const manual = clampHeight(heightField.value);
-        if (manual) return manual;
-        if (derivedHeight) return derivedHeight;
-        return DEFAULT_PREVIEW_HEIGHT;
-      })();
+      const baseHeight = computeBaseHeight();
       const displayHeight = Math.round(baseHeight * scale);
       scaleValue.textContent = `${percent}%`;
       scaleLabel.textContent = `${percent}%`;
@@ -863,6 +874,80 @@ export function chartFormDialog(T, data = {}) {
     };
     previewFrame.addEventListener('load', handlePreviewLoad);
 
+    let stopActiveResize = null;
+
+    const startResize = (type, startEvent) => {
+      if (startEvent.button !== 0 && startEvent.pointerType !== 'touch' && startEvent.pointerType !== 'pen') {
+        return;
+      }
+      if (typeof stopActiveResize === 'function') {
+        stopActiveResize();
+      }
+      startEvent.preventDefault();
+      const pointerId = startEvent.pointerId;
+      const startX = startEvent.clientX;
+      const startY = startEvent.clientY;
+      const startPercent = clampPercent(scaleField.value || DEFAULT_SCALE_PERCENT);
+      const startHeight = computeBaseHeight();
+      previewWrap.dataset.resizing = type;
+      previewWrap.classList.add('chart-preview__frame--resizing');
+      const originalUserSelect = document.body.style.userSelect;
+      document.body.style.userSelect = 'none';
+
+      const handleMove = (moveEvent) => {
+        if (moveEvent.pointerId !== pointerId) return;
+        moveEvent.preventDefault();
+        const deltaX = moveEvent.clientX - startX;
+        const deltaY = moveEvent.clientY - startY;
+        if (type === 'x' || type === 'xy') {
+          const nextPercent = clampPercent(
+            Math.round(startPercent + deltaX * SCALE_DRAG_SENSITIVITY),
+          );
+          if (nextPercent !== clampPercent(scaleField.value || startPercent)) {
+            scaleField.value = nextPercent;
+          }
+        }
+        if (type === 'y' || type === 'xy') {
+          const proposedHeight = Math.round(startHeight + deltaY);
+          const nextHeight = clampHeight(proposedHeight);
+          if (Number.isFinite(nextHeight)) {
+            heightField.value = nextHeight;
+          }
+        }
+        applySizing();
+      };
+
+      const finishResize = () => {
+        previewWrap.classList.remove('chart-preview__frame--resizing');
+        delete previewWrap.dataset.resizing;
+        document.body.style.userSelect = originalUserSelect;
+        window.removeEventListener('pointermove', handleMove);
+        window.removeEventListener('pointerup', handleEnd);
+        window.removeEventListener('pointercancel', handleEnd);
+        try {
+          startEvent.target.releasePointerCapture(pointerId);
+        } catch {
+          /* ignore */
+        }
+        stopActiveResize = null;
+      };
+
+      const handleEnd = (endEvent) => {
+        if (pointerId && endEvent.pointerId !== pointerId) return;
+        finishResize();
+      };
+
+      window.addEventListener('pointermove', handleMove);
+      window.addEventListener('pointerup', handleEnd);
+      window.addEventListener('pointercancel', handleEnd);
+      try {
+        startEvent.target.setPointerCapture(pointerId);
+      } catch {
+        /* ignore */
+      }
+      stopActiveResize = finishResize;
+    };
+
     function cleanup() {
       form.removeEventListener('submit', submit);
       cancel.removeEventListener('click', close);
@@ -870,6 +955,12 @@ export function chartFormDialog(T, data = {}) {
       scaleField.removeEventListener('input', handleScaleInput);
       heightField.removeEventListener('input', handleHeightInput);
       previewFrame.removeEventListener('load', handlePreviewLoad);
+      resizeHandles.forEach((handle) => {
+        handle.removeEventListener('pointerdown', handleResizePointerDown);
+      });
+      if (typeof stopActiveResize === 'function') {
+        stopActiveResize();
+      }
       dlg.remove();
       prevFocus?.focus();
     }
@@ -889,6 +980,12 @@ export function chartFormDialog(T, data = {}) {
         heightField.value = manual;
       }
       applySizing();
+    };
+
+    const handleResizePointerDown = (event) => {
+      const type = event.currentTarget?.dataset?.chartResize;
+      if (!type) return;
+      startResize(type, event);
     };
 
     function submit(e) {
@@ -935,6 +1032,9 @@ export function chartFormDialog(T, data = {}) {
     urlField.addEventListener('input', handleUrlInput);
     scaleField.addEventListener('input', handleScaleInput);
     heightField.addEventListener('input', handleHeightInput);
+    resizeHandles.forEach((handle) => {
+      handle.addEventListener('pointerdown', handleResizePointerDown);
+    });
 
     dlg.showModal();
     const first = dlg.querySelector(

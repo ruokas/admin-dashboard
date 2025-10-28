@@ -96,6 +96,7 @@ export const Tlt = {
   chartPreviewPlaceholder: 'Įveskite nuorodą, kad pamatytumėte grafiką.',
   chartPreviewFrameTitle: 'Grafiko peržiūra',
   chartPreviewLoading: 'Kraunama…',
+  chartDragHint: 'Tempkite peržiūrą šonu ir apačia, kad greitai koreguotumėte mastelį ir aukštį.',
   chartFrameTitle: 'Grafiko kortelė',
   editMode: 'Redaguoti',
   done: 'Baigti',
