@@ -459,73 +459,38 @@ dialog.item-form-dialog form {
   min-height: 160px;
 }
 
-.note-form__templates {
+
+.note-form__options {
   display: grid;
   gap: var(--space-1);
-  background: color-mix(in srgb, var(--muted) 35%, transparent);
-  border-radius: var(--radius-lg);
-  padding: var(--space-1-5);
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 
-.note-form__templates-label {
-  font-size: var(--font-xs);
-  font-weight: 600;
-  color: var(--subtext-strong);
-}
-
-.note-form__templates-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-}
-
-.note-form__template {
-  border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
-  background: color-mix(in srgb, var(--surface) 90%, transparent);
-  color: inherit;
-  border-radius: var(--radius-md);
-  padding: var(--space-0-75) var(--space-1-5);
-  font-size: var(--font-xs);
-  cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.note-form__template:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 12%, transparent);
-}
-
-.note-form__template:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.note-form__template--clear {
-  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
-  color: color-mix(in srgb, var(--danger) 70%, var(--text));
-}
-
-.note-form__slider {
+.note-form__option {
   display: grid;
   gap: var(--space-0-5);
-}
-
-.note-form__slider-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-}
-
-.note-form__slider-row input[type='range'] {
-  flex: 1 1 auto;
-}
-
-.note-form__slider-row output {
-  min-width: 3.5rem;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
   font-size: var(--font-sm);
   color: var(--subtext-strong);
+}
+
+.note-form__option span {
+  font-weight: 600;
+}
+
+.note-form__option select {
+  width: 100%;
+  padding: var(--space-1) var(--space-1-5);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--font-sm);
+  line-height: 1.4;
+}
+
+.note-form__option select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .note-form__colors {
@@ -533,47 +498,6 @@ dialog.item-form-dialog form {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-2);
   align-items: center;
-}
-
-.note-form__palette {
-  display: flex;
-  gap: var(--space-1);
-  flex-wrap: wrap;
-}
-
-.note-form__palette-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-md);
-  border: 1px solid color-mix(in srgb, var(--swatch, var(--accent)) 30%, transparent);
-  background: var(--swatch, var(--surface));
-  background-image: var(
-    --swatch-gradient,
-    linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--swatch, var(--accent)) 65%, white),
-      color-mix(in srgb, var(--swatch, var(--accent)) 90%, transparent)
-    )
-  );
-  background-size: 180% 180%;
-  background-position: center;
-  cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.note-form__palette-btn[aria-pressed='true'] {
-  box-shadow: 0 0 0 2px var(--surface),
-    0 0 0 4px color-mix(in srgb, var(--swatch, var(--accent)) 65%, transparent);
-}
-
-.note-form__palette-btn:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--swatch, var(--accent)) 70%, var(--accent));
-  outline-offset: 2px;
-}
-
-.note-form__palette-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 14px color-mix(in srgb, var(--swatch, var(--accent)) 35%, transparent);
 }
 
 .note-form__custom-color {
@@ -585,7 +509,7 @@ dialog.item-form-dialog form {
 }
 
 .note-preview {
-  --note-preview-bg: #fef08a;
+  --note-preview-bg: #facc15;
   --note-preview-text: #1f2937;
   --note-preview-font: 20px;
   --note-preview-padding: 20px;
@@ -596,6 +520,8 @@ dialog.item-form-dialog form {
   display: grid;
   gap: var(--space-0-75);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, black 6%, transparent);
+  max-height: 240px;
+  overflow: auto;
 }
 
 .note-preview h3 {
