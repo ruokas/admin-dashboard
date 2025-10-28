@@ -450,6 +450,69 @@ dialog.item-form-dialog form {
   text-align: center;
 }
 
+.note-form__header {
+  gap: var(--space-1);
+}
+
+.note-form__field textarea {
+  resize: vertical;
+  min-height: 160px;
+}
+
+
+.note-form__options {
+  display: grid;
+  gap: var(--space-1);
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.note-form__option {
+  display: grid;
+  gap: var(--space-0-5);
+  font-size: var(--font-sm);
+  color: var(--subtext-strong);
+}
+
+.note-form__option span {
+  font-weight: 600;
+}
+
+.note-form__slider {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-1);
+  align-items: center;
+}
+
+.note-form__slider input[type='range'] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.note-form__slider input[type='range']:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 70%, transparent);
+  border-radius: 999px;
+}
+
+.note-form__slider output {
+  font-size: var(--font-xs);
+  color: var(--subtext);
+  min-width: 48px;
+  text-align: right;
+}
+
+.note-form__colors {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.note-form__custom-color {
+  min-width: 36px;
+}
+
 .help-dialog__form {
   max-width: min(560px, 80vw);
 }
