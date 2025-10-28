@@ -789,10 +789,10 @@ export function notesDialog(
       { value: DEFAULT_NOTE_COLOR, label: 'Ryški gelsva' },
     ];
 
-    const SIZE_MIN = 14;
-    const SIZE_MAX = 36;
-    const PADDING_MIN = 8;
-    const PADDING_MAX = 48;
+    const SIZE_MIN = 12;
+    const SIZE_MAX = 44;
+    const PADDING_MIN = 4;
+    const PADDING_MAX = 64;
 
     const prevFocus = document.activeElement;
     const dlg = document.createElement('dialog');
@@ -848,8 +848,8 @@ export function notesDialog(
                 id="noteSizeInput"
                 name="size"
                 type="range"
-                min="14"
-                max="36"
+                min="12"
+                max="44"
                 step="1"
                 aria-describedby="noteSizeValue"
               >
@@ -863,8 +863,8 @@ export function notesDialog(
                 id="notePaddingInput"
                 name="padding"
                 type="range"
-                min="8"
-                max="48"
+                min="4"
+                max="64"
                 step="1"
                 aria-describedby="notePaddingValue"
               >
