@@ -380,7 +380,7 @@ dialog.chart-form-dialog {
 }
 
 .chart-form__field textarea {
-  min-height: 104px;
+  min-height: 72px;
   resize: vertical;
 }
 
@@ -405,7 +405,7 @@ dialog.chart-form-dialog {
   gap: var(--space-2);
   border: 1px solid var(--border-strong);
   border-radius: var(--space-3);
-  padding: var(--space-3);
+  padding: var(--space-2);
   background: var(--surface-raised);
 }
 
@@ -434,7 +434,7 @@ dialog.chart-form-dialog {
   position: relative;
   border: 1px dashed var(--border-strong);
   border-radius: var(--space-3);
-  min-height: 180px;
+  min-height: 160px;
   display: block;
   overflow: hidden;
   background: var(--surface);
