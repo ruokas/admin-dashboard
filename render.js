@@ -16,6 +16,11 @@ const MIN_SIZE_ADJUSTER = Symbol('minSizeAdjuster');
 const RESIZE_HANDLE_SIZE = 20;
 const RESIZE_HANDLER_KEY = Symbol('resizeHandler');
 
+const CHART_MIN_WIDTH = 200;
+const CHART_MAX_WIDTH = 2400;
+const CHART_MIN_HEIGHT = 120;
+const CHART_MAX_HEIGHT = 2000;
+
 let resizeGuideEl = null;
 let measureHostEl = null;
 
@@ -110,6 +115,120 @@ function rememberCardDimensions(el, width, height) {
     width: Number.isFinite(width) ? Math.round(width) : null,
     height: Number.isFinite(height) ? Math.round(height) : null,
   });
+}
+
+function clampChartWidth(value) {
+  const numeric = Number.parseFloat(value);
+  if (!Number.isFinite(numeric)) return null;
+  return Math.min(CHART_MAX_WIDTH, Math.max(CHART_MIN_WIDTH, Math.round(numeric)));
+}
+
+function clampChartHeight(value) {
+  const numeric = Number.parseFloat(value);
+  if (!Number.isFinite(numeric)) return null;
+  return Math.min(CHART_MAX_HEIGHT, Math.max(CHART_MIN_HEIGHT, Math.round(numeric)));
+}
+
+function parseChartNumber(value) {
+  const numeric = Number.parseFloat(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function updateChartSizingForCard(
+  cardEl,
+  displayWidth,
+  displayHeight,
+  options = {},
+) {
+  if (!cardEl || !cardEl.classList?.contains('group--chart')) return;
+  const embed = cardEl.querySelector('.embed');
+  const frameWrap = cardEl.querySelector('.chart-frame');
+  const iframe = frameWrap?.querySelector('iframe');
+  if (!embed || !frameWrap || !iframe) return;
+
+  const { baseWidth: overrideBaseWidth, baseHeight: overrideBaseHeight } = options || {};
+
+  const resolvedBaseWidth =
+    clampChartWidth(overrideBaseWidth) ??
+    clampChartWidth(frameWrap.dataset?.width) ??
+    clampChartWidth(iframe.dataset?.baseWidth) ??
+    clampChartWidth(cardEl.dataset?.chartBaseWidth) ??
+    clampChartWidth(displayWidth) ??
+    CHART_MIN_WIDTH;
+
+  const resolvedBaseHeight =
+    clampChartHeight(overrideBaseHeight) ??
+    clampChartHeight(frameWrap.dataset?.height) ??
+    clampChartHeight(iframe.dataset?.baseHeight) ??
+    clampChartHeight(cardEl.dataset?.chartBaseHeight) ??
+    clampChartHeight(displayHeight) ??
+    CHART_MIN_HEIGHT;
+
+  const defaultDisplayWidth =
+    Number.isFinite(displayWidth)
+      ? displayWidth
+      : parseChartNumber(frameWrap.dataset?.displayWidth) ??
+        cardEl.getBoundingClientRect()?.width ??
+        resolvedBaseWidth;
+
+  const defaultDisplayHeight =
+    Number.isFinite(displayHeight)
+      ? displayHeight
+      : parseChartNumber(frameWrap.dataset?.displayHeight) ??
+        cardEl.getBoundingClientRect()?.height ??
+        resolvedBaseHeight;
+
+  const finalDisplayWidth = clampChartWidth(defaultDisplayWidth) ?? CHART_MIN_WIDTH;
+  const finalDisplayHeight = clampChartHeight(defaultDisplayHeight) ?? CHART_MIN_HEIGHT;
+
+  const scaleX = resolvedBaseWidth ? finalDisplayWidth / resolvedBaseWidth : 1;
+  const scaleY = resolvedBaseHeight ? finalDisplayHeight / resolvedBaseHeight : 1;
+  const scale = Math.min(scaleX, scaleY);
+  const scaledWidth = Math.round(resolvedBaseWidth * scale);
+  const scaledHeight = Math.round(resolvedBaseHeight * scale);
+  const offsetX = Math.max(0, (finalDisplayWidth - scaledWidth) / 2);
+  const offsetY = Math.max(0, (finalDisplayHeight - scaledHeight) / 2);
+
+  if (embed instanceof HTMLElement) {
+    embed.style.width = '100%';
+    embed.style.height = '100%';
+    embed.style.minWidth = `${CHART_MIN_WIDTH}px`;
+    embed.style.minHeight = `${CHART_MIN_HEIGHT}px`;
+  }
+
+  if (frameWrap instanceof HTMLElement) {
+    frameWrap.style.width = '100%';
+    frameWrap.style.height = '100%';
+    frameWrap.style.minWidth = `${CHART_MIN_WIDTH}px`;
+    frameWrap.style.minHeight = `${CHART_MIN_HEIGHT}px`;
+    frameWrap.dataset.width = String(resolvedBaseWidth);
+    frameWrap.dataset.height = String(resolvedBaseHeight);
+    frameWrap.dataset.displayWidth = String(finalDisplayWidth);
+    frameWrap.dataset.displayHeight = String(finalDisplayHeight);
+    frameWrap.dataset.scale = String(scale);
+  }
+
+  if (iframe instanceof HTMLElement) {
+    iframe.style.width = `${resolvedBaseWidth}px`;
+    iframe.style.height = `${resolvedBaseHeight}px`;
+    iframe.style.transform = `scale(${scale})`;
+    iframe.style.transformOrigin = 'top left';
+    iframe.style.left = `${offsetX}px`;
+    iframe.style.top = `${offsetY}px`;
+    iframe.style.aspectRatio = 'auto';
+    iframe.dataset.baseWidth = String(resolvedBaseWidth);
+    iframe.dataset.baseHeight = String(resolvedBaseHeight);
+    iframe.dataset.scale = String(scale);
+  }
+
+  if (cardEl instanceof HTMLElement) {
+    cardEl.style.minWidth = `${CHART_MIN_WIDTH}px`;
+    cardEl.style.minHeight = `${CHART_MIN_HEIGHT}px`;
+    cardEl.dataset.chartBaseWidth = String(resolvedBaseWidth);
+    cardEl.dataset.chartBaseHeight = String(resolvedBaseHeight);
+    cardEl.dataset.chartDisplayWidth = String(finalDisplayWidth);
+    cardEl.dataset.chartDisplayHeight = String(finalDisplayHeight);
+  }
 }
 
 function getCardDimensions(el) {
@@ -312,6 +431,11 @@ function measureIntrinsicContentSize(cardEl, innerEl = findCardInnerElement(card
 
 function applyMinSizeStyles(cardEl, width, height) {
   if (!cardEl) return;
+  if (cardEl.classList?.contains('group--chart')) {
+    cardEl.style.minWidth = `${CHART_MIN_WIDTH}px`;
+    cardEl.style.minHeight = `${CHART_MIN_HEIGHT}px`;
+    return;
+  }
   const widthPx = width > 0 ? `${width}px` : '';
   const heightPx = height > 0 ? `${height}px` : '';
   if (cardEl.style.minWidth !== widthPx) {
@@ -332,6 +456,9 @@ function computeIntrinsicSizeFromState(state) {
   }
   if (Number.isFinite(measured.heightExtra)) {
     state.hostPaddingHeight = Math.max(0, measured.heightExtra);
+  }
+  if (state.cardEl.classList?.contains('group--chart')) {
+    return { width: CHART_MIN_WIDTH, height: CHART_MIN_HEIGHT };
   }
   return { width: measured.width, height: measured.height };
 }
@@ -468,14 +595,20 @@ function applyIntrinsicMinSize(
   }
   if (!state.last || (!state.last.width && !state.last.height)) {
     const measured = measureIntrinsicContentSize(cardEl, innerEl);
-    state.last = { width: measured.width, height: measured.height };
+    let resolvedWidth = measured.width;
+    let resolvedHeight = measured.height;
+    if (cardEl.classList?.contains('group--chart')) {
+      resolvedWidth = CHART_MIN_WIDTH;
+      resolvedHeight = CHART_MIN_HEIGHT;
+    }
+    state.last = { width: resolvedWidth, height: resolvedHeight };
     if (Number.isFinite(measured.widthExtra)) {
       state.hostPaddingWidth = Math.max(0, measured.widthExtra);
     }
     if (Number.isFinite(measured.heightExtra)) {
       state.hostPaddingHeight = Math.max(0, measured.heightExtra);
     }
-    applyMinSizeStyles(cardEl, measured.width, measured.height);
+    applyMinSizeStyles(cardEl, resolvedWidth, resolvedHeight);
   }
   scheduleIntrinsicUpdate(cardEl);
   return state.last;
@@ -705,13 +838,22 @@ function initResizeHandles(cardEl) {
     targets
       .filter((target, index) => target && target.isConnected && targets.indexOf(target) === index)
       .forEach((target) => {
-        if (Number.isFinite(nextWidth)) {
-          target.style.width = `${Math.max(0, nextWidth)}px`;
+        const widthValue = Number.isFinite(nextWidth) ? Math.max(0, nextWidth) : null;
+        const heightValue = Number.isFinite(nextHeight) ? Math.max(0, nextHeight) : null;
+        if (Number.isFinite(widthValue)) {
+          target.style.width = `${widthValue}px`;
         }
-        if (Number.isFinite(nextHeight)) {
-          target.style.height = `${Math.max(0, nextHeight)}px`;
+        if (Number.isFinite(heightValue)) {
+          target.style.height = `${heightValue}px`;
         }
-        rememberCardDimensions(target, nextWidth, nextHeight);
+        rememberCardDimensions(target, widthValue, heightValue);
+        if (Number.isFinite(widthValue) || Number.isFinite(heightValue)) {
+          updateChartSizingForCard(
+            target,
+            Number.isFinite(widthValue) ? widthValue : undefined,
+            Number.isFinite(heightValue) ? heightValue : undefined,
+          );
+        }
       });
 
     activeResize.snapWidth = widthSnap?.value ?? null;
@@ -939,6 +1081,7 @@ function applyResizeForElement(el, width, height, wSize, hSize) {
   const metadata = resolveSizeMetadata(finalWidth, finalHeight);
 
   applySize(el, finalWidth, finalHeight, wSize, hSize);
+  updateChartSizingForCard(el, finalWidth, finalHeight, { commitState: true });
   if (el.dataset.id === 'reminders') {
     const prev = currentState.remindersCard || {};
     const changed =
@@ -1949,17 +2092,6 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
       iframe.allowFullscreen = true;
       iframe.title = g.name ? `${g.name}` : T.chartFrameTitle || 'Grafikas';
 
-      const clampHeight = (value) => {
-        const numeric = Number(value);
-        if (!Number.isFinite(numeric)) return null;
-        return Math.min(2000, Math.max(120, Math.round(numeric)));
-      };
-      const clampWidth = (value) => {
-        const numeric = Number(value);
-        if (!Number.isFinite(numeric)) return null;
-        return Math.min(2400, Math.max(200, Math.round(numeric)));
-      };
-
       const fallbackCardHeight = Number.isFinite(g.height)
         ? g.height
         : SIZE_MAP[g.hSize ?? 'md']?.height ?? SIZE_MAP.md.height;
@@ -1977,64 +2109,59 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
           ? g.w
           : null;
       let baseHeight =
-        clampHeight(baseHeightRaw) ?? clampHeight(fallbackCardHeight) ?? clampHeight(480);
+        clampChartHeight(baseHeightRaw) ??
+        clampChartHeight(fallbackCardHeight) ??
+        clampChartHeight(480);
       let baseWidth =
-        clampWidth(baseWidthRaw) ?? clampWidth(fallbackCardWidth) ?? clampWidth(640);
+        clampChartWidth(baseWidthRaw) ??
+        clampChartWidth(fallbackCardWidth) ??
+        clampChartWidth(640);
 
       const resolveDisplayHeight = () => {
         if (Number.isFinite(g.height)) {
-          const clamped = clampHeight(g.height);
+          const clamped = clampChartHeight(g.height);
           if (clamped) return clamped;
         }
-        const fallback = clampHeight(fallbackCardHeight);
-        return fallback ?? clampHeight(baseHeight) ?? clampHeight(480);
+        const fallback = clampChartHeight(fallbackCardHeight);
+        return fallback ?? clampChartHeight(baseHeight) ?? clampChartHeight(480);
       };
 
       const resolveDisplayWidth = () => {
         if (Number.isFinite(g.width)) {
-          const clamped = clampWidth(g.width);
+          const clamped = clampChartWidth(g.width);
           if (clamped) return clamped;
         }
-        const fallback = clampWidth(fallbackCardWidth);
-        return fallback ?? clampWidth(baseWidth) ?? clampWidth(640);
+        const fallback = clampChartWidth(fallbackCardWidth);
+        return fallback ?? clampChartWidth(baseWidth) ?? clampChartWidth(640);
       };
 
       const applySizing = () => {
         const safeBaseHeight =
-          clampHeight(baseHeight) ?? clampHeight(fallbackCardHeight) ?? clampHeight(480);
+          clampChartHeight(baseHeight) ??
+          clampChartHeight(fallbackCardHeight) ??
+          clampChartHeight(480);
         const safeBaseWidth =
-          clampWidth(baseWidth) ?? clampWidth(fallbackCardWidth) ?? clampWidth(640);
+          clampChartWidth(baseWidth) ??
+          clampChartWidth(fallbackCardWidth) ??
+          clampChartWidth(640);
         const displayHeight = resolveDisplayHeight();
         const displayWidth = resolveDisplayWidth();
-        const finalHeight = Number.isFinite(displayHeight) ? displayHeight : safeBaseHeight;
-        const finalWidth = Number.isFinite(displayWidth) ? displayWidth : safeBaseWidth;
-        emb.style.minHeight = `${finalHeight}px`;
-        emb.style.minWidth = `${finalWidth}px`;
-        emb.style.height = `${finalHeight}px`;
-        emb.style.width = `${finalWidth}px`;
-        frameWrap.style.height = `${finalHeight}px`;
-        frameWrap.style.width = `${finalWidth}px`;
-        frameWrap.style.minHeight = `${finalHeight}px`;
-        frameWrap.style.minWidth = `${finalWidth}px`;
-        frameWrap.dataset.height = String(safeBaseHeight);
-        frameWrap.dataset.width = String(safeBaseWidth);
-        frameWrap.dataset.scale = '1';
-        frameWrap.dataset.displayHeight = String(finalHeight);
-        frameWrap.dataset.displayWidth = String(finalWidth);
-        iframe.style.height = `${finalHeight}px`;
-        iframe.style.width = `${finalWidth}px`;
-        iframe.style.transform = 'none';
-        iframe.style.transformOrigin = 'top left';
-        iframe.dataset.baseHeight = String(safeBaseHeight);
-        iframe.dataset.baseWidth = String(safeBaseWidth);
-        iframe.dataset.scale = '1';
-        iframe.style.aspectRatio = 'auto';
+        const finalHeight = Number.isFinite(displayHeight)
+          ? clampChartHeight(displayHeight)
+          : safeBaseHeight;
+        const finalWidth = Number.isFinite(displayWidth)
+          ? clampChartWidth(displayWidth)
+          : safeBaseWidth;
         g.width = finalWidth;
         g.height = finalHeight;
         g.wSize = sizeFromWidth(finalWidth);
         g.hSize = sizeFromHeight(finalHeight);
         delete g.scale;
         applySize(grp, finalWidth, finalHeight, g.wSize, g.hSize);
+        updateChartSizingForCard(grp, finalWidth, finalHeight, {
+          baseWidth: safeBaseWidth,
+          baseHeight: safeBaseHeight,
+        });
       };
 
       const measureSize = () => {
@@ -2051,11 +2178,11 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
           const measuredWidth = Math.max(bodyWidth, rootWidth);
           const safeHeight =
             Number.isFinite(measuredHeight) && measuredHeight > 0
-              ? clampHeight(measuredHeight)
+              ? clampChartHeight(measuredHeight)
               : null;
           const safeWidth =
             Number.isFinite(measuredWidth) && measuredWidth > 0
-              ? clampWidth(measuredWidth)
+              ? clampChartWidth(measuredWidth)
               : null;
           if (!safeHeight && !safeWidth) return null;
           return { height: safeHeight, width: safeWidth };
@@ -2113,8 +2240,6 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
         }
       };
 
-      applySizing();
-
       iframe.addEventListener('load', () => {
         applySizing();
         syncMeasuredSize();
@@ -2129,8 +2254,9 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
       activeCardIds.add(g.id);
       registerCard(g.id, grp);
       const inner = grp.querySelector('.embed');
+      applySizing();
       setupMinSizeWatcher(grp, inner);
-      
+
       return;
     }
     const { section: grp, header: h, content } =
