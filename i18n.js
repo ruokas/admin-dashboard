@@ -85,6 +85,7 @@ export const Tlt = {
   editGroup: 'Redaguoti grupę',
   editChart: 'Redaguoti grafiką',
   chartBasics: 'Pagrindiniai nustatymai',
+  chartDialogTitle: 'Naujas grafikas',
   chartPreview: 'Gyva peržiūra',
   chartPreviewWidth: 'Numatomas plotis',
   chartPreviewHeight: 'Numatomas aukštis',

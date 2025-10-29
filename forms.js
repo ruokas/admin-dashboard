@@ -650,8 +650,8 @@ export function itemFormDialog(T, data = {}) {
 export function chartFormDialog(T, data = {}) {
   return new Promise((resolve) => {
     const prevFocus = document.activeElement;
-    const DEFAULT_PREVIEW_HEIGHT = 360;
-    const DEFAULT_PREVIEW_WIDTH = 520;
+    const DEFAULT_PREVIEW_HEIGHT = 280;
+    const DEFAULT_PREVIEW_WIDTH = 440;
     const MIN_AUTO_HEIGHT = 120;
     const MAX_AUTO_HEIGHT = 2000;
     const MIN_AUTO_WIDTH = 200;
@@ -660,14 +660,19 @@ export function chartFormDialog(T, data = {}) {
     const dlg = document.createElement('dialog');
     dlg.classList.add('chart-form-dialog');
     dlg.innerHTML = `<form method="dialog" id="chartForm">
+      <header class="chart-form__header">
+        <h2 id="chartFormHeading">${escapeHtml(
+          T.chartDialogTitle || T.addChart || 'Naujas grafikas',
+        )}</h2>
+      </header>
       <fieldset class="form-section">
         <legend>${T.chartBasics || 'Pagrindiniai nustatymai'}</legend>
-        <label id="chartFormLabel" class="chart-form__field"><span class="chart-form__field-label">${
+        <label class="chart-form__field"><span class="chart-form__field-label">${
           T.itemTitle
         }</span><input name="title" required></label>
         <label class="chart-form__field"><span class="chart-form__field-label">${
           T.itemUrl
-        }</span><textarea name="url" rows="3" required></textarea></label>
+        }</span><textarea name="url" rows="2" required></textarea></label>
       </fieldset>
       <section class="chart-preview" aria-live="polite">
         <header class="chart-preview__header">
@@ -702,7 +707,7 @@ export function chartFormDialog(T, data = {}) {
       </menu>
     </form>`;
     dlg.setAttribute('aria-modal', 'true');
-    dlg.setAttribute('aria-labelledby', 'chartFormLabel');
+    dlg.setAttribute('aria-labelledby', 'chartFormHeading');
     document.body.appendChild(dlg);
 
     const form = dlg.querySelector('form');

@@ -336,8 +336,20 @@ dialog form {
 
 
 dialog.chart-form-dialog {
-  width: min(720px, 96vw);
-  max-width: min(720px, 96vw);
+  width: min(640px, 94vw);
+  max-width: min(640px, 94vw);
+}
+
+.chart-form__header {
+  display: grid;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+}
+
+.chart-form__header h2 {
+  margin: 0;
+  font-size: var(--font-lg);
+  font-weight: 700;
 }
 
 .chart-form__field {
@@ -368,7 +380,7 @@ dialog.chart-form-dialog {
 }
 
 .chart-form__field textarea {
-  min-height: 128px;
+  min-height: 104px;
   resize: vertical;
 }
 
@@ -422,7 +434,7 @@ dialog.chart-form-dialog {
   position: relative;
   border: 1px dashed var(--border-strong);
   border-radius: var(--space-3);
-  min-height: 200px;
+  min-height: 180px;
   display: block;
   overflow: hidden;
   background: var(--surface);
