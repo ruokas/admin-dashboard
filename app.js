@@ -1142,7 +1142,8 @@ async function addChart() {
   const cDims = SIZE_MAP.md;
   const width = Number.isFinite(cDims.width) ? cDims.width : SIZE_MAP.md.width;
   const height = Number.isFinite(cDims.height) ? cDims.height : SIZE_MAP.md.height;
-  const scale = Number.isFinite(res.scale) ? Number(res.scale) : 1;
+  const safeDefaultWidth = Number.isFinite(width) && width > 0 ? width : SIZE_MAP.md.width;
+  const safeDefaultHeight = Number.isFinite(height) && height > 0 ? height : SIZE_MAP.md.height;
   const baseHeight = Number.isFinite(res.frameHeight)
     ? Math.round(res.frameHeight)
     : Number.isFinite(res.height)
@@ -1153,25 +1154,24 @@ async function addChart() {
     : Number.isFinite(res.width)
       ? Math.round(res.width)
       : null;
-  const scaledHeight = Number.isFinite(baseHeight)
-    ? Math.max(120, Math.round(baseHeight * scale))
-    : height;
-  const scaledWidth = Number.isFinite(baseWidth)
-    ? Math.max(200, Math.round(baseWidth * scale))
-    : width;
+  const finalHeight = Number.isFinite(baseHeight)
+    ? Math.max(120, baseHeight)
+    : Math.max(120, Math.round(safeDefaultHeight || 0));
+  const finalWidth = Number.isFinite(baseWidth)
+    ? Math.max(200, baseWidth)
+    : Math.max(200, Math.round(safeDefaultWidth || 0));
 
   const chart = {
     id: uid(),
     type: 'chart',
     name: res.title,
     url: res.url,
-    scale,
     frameHeight: Number.isFinite(baseHeight) ? baseHeight : undefined,
     frameWidth: Number.isFinite(baseWidth) ? baseWidth : undefined,
-    width: scaledWidth,
-    height: scaledHeight,
-    wSize: sizeFromWidth(scaledWidth),
-    hSize: sizeFromHeight(scaledHeight),
+    width: finalWidth,
+    height: finalHeight,
+    wSize: sizeFromWidth(finalWidth),
+    hSize: sizeFromHeight(finalHeight),
   };
   if (Number.isFinite(chart.frameHeight)) {
     chart.h = chart.frameHeight;
@@ -1258,25 +1258,26 @@ async function editChart(gid) {
   const res = await chartFormDialog(T, {
     title: g.name,
     url: g.url,
-    scale: Number.isFinite(g.scale) ? g.scale : 1,
     frameHeight: Number.isFinite(g.frameHeight)
       ? g.frameHeight
       : Number.isFinite(g.h)
         ? g.h
-        : null,
+        : Number.isFinite(g.height)
+          ? g.height
+          : null,
     frameWidth: Number.isFinite(g.frameWidth)
       ? g.frameWidth
       : Number.isFinite(g.w)
         ? g.w
-        : Number.isFinite(g.width) && Number.isFinite(g.scale) && g.scale
-          ? Math.round(g.width / g.scale)
+        : Number.isFinite(g.width)
+          ? g.width
           : null,
+    height: Number.isFinite(g.height) ? g.height : null,
     width: Number.isFinite(g.width) ? g.width : null,
   });
   if (!res) return;
   g.name = res.title;
   g.url = res.url;
-  g.scale = Number.isFinite(res.scale) ? Number(res.scale) : 1;
   const nextHeight = Number.isFinite(res.frameHeight)
     ? Math.round(res.frameHeight)
     : Number.isFinite(res.height)
@@ -1301,7 +1302,6 @@ async function editChart(gid) {
     delete g.frameWidth;
     delete g.w;
   }
-  const scale = Number.isFinite(g.scale) ? g.scale : 1;
   const fallbackWidth =
     Number.isFinite(g.width)
       ? g.width
@@ -1310,16 +1310,25 @@ async function editChart(gid) {
     Number.isFinite(g.height)
       ? g.height
       : SIZE_MAP[g.hSize ?? 'md']?.height ?? SIZE_MAP.md.height;
-  const scaledWidth = Number.isFinite(nextWidth)
-    ? Math.max(200, Math.round(nextWidth * scale))
-    : fallbackWidth;
-  const scaledHeight = Number.isFinite(nextHeight)
-    ? Math.max(120, Math.round(nextHeight * scale))
-    : fallbackHeight;
-  g.width = scaledWidth;
-  g.height = scaledHeight;
-  g.wSize = sizeFromWidth(scaledWidth);
-  g.hSize = sizeFromHeight(scaledHeight);
+  const safeFallbackWidth =
+    Number.isFinite(fallbackWidth) && fallbackWidth > 0 ? fallbackWidth : SIZE_MAP.md.width;
+  const safeFallbackHeight =
+    Number.isFinite(fallbackHeight) && fallbackHeight > 0 ? fallbackHeight : SIZE_MAP.md.height;
+  const nextDisplayWidth = Number.isFinite(res.width)
+    ? Math.max(200, Math.round(res.width))
+    : Number.isFinite(nextWidth)
+      ? Math.max(200, Math.round(nextWidth))
+      : Math.max(200, Math.round(safeFallbackWidth || 0));
+  const nextDisplayHeight = Number.isFinite(res.height)
+    ? Math.max(120, Math.round(res.height))
+    : Number.isFinite(nextHeight)
+      ? Math.max(120, Math.round(nextHeight))
+      : Math.max(120, Math.round(safeFallbackHeight || 0));
+  g.width = nextDisplayWidth;
+  g.height = nextDisplayHeight;
+  g.wSize = sizeFromWidth(nextDisplayWidth);
+  g.hSize = sizeFromHeight(nextDisplayHeight);
+  delete g.scale;
   applySizeMetadata(g, g.width, g.height);
   persistState();
   renderAll();

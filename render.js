@@ -1949,11 +1949,6 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
       iframe.allowFullscreen = true;
       iframe.title = g.name ? `${g.name}` : T.chartFrameTitle || 'Grafikas';
 
-      const clampScale = (value) => {
-        const numeric = Number(value);
-        if (!Number.isFinite(numeric)) return 1;
-        return Math.min(2, Math.max(0.5, numeric));
-      };
       const clampHeight = (value) => {
         const numeric = Number(value);
         if (!Number.isFinite(numeric)) return null;
@@ -1985,13 +1980,23 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
         clampHeight(baseHeightRaw) ?? clampHeight(fallbackCardHeight) ?? clampHeight(480);
       let baseWidth =
         clampWidth(baseWidthRaw) ?? clampWidth(fallbackCardWidth) ?? clampWidth(640);
-      const defaultScale = clampScale(g.scale);
-      let scale = defaultScale;
 
-      const computeDisplaySize = (base, currentScale) => {
-        if (!Number.isFinite(base) || base <= 0) return null;
-        const scaled = Math.round(base * currentScale);
-        return Math.max(1, scaled);
+      const resolveDisplayHeight = () => {
+        if (Number.isFinite(g.height)) {
+          const clamped = clampHeight(g.height);
+          if (clamped) return clamped;
+        }
+        const fallback = clampHeight(fallbackCardHeight);
+        return fallback ?? clampHeight(baseHeight) ?? clampHeight(480);
+      };
+
+      const resolveDisplayWidth = () => {
+        if (Number.isFinite(g.width)) {
+          const clamped = clampWidth(g.width);
+          if (clamped) return clamped;
+        }
+        const fallback = clampWidth(fallbackCardWidth);
+        return fallback ?? clampWidth(baseWidth) ?? clampWidth(640);
       };
 
       const applySizing = () => {
@@ -1999,34 +2004,37 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
           clampHeight(baseHeight) ?? clampHeight(fallbackCardHeight) ?? clampHeight(480);
         const safeBaseWidth =
           clampWidth(baseWidth) ?? clampWidth(fallbackCardWidth) ?? clampWidth(640);
-        const displayHeight = computeDisplaySize(safeBaseHeight, scale) ?? safeBaseHeight;
-        const displayWidth = computeDisplaySize(safeBaseWidth, scale) ?? safeBaseWidth;
-        emb.style.minHeight = `${displayHeight}px`;
-        emb.style.minWidth = `${displayWidth}px`;
-        emb.style.height = `${displayHeight}px`;
-        emb.style.width = `${displayWidth}px`;
-        frameWrap.style.height = `${displayHeight}px`;
-        frameWrap.style.width = `${displayWidth}px`;
-        frameWrap.style.minHeight = `${displayHeight}px`;
-        frameWrap.style.minWidth = `${displayWidth}px`;
+        const displayHeight = resolveDisplayHeight();
+        const displayWidth = resolveDisplayWidth();
+        const finalHeight = Number.isFinite(displayHeight) ? displayHeight : safeBaseHeight;
+        const finalWidth = Number.isFinite(displayWidth) ? displayWidth : safeBaseWidth;
+        emb.style.minHeight = `${finalHeight}px`;
+        emb.style.minWidth = `${finalWidth}px`;
+        emb.style.height = `${finalHeight}px`;
+        emb.style.width = `${finalWidth}px`;
+        frameWrap.style.height = `${finalHeight}px`;
+        frameWrap.style.width = `${finalWidth}px`;
+        frameWrap.style.minHeight = `${finalHeight}px`;
+        frameWrap.style.minWidth = `${finalWidth}px`;
         frameWrap.dataset.height = String(safeBaseHeight);
         frameWrap.dataset.width = String(safeBaseWidth);
-        frameWrap.dataset.scale = String(scale);
-        frameWrap.dataset.displayHeight = String(displayHeight);
-        frameWrap.dataset.displayWidth = String(displayWidth);
-        iframe.style.height = `${safeBaseHeight}px`;
-        iframe.style.width = `${safeBaseWidth}px`;
-        iframe.style.transform = scale === 1 ? 'none' : `scale(${scale})`;
+        frameWrap.dataset.scale = '1';
+        frameWrap.dataset.displayHeight = String(finalHeight);
+        frameWrap.dataset.displayWidth = String(finalWidth);
+        iframe.style.height = `${finalHeight}px`;
+        iframe.style.width = `${finalWidth}px`;
+        iframe.style.transform = 'none';
         iframe.style.transformOrigin = 'top left';
         iframe.dataset.baseHeight = String(safeBaseHeight);
         iframe.dataset.baseWidth = String(safeBaseWidth);
-        iframe.dataset.scale = String(scale);
+        iframe.dataset.scale = '1';
         iframe.style.aspectRatio = 'auto';
-        g.width = displayWidth;
-        g.height = displayHeight;
-        g.wSize = sizeFromWidth(displayWidth);
-        g.hSize = sizeFromHeight(displayHeight);
-        applySize(grp, displayWidth, displayHeight, g.wSize, g.hSize);
+        g.width = finalWidth;
+        g.height = finalHeight;
+        g.wSize = sizeFromWidth(finalWidth);
+        g.hSize = sizeFromHeight(finalHeight);
+        delete g.scale;
+        applySize(grp, finalWidth, finalHeight, g.wSize, g.hSize);
       };
 
       const measureSize = () => {
@@ -2056,10 +2064,15 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
         }
       };
 
+      const nearlyEqual = (a, b, tolerance = 2) =>
+        Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= tolerance;
+
       const syncMeasuredSize = () => {
         const measured = measureSize();
         if (!measured) return;
         let changed = false;
+        const prevBaseHeight = baseHeight;
+        const prevBaseWidth = baseWidth;
         if (
           Number.isFinite(measured.height) &&
           (!baseHeight || Math.abs(measured.height - baseHeight) > 2)
@@ -2067,6 +2080,12 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
           baseHeight = measured.height;
           g.frameHeight = measured.height;
           g.h = measured.height;
+          if (
+            !Number.isFinite(g.height) ||
+            nearlyEqual(g.height, prevBaseHeight)
+          ) {
+            g.height = measured.height;
+          }
           changed = true;
         }
         if (
@@ -2076,9 +2095,17 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
           baseWidth = measured.width;
           g.frameWidth = measured.width;
           g.w = measured.width;
+          if (
+            !Number.isFinite(g.width) ||
+            nearlyEqual(g.width, prevBaseWidth)
+          ) {
+            g.width = measured.width;
+          }
           changed = true;
         }
         if (changed) {
+          g.wSize = sizeFromWidth(g.width);
+          g.hSize = sizeFromHeight(g.height);
           applySizing();
           if (typeof persist === 'function') {
             persist();
@@ -2089,7 +2116,6 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
       applySizing();
 
       iframe.addEventListener('load', () => {
-        scale = clampScale(g.scale ?? defaultScale);
         applySizing();
         syncMeasuredSize();
         window.setTimeout(syncMeasuredSize, 400);

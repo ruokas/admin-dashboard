@@ -650,9 +650,6 @@ export function itemFormDialog(T, data = {}) {
 export function chartFormDialog(T, data = {}) {
   return new Promise((resolve) => {
     const prevFocus = document.activeElement;
-    const DEFAULT_SCALE_PERCENT = 100;
-    const MIN_SCALE_PERCENT = 50;
-    const MAX_SCALE_PERCENT = 200;
     const DEFAULT_PREVIEW_HEIGHT = 480;
     const DEFAULT_PREVIEW_WIDTH = 640;
     const MIN_AUTO_HEIGHT = 120;
@@ -674,27 +671,24 @@ export function chartFormDialog(T, data = {}) {
       </fieldset>
       <fieldset class="form-section">
         <legend>${T.chartDisplay || 'Atvaizdavimo parametrai'}</legend>
-        <div class="chart-form__grid">
-          <label class="chart-form__scale">${T.chartScale || 'Mastelis'}
-            <input type="range" name="scale" min="${MIN_SCALE_PERCENT}" max="${MAX_SCALE_PERCENT}" step="5">
-            <span class="chart-form__scale-value" data-chart-scale-value>100%</span>
-          </label>
-        </div>
         <p class="hint">${
           T.chartHint ||
-          'Įveskite iframe nuorodą ar kodą. Kortelės plotis ir aukštis prisitaiko automatiškai, mastelį keiskite slankikliu.'
+          'Įveskite iframe nuorodą ar kodą. Kortelė prisitaikys prie grafiko, o dydį koreguosite keisdami kortelę.'
+        }</p>
+        <p class="hint">${
+          T.chartSizeHint ||
+          'Išsaugoję įjunkite redagavimą ir keiskite kortelės plotį bei aukštį tempiant jos kampus (Shift – kelioms kortelėms).'
         }</p>
       </fieldset>
       <section class="chart-preview" aria-live="polite">
         <header class="chart-preview__header">
           <h3>${T.chartPreview || 'Gyva peržiūra'}</h3>
           <p class="chart-preview__meta">
-            <span>${T.chartPreviewScale || 'Mastelis'}: <strong data-chart-scale-label>100%</strong></span>
             <span>${
-              T.chartPreviewWidth || 'Rodymo plotis'
+              T.chartPreviewWidth || 'Numatomas plotis'
             }: <strong data-chart-width-label>${DEFAULT_PREVIEW_WIDTH}px</strong></span>
             <span>${
-              T.chartPreviewHeight || 'Rodymo aukštis'
+              T.chartPreviewHeight || 'Numatomas aukštis'
             }: <strong data-chart-height-label>${DEFAULT_PREVIEW_HEIGHT}px</strong></span>
           </p>
         </header>
@@ -708,8 +702,8 @@ export function chartFormDialog(T, data = {}) {
         </div>
         <p class="chart-preview__status" data-chart-status></p>
         <p class="chart-preview__hint">${
-          T.chartDragHint ||
-          'Reguliuokite mastelį slankikliu aukščiau – kortelės dydis prisitaikys automatiškai.'
+          T.chartResizeHint ||
+          'Išsaugojus koreguokite kortelės dydį redagavimo režime tempiant jos kampus (Shift – kelioms kortelėms).'
         }</p>
       </section>
       <p class="error" id="chartErr" role="status" aria-live="polite"></p>
@@ -727,9 +721,6 @@ export function chartFormDialog(T, data = {}) {
     const cancel = form.querySelector('[data-act="cancel"]');
     const urlField = form.elements.url;
     const titleField = form.elements.title;
-    const scaleField = form.elements.scale;
-    const scaleValue = form.querySelector('[data-chart-scale-value]');
-    const scaleLabel = form.querySelector('[data-chart-scale-label]');
     const widthLabel = form.querySelector('[data-chart-width-label]');
     const heightLabel = form.querySelector('[data-chart-height-label]');
     const previewWrap = form.querySelector('.chart-preview__frame');
@@ -737,9 +728,6 @@ export function chartFormDialog(T, data = {}) {
     const previewPlaceholder = form.querySelector('[data-chart-placeholder]');
     const previewStatus = form.querySelector('[data-chart-status]');
 
-    const initialScale = Number.isFinite(data.scale)
-      ? Math.round(Number(data.scale) * 100)
-      : DEFAULT_SCALE_PERCENT;
     const initialHeight = [data.frameHeight, data.height, data.h]
       .map((val) => Number(val))
       .find((val) => Number.isFinite(val));
@@ -755,12 +743,6 @@ export function chartFormDialog(T, data = {}) {
       : null;
     let currentSrc = '';
     let hasLoaded = false;
-
-    const clampPercent = (value) => {
-      const numeric = Number.parseInt(value, 10);
-      if (!Number.isFinite(numeric)) return DEFAULT_SCALE_PERCENT;
-      return Math.min(MAX_SCALE_PERCENT, Math.max(MIN_SCALE_PERCENT, numeric));
-    };
 
     const clampHeight = (value) => {
       const numeric = Number.parseInt(value, 10);
@@ -822,32 +804,25 @@ export function chartFormDialog(T, data = {}) {
     };
 
     const applySizing = () => {
-      const percent = clampPercent(scaleField.value || DEFAULT_SCALE_PERCENT);
-      scaleField.value = percent;
-      const scale = percent / 100;
       const baseHeight = computeBaseHeight();
       const baseWidth = computeBaseWidth();
-      const displayHeight = Math.round(baseHeight * scale);
-      const displayWidth = Math.round(baseWidth * scale);
-      scaleValue.textContent = `${percent}%`;
-      scaleLabel.textContent = `${percent}%`;
       if (widthLabel) {
-        widthLabel.textContent = `${displayWidth}px`;
+        widthLabel.textContent = `${baseWidth}px`;
       }
-      heightLabel.textContent = `${displayHeight}px`;
+      heightLabel.textContent = `${baseHeight}px`;
       previewFrame.style.height = `${baseHeight}px`;
       previewFrame.style.width = `${baseWidth}px`;
-      previewFrame.style.transform = scale === 1 ? 'none' : `scale(${scale})`;
+      previewFrame.style.transform = 'none';
       previewFrame.style.transformOrigin = 'top left';
-      previewWrap.style.height = `${displayHeight}px`;
-      previewWrap.style.width = `${displayWidth}px`;
-      previewWrap.style.minHeight = `${displayHeight}px`;
-      previewWrap.style.minWidth = `${displayWidth}px`;
-      previewWrap.dataset.scale = String(scale);
+      previewWrap.style.height = `${baseHeight}px`;
+      previewWrap.style.width = `${baseWidth}px`;
+      previewWrap.style.minHeight = `${baseHeight}px`;
+      previewWrap.style.minWidth = `${baseWidth}px`;
+      previewWrap.dataset.scale = '1';
       previewWrap.dataset.height = String(baseHeight);
       previewWrap.dataset.width = String(baseWidth);
-      previewWrap.dataset.displayHeight = String(displayHeight);
-      previewWrap.dataset.displayWidth = String(displayWidth);
+      previewWrap.dataset.displayHeight = String(baseHeight);
+      previewWrap.dataset.displayWidth = String(baseWidth);
     };
 
     const measureFrameSize = () => {
@@ -956,7 +931,6 @@ export function chartFormDialog(T, data = {}) {
       form.removeEventListener('submit', submit);
       cancel.removeEventListener('click', close);
       urlField.removeEventListener('input', handleUrlInput);
-      scaleField.removeEventListener('input', handleScaleInput);
       previewFrame.removeEventListener('load', handlePreviewLoad);
       dlg.remove();
       prevFocus?.focus();
@@ -965,10 +939,6 @@ export function chartFormDialog(T, data = {}) {
     const handleUrlInput = () => {
       previewStatus.textContent = '';
       updatePreview();
-    };
-
-    const handleScaleInput = () => {
-      applySizing();
     };
 
     function submit(e) {
@@ -984,13 +954,11 @@ export function chartFormDialog(T, data = {}) {
         err.textContent = T.invalidUrl;
         return;
       }
-      const percent = clampPercent(scaleField.value || DEFAULT_SCALE_PERCENT);
       const baseHeight = computeBaseHeight();
       const baseWidth = computeBaseWidth();
       resolve({
         title,
         url: src,
-        scale: percent / 100,
         frameHeight: baseHeight,
         height: baseHeight,
         frameWidth: baseWidth,
@@ -1006,13 +974,10 @@ export function chartFormDialog(T, data = {}) {
 
     titleField.value = data.title || '';
     urlField.value = data.url || '';
-    scaleField.value = clampPercent(initialScale || DEFAULT_SCALE_PERCENT);
-
     form.addEventListener('submit', submit);
     cancel.addEventListener('click', close);
     dlg.addEventListener('cancel', close);
     urlField.addEventListener('input', handleUrlInput);
-    scaleField.addEventListener('input', handleScaleInput);
 
     dlg.showModal();
     const first = dlg.querySelector(
