@@ -134,6 +134,108 @@ function parseChartNumber(value) {
   return Number.isFinite(numeric) ? numeric : null;
 }
 
+function measureChartHostMetrics(cardEl) {
+  const fallback = {
+    viewportWidth: null,
+    viewportHeight: null,
+    widthExtra: 0,
+    heightExtra: 0,
+    cardWidth: null,
+    cardHeight: null,
+  };
+  if (!cardEl || !(cardEl instanceof HTMLElement) || !cardEl.isConnected) {
+    return fallback;
+  }
+  const embed = cardEl.querySelector('.embed');
+  const frameWrap = cardEl.querySelector('.chart-frame');
+
+  let cardRect = null;
+  let frameRect = null;
+  let embedRect = null;
+  try {
+    cardRect = cardEl.getBoundingClientRect();
+  } catch {}
+  try {
+    frameRect = frameWrap?.getBoundingClientRect?.();
+  } catch {}
+  try {
+    embedRect = embed?.getBoundingClientRect?.();
+  } catch {}
+
+  const viewportWidthCandidates = [];
+  const viewportHeightCandidates = [];
+  if (frameRect && Number.isFinite(frameRect.width)) {
+    viewportWidthCandidates.push(frameRect.width);
+  }
+  if (embedRect && Number.isFinite(embedRect.width)) {
+    viewportWidthCandidates.push(embedRect.width);
+  }
+  if (frameRect && Number.isFinite(frameRect.height)) {
+    viewportHeightCandidates.push(frameRect.height);
+  }
+  if (embedRect && Number.isFinite(embedRect.height)) {
+    viewportHeightCandidates.push(embedRect.height);
+  }
+
+  const viewportWidth = viewportWidthCandidates.length
+    ? Math.max(
+        ...viewportWidthCandidates.map((value) => Math.max(CHART_MIN_WIDTH, Math.round(value))),
+      )
+    : Number.isFinite(cardRect?.width)
+      ? Math.max(CHART_MIN_WIDTH, Math.round(cardRect.width))
+      : null;
+
+  const viewportHeight = viewportHeightCandidates.length
+    ? Math.max(
+        ...viewportHeightCandidates.map((value) => Math.max(CHART_MIN_HEIGHT, Math.round(value))),
+      )
+    : Number.isFinite(cardRect?.height)
+      ? Math.max(CHART_MIN_HEIGHT, Math.round(cardRect.height))
+      : null;
+
+  const widthExtraCandidates = [];
+  const heightExtraCandidates = [];
+  if (Number.isFinite(cardRect?.width) && Number.isFinite(frameRect?.width)) {
+    widthExtraCandidates.push(cardRect.width - frameRect.width);
+  }
+  if (Number.isFinite(cardRect?.width) && Number.isFinite(embedRect?.width)) {
+    widthExtraCandidates.push(cardRect.width - embedRect.width);
+  }
+  if (Number.isFinite(cardRect?.height) && Number.isFinite(frameRect?.height)) {
+    heightExtraCandidates.push(cardRect.height - frameRect.height);
+  }
+  if (Number.isFinite(cardRect?.height) && Number.isFinite(embedRect?.height)) {
+    heightExtraCandidates.push(cardRect.height - embedRect.height);
+  }
+
+  const widthExtra = widthExtraCandidates.length
+    ? Math.max(0, ...widthExtraCandidates.map((value) => Math.round(value)))
+    : 0;
+  const heightExtra = heightExtraCandidates.length
+    ? Math.max(0, ...heightExtraCandidates.map((value) => Math.round(value)))
+    : 0;
+
+  const cardWidth = Number.isFinite(cardRect?.width)
+    ? Math.max(0, Math.round(cardRect.width))
+    : Number.isFinite(viewportWidth)
+      ? viewportWidth + widthExtra
+      : null;
+  const cardHeight = Number.isFinite(cardRect?.height)
+    ? Math.max(0, Math.round(cardRect.height))
+    : Number.isFinite(viewportHeight)
+      ? viewportHeight + heightExtra
+      : null;
+
+  return {
+    viewportWidth: Number.isFinite(viewportWidth) ? viewportWidth : null,
+    viewportHeight: Number.isFinite(viewportHeight) ? viewportHeight : null,
+    widthExtra,
+    heightExtra,
+    cardWidth: Number.isFinite(cardWidth) ? cardWidth : null,
+    cardHeight: Number.isFinite(cardHeight) ? cardHeight : null,
+  };
+}
+
 function updateChartSizingForCard(
   cardEl,
   displayWidth,
@@ -146,55 +248,9 @@ function updateChartSizingForCard(
   const iframe = frameWrap?.querySelector('iframe');
   if (!embed || !frameWrap || !iframe) return;
 
-  const measureHostExtras = () => {
-    try {
-      const cardRect = cardEl.getBoundingClientRect();
-      const frameRect = frameWrap.getBoundingClientRect();
-      const embedRect = embed.getBoundingClientRect();
-      const widthCandidates = [];
-      const heightCandidates = [];
-      if (cardRect && Number.isFinite(cardRect.width)) {
-        if (embedRect && Number.isFinite(embedRect.width)) {
-          widthCandidates.push(Math.max(0, Math.round(cardRect.width - embedRect.width)));
-        }
-        if (frameRect && Number.isFinite(frameRect.width)) {
-          widthCandidates.push(Math.max(0, Math.round(cardRect.width - frameRect.width)));
-        }
-      }
-      if (cardRect && Number.isFinite(cardRect.height)) {
-        if (embedRect && Number.isFinite(embedRect.height)) {
-          heightCandidates.push(Math.max(0, Math.round(cardRect.height - embedRect.height)));
-        }
-        if (frameRect && Number.isFinite(frameRect.height)) {
-          heightCandidates.push(Math.max(0, Math.round(cardRect.height - frameRect.height)));
-        }
-      }
-      return {
-        widthExtra: widthCandidates.length ? Math.max(...widthCandidates) : 0,
-        heightExtra: heightCandidates.length ? Math.max(...heightCandidates) : 0,
-      };
-    } catch {
-      return { widthExtra: 0, heightExtra: 0 };
-    }
-  };
-
-  const measuredExtras = measureHostExtras();
-  let hostWidthExtra = parseChartNumber(cardEl.dataset?.chartHostWidthExtra);
-  let hostHeightExtra = parseChartNumber(cardEl.dataset?.chartHostHeightExtra);
-  if (!Number.isFinite(hostWidthExtra)) {
-    hostWidthExtra = measuredExtras.widthExtra;
-  }
-  if (!Number.isFinite(hostHeightExtra)) {
-    hostHeightExtra = measuredExtras.heightExtra;
-  }
-  hostWidthExtra = Number.isFinite(hostWidthExtra) ? Math.max(0, hostWidthExtra) : 0;
-  hostHeightExtra = Number.isFinite(hostHeightExtra) ? Math.max(0, hostHeightExtra) : 0;
-  if (Number.isFinite(measuredExtras.widthExtra)) {
-    hostWidthExtra = Math.max(hostWidthExtra, measuredExtras.widthExtra);
-  }
-  if (Number.isFinite(measuredExtras.heightExtra)) {
-    hostHeightExtra = Math.max(hostHeightExtra, measuredExtras.heightExtra);
-  }
+  const metrics = measureChartHostMetrics(cardEl);
+  const hostWidthExtra = Math.max(0, metrics.widthExtra || 0);
+  const hostHeightExtra = Math.max(0, metrics.heightExtra || 0);
   const minHostWidth = Math.max(CHART_MIN_WIDTH + hostWidthExtra, CHART_MIN_WIDTH);
   const minHostHeight = Math.max(CHART_MIN_HEIGHT + hostHeightExtra, CHART_MIN_HEIGHT);
 
@@ -216,29 +272,41 @@ function updateChartSizingForCard(
     clampChartHeight(displayHeight) ??
     CHART_MIN_HEIGHT;
 
-  const cardRect = cardEl.getBoundingClientRect();
-  const hostWidthCandidate = Number.isFinite(displayWidth)
-    ? displayWidth
-    : parseChartNumber(cardEl.dataset?.chartHostWidth) ??
-      (Number.isFinite(cardRect?.width) ? Math.round(cardRect.width) : null);
-  const hostHeightCandidate = Number.isFinite(displayHeight)
-    ? displayHeight
-    : parseChartNumber(cardEl.dataset?.chartHostHeight) ??
-      (Number.isFinite(cardRect?.height) ? Math.round(cardRect.height) : null);
+  const measuredHostWidth = Number.isFinite(metrics.cardWidth) ? metrics.cardWidth : null;
+  const measuredHostHeight = Number.isFinite(metrics.cardHeight) ? metrics.cardHeight : null;
 
-  const hostWidth = Number.isFinite(hostWidthCandidate)
-    ? hostWidthCandidate
-    : resolvedBaseWidth + hostWidthExtra;
-  const hostHeight = Number.isFinite(hostHeightCandidate)
-    ? hostHeightCandidate
-    : resolvedBaseHeight + hostHeightExtra;
+  const hostWidth = Number.isFinite(displayWidth)
+    ? Math.max(minHostWidth, Math.round(displayWidth))
+    : Number.isFinite(measuredHostWidth)
+      ? Math.max(minHostWidth, measuredHostWidth)
+      : Number.isFinite(resolvedBaseWidth)
+        ? Math.max(minHostWidth, Math.round(resolvedBaseWidth + hostWidthExtra))
+        : minHostWidth;
+  const hostHeight = Number.isFinite(displayHeight)
+    ? Math.max(minHostHeight, Math.round(displayHeight))
+    : Number.isFinite(measuredHostHeight)
+      ? Math.max(minHostHeight, measuredHostHeight)
+      : Number.isFinite(resolvedBaseHeight)
+        ? Math.max(minHostHeight, Math.round(resolvedBaseHeight + hostHeightExtra))
+        : minHostHeight;
 
-  const displayWidthCandidate = Number.isFinite(hostWidth)
-    ? hostWidth - hostWidthExtra
+  const measuredViewportWidth = Number.isFinite(metrics.viewportWidth)
+    ? metrics.viewportWidth
     : null;
-  const displayHeightCandidate = Number.isFinite(hostHeight)
-    ? hostHeight - hostHeightExtra
+  const measuredViewportHeight = Number.isFinite(metrics.viewportHeight)
+    ? metrics.viewportHeight
     : null;
+
+  const displayWidthCandidate = Number.isFinite(measuredViewportWidth)
+    ? measuredViewportWidth
+    : Number.isFinite(hostWidth)
+      ? hostWidth - hostWidthExtra
+      : null;
+  const displayHeightCandidate = Number.isFinite(measuredViewportHeight)
+    ? measuredViewportHeight
+    : Number.isFinite(hostHeight)
+      ? hostHeight - hostHeightExtra
+      : null;
 
   const fallbackDisplayWidth = parseChartNumber(frameWrap.dataset?.displayWidth);
   const fallbackDisplayHeight = parseChartNumber(frameWrap.dataset?.displayHeight);
@@ -252,8 +320,14 @@ function updateChartSizingForCard(
     clampChartHeight(fallbackDisplayHeight) ??
     resolvedBaseHeight;
 
-  const hostWidthForStore = finalDisplayWidth + hostWidthExtra;
-  const hostHeightForStore = finalDisplayHeight + hostHeightExtra;
+  const hostWidthForStore = Math.max(
+    minHostWidth,
+    Math.round(finalDisplayWidth + hostWidthExtra),
+  );
+  const hostHeightForStore = Math.max(
+    minHostHeight,
+    Math.round(finalDisplayHeight + hostHeightExtra),
+  );
 
   const scaleX = resolvedBaseWidth ? finalDisplayWidth / resolvedBaseWidth : 1;
   const scaleY = resolvedBaseHeight ? finalDisplayHeight / resolvedBaseHeight : 1;
@@ -2273,11 +2347,10 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
         Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= tolerance;
 
       const getHostExtras = () => {
-        const widthExtra = parseChartNumber(grp.dataset?.chartHostWidthExtra);
-        const heightExtra = parseChartNumber(grp.dataset?.chartHostHeightExtra);
+        const metrics = measureChartHostMetrics(grp);
         return {
-          width: Number.isFinite(widthExtra) ? Math.max(0, widthExtra) : 0,
-          height: Number.isFinite(heightExtra) ? Math.max(0, heightExtra) : 0,
+          width: Math.max(0, metrics.widthExtra || 0),
+          height: Math.max(0, metrics.heightExtra || 0),
         };
       };
 
