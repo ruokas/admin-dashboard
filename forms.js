@@ -650,8 +650,8 @@ export function itemFormDialog(T, data = {}) {
 export function chartFormDialog(T, data = {}) {
   return new Promise((resolve) => {
     const prevFocus = document.activeElement;
-    const DEFAULT_PREVIEW_HEIGHT = 480;
-    const DEFAULT_PREVIEW_WIDTH = 640;
+    const DEFAULT_PREVIEW_HEIGHT = 360;
+    const DEFAULT_PREVIEW_WIDTH = 520;
     const MIN_AUTO_HEIGHT = 120;
     const MAX_AUTO_HEIGHT = 2000;
     const MIN_AUTO_WIDTH = 200;
@@ -668,17 +668,6 @@ export function chartFormDialog(T, data = {}) {
         <label class="chart-form__field"><span class="chart-form__field-label">${
           T.itemUrl
         }</span><textarea name="url" rows="3" required></textarea></label>
-      </fieldset>
-      <fieldset class="form-section">
-        <legend>${T.chartDisplay || 'Atvaizdavimo parametrai'}</legend>
-        <p class="hint">${
-          T.chartHint ||
-          'Įveskite iframe nuorodą ar kodą. Kortelė prisitaikys prie grafiko, o dydį koreguosite keisdami kortelę.'
-        }</p>
-        <p class="hint">${
-          T.chartSizeHint ||
-          'Išsaugoję įjunkite redagavimą ir keiskite kortelės plotį bei aukštį tempiant jos kampus (Shift – kelioms kortelėms).'
-        }</p>
       </fieldset>
       <section class="chart-preview" aria-live="polite">
         <header class="chart-preview__header">

@@ -422,7 +422,7 @@ dialog.chart-form-dialog {
   position: relative;
   border: 1px dashed var(--border-strong);
   border-radius: var(--space-3);
-  min-height: 220px;
+  min-height: 200px;
   display: block;
   overflow: hidden;
   background: var(--surface);

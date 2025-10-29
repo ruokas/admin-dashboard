@@ -85,11 +85,6 @@ export const Tlt = {
   editGroup: 'Redaguoti grupę',
   editChart: 'Redaguoti grafiką',
   chartBasics: 'Pagrindiniai nustatymai',
-  chartDisplay: 'Atvaizdavimo parametrai',
-  chartHint:
-    'Įveskite iframe nuorodą arba pilną įterpimo kodą. Kortelė prisitaikys prie grafiko automatiškai.',
-  chartSizeHint:
-    'Išsaugoję įjunkite redagavimą ir keiskite kortelės plotį bei aukštį tempiant jos kampus (Shift – kelioms kortelėms).',
   chartPreview: 'Gyva peržiūra',
   chartPreviewWidth: 'Numatomas plotis',
   chartPreviewHeight: 'Numatomas aukštis',
