@@ -134,7 +134,7 @@ function parseChartNumber(value) {
   return Number.isFinite(numeric) ? numeric : null;
 }
 
-function measureChartHostMetrics(cardEl) {
+function measureChartHostMetrics(cardEl, fallbackWidth = null, fallbackHeight = null) {
   const fallback = {
     viewportWidth: null,
     viewportHeight: null,
@@ -147,84 +147,74 @@ function measureChartHostMetrics(cardEl) {
     return fallback;
   }
   const embed = cardEl.querySelector('.embed');
-  const frameWrap = cardEl.querySelector('.chart-frame');
+  const content = cardEl.querySelector('.group-content');
+  const header = cardEl.querySelector('.group-header');
 
   let cardRect = null;
-  let frameRect = null;
-  let embedRect = null;
   try {
     cardRect = cardEl.getBoundingClientRect();
   } catch {}
-  try {
-    frameRect = frameWrap?.getBoundingClientRect?.();
-  } catch {}
-  try {
-    embedRect = embed?.getBoundingClientRect?.();
-  } catch {}
 
-  const viewportWidthCandidates = [];
-  const viewportHeightCandidates = [];
-  if (frameRect && Number.isFinite(frameRect.width)) {
-    viewportWidthCandidates.push(frameRect.width);
+  const parseSize = (value) => {
+    const numeric = Number.parseFloat(value);
+    return Number.isFinite(numeric) ? numeric : 0;
+  };
+
+  const cardStyles = typeof window !== 'undefined' ? window.getComputedStyle(cardEl) : null;
+  const contentStyles = content && typeof window !== 'undefined' ? window.getComputedStyle(content) : null;
+  const embedStyles = embed && typeof window !== 'undefined' ? window.getComputedStyle(embed) : null;
+
+  let cardWidth = Number.isFinite(cardRect?.width) ? Math.round(cardRect.width) : null;
+  let cardHeight = Number.isFinite(cardRect?.height) ? Math.round(cardRect.height) : null;
+
+  if (!Number.isFinite(cardWidth) && Number.isFinite(fallbackWidth)) {
+    cardWidth = Math.round(fallbackWidth);
   }
-  if (embedRect && Number.isFinite(embedRect.width)) {
-    viewportWidthCandidates.push(embedRect.width);
-  }
-  if (frameRect && Number.isFinite(frameRect.height)) {
-    viewportHeightCandidates.push(frameRect.height);
-  }
-  if (embedRect && Number.isFinite(embedRect.height)) {
-    viewportHeightCandidates.push(embedRect.height);
+  if (!Number.isFinite(cardHeight) && Number.isFinite(fallbackHeight)) {
+    cardHeight = Math.round(fallbackHeight);
   }
 
-  const viewportWidth = viewportWidthCandidates.length
-    ? Math.max(
-        ...viewportWidthCandidates.map((value) => Math.max(CHART_MIN_WIDTH, Math.round(value))),
-      )
-    : Number.isFinite(cardRect?.width)
-      ? Math.max(CHART_MIN_WIDTH, Math.round(cardRect.width))
-      : null;
-
-  const viewportHeight = viewportHeightCandidates.length
-    ? Math.max(
-        ...viewportHeightCandidates.map((value) => Math.max(CHART_MIN_HEIGHT, Math.round(value))),
-      )
-    : Number.isFinite(cardRect?.height)
-      ? Math.max(CHART_MIN_HEIGHT, Math.round(cardRect.height))
-      : null;
-
-  const widthExtraCandidates = [];
-  const heightExtraCandidates = [];
-  if (Number.isFinite(cardRect?.width) && Number.isFinite(frameRect?.width)) {
-    widthExtraCandidates.push(cardRect.width - frameRect.width);
-  }
-  if (Number.isFinite(cardRect?.width) && Number.isFinite(embedRect?.width)) {
-    widthExtraCandidates.push(cardRect.width - embedRect.width);
-  }
-  if (Number.isFinite(cardRect?.height) && Number.isFinite(frameRect?.height)) {
-    heightExtraCandidates.push(cardRect.height - frameRect.height);
-  }
-  if (Number.isFinite(cardRect?.height) && Number.isFinite(embedRect?.height)) {
-    heightExtraCandidates.push(cardRect.height - embedRect.height);
-  }
-
-  const widthExtra = widthExtraCandidates.length
-    ? Math.max(0, ...widthExtraCandidates.map((value) => Math.round(value)))
-    : 0;
-  const heightExtra = heightExtraCandidates.length
-    ? Math.max(0, ...heightExtraCandidates.map((value) => Math.round(value)))
+  const headerHeight = header
+    ? Math.max(0, Math.round(header.getBoundingClientRect?.().height || header.offsetHeight || 0))
     : 0;
 
-  const cardWidth = Number.isFinite(cardRect?.width)
-    ? Math.max(0, Math.round(cardRect.width))
-    : Number.isFinite(viewportWidth)
-      ? viewportWidth + widthExtra
-      : null;
-  const cardHeight = Number.isFinite(cardRect?.height)
-    ? Math.max(0, Math.round(cardRect.height))
-    : Number.isFinite(viewportHeight)
-      ? viewportHeight + heightExtra
-      : null;
+  const cardBorderX = cardStyles
+    ? parseSize(cardStyles.borderLeftWidth) + parseSize(cardStyles.borderRightWidth)
+    : 0;
+  const cardBorderY = cardStyles
+    ? parseSize(cardStyles.borderTopWidth) + parseSize(cardStyles.borderBottomWidth)
+    : 0;
+  const contentPaddingX = contentStyles
+    ? parseSize(contentStyles.paddingLeft) + parseSize(contentStyles.paddingRight)
+    : 0;
+  const contentPaddingY = contentStyles
+    ? parseSize(contentStyles.paddingTop) + parseSize(contentStyles.paddingBottom)
+    : 0;
+  const embedPaddingX = embedStyles
+    ? parseSize(embedStyles.paddingLeft) + parseSize(embedStyles.paddingRight)
+    : 0;
+  const embedPaddingY = embedStyles
+    ? parseSize(embedStyles.paddingTop) + parseSize(embedStyles.paddingBottom)
+    : 0;
+  const embedBorderX = embedStyles
+    ? parseSize(embedStyles.borderLeftWidth) + parseSize(embedStyles.borderRightWidth)
+    : 0;
+  const embedBorderY = embedStyles
+    ? parseSize(embedStyles.borderTopWidth) + parseSize(embedStyles.borderBottomWidth)
+    : 0;
+
+  const widthExtra = Math.max(0, Math.round(cardBorderX + contentPaddingX + embedPaddingX + embedBorderX));
+  const heightExtra = Math.max(
+    0,
+    Math.round(cardBorderY + headerHeight + contentPaddingY + embedPaddingY + embedBorderY),
+  );
+
+  const viewportWidth = Number.isFinite(cardWidth) && cardWidth > widthExtra
+    ? Math.round(cardWidth - widthExtra)
+    : null;
+  const viewportHeight = Number.isFinite(cardHeight) && cardHeight > heightExtra
+    ? Math.round(cardHeight - heightExtra)
+    : null;
 
   return {
     viewportWidth: Number.isFinite(viewportWidth) ? viewportWidth : null,
@@ -248,9 +238,10 @@ function updateChartSizingForCard(
   const iframe = frameWrap?.querySelector('iframe');
   if (!embed || !frameWrap || !iframe) return;
 
-  const metrics = measureChartHostMetrics(cardEl);
+  const metrics = measureChartHostMetrics(cardEl, displayWidth, displayHeight);
   const hostWidthExtra = Math.max(0, metrics.widthExtra || 0);
   const hostHeightExtra = Math.max(0, metrics.heightExtra || 0);
+
   const minHostWidth = Math.max(CHART_MIN_WIDTH + hostWidthExtra, CHART_MIN_WIDTH);
   const minHostHeight = Math.max(CHART_MIN_HEIGHT + hostHeightExtra, CHART_MIN_HEIGHT);
 
@@ -258,101 +249,74 @@ function updateChartSizingForCard(
 
   const resolvedBaseWidth =
     clampChartWidth(overrideBaseWidth) ??
-    clampChartWidth(frameWrap.dataset?.width) ??
-    clampChartWidth(iframe.dataset?.baseWidth) ??
-    clampChartWidth(cardEl.dataset?.chartBaseWidth) ??
-    clampChartWidth(displayWidth) ??
+    clampChartWidth(parseChartNumber(frameWrap.dataset?.width)) ??
+    clampChartWidth(parseChartNumber(iframe.dataset?.baseWidth)) ??
+    clampChartWidth(parseChartNumber(cardEl.dataset?.chartBaseWidth)) ??
     CHART_MIN_WIDTH;
 
   const resolvedBaseHeight =
     clampChartHeight(overrideBaseHeight) ??
-    clampChartHeight(frameWrap.dataset?.height) ??
-    clampChartHeight(iframe.dataset?.baseHeight) ??
-    clampChartHeight(cardEl.dataset?.chartBaseHeight) ??
-    clampChartHeight(displayHeight) ??
+    clampChartHeight(parseChartNumber(frameWrap.dataset?.height)) ??
+    clampChartHeight(parseChartNumber(iframe.dataset?.baseHeight)) ??
+    clampChartHeight(parseChartNumber(cardEl.dataset?.chartBaseHeight)) ??
     CHART_MIN_HEIGHT;
 
-  const measuredHostWidth = Number.isFinite(metrics.cardWidth) ? metrics.cardWidth : null;
-  const measuredHostHeight = Number.isFinite(metrics.cardHeight) ? metrics.cardHeight : null;
+  const fallbackHostWidth = clampChartWidth(parseChartNumber(cardEl.dataset?.chartHostWidth));
+  const fallbackHostHeight = clampChartHeight(parseChartNumber(cardEl.dataset?.chartHostHeight));
 
-  const hostWidth = Number.isFinite(displayWidth)
-    ? Math.max(minHostWidth, Math.round(displayWidth))
-    : Number.isFinite(measuredHostWidth)
-      ? Math.max(minHostWidth, measuredHostWidth)
-      : Number.isFinite(resolvedBaseWidth)
-        ? Math.max(minHostWidth, Math.round(resolvedBaseWidth + hostWidthExtra))
-        : minHostWidth;
-  const hostHeight = Number.isFinite(displayHeight)
-    ? Math.max(minHostHeight, Math.round(displayHeight))
-    : Number.isFinite(measuredHostHeight)
-      ? Math.max(minHostHeight, measuredHostHeight)
-      : Number.isFinite(resolvedBaseHeight)
-        ? Math.max(minHostHeight, Math.round(resolvedBaseHeight + hostHeightExtra))
-        : minHostHeight;
+  const rawHostWidth = Number.isFinite(displayWidth)
+    ? Math.round(displayWidth)
+    : Number.isFinite(metrics.cardWidth)
+      ? metrics.cardWidth
+      : fallbackHostWidth;
+  const rawHostHeight = Number.isFinite(displayHeight)
+    ? Math.round(displayHeight)
+    : Number.isFinite(metrics.cardHeight)
+      ? metrics.cardHeight
+      : fallbackHostHeight;
 
-  const measuredViewportWidth = Number.isFinite(metrics.viewportWidth)
+  const hostWidth = Math.max(minHostWidth, rawHostWidth || minHostWidth);
+  const hostHeight = Math.max(minHostHeight, rawHostHeight || minHostHeight);
+
+  const viewportWidthCandidate = Number.isFinite(metrics.viewportWidth)
     ? metrics.viewportWidth
-    : null;
-  const measuredViewportHeight = Number.isFinite(metrics.viewportHeight)
+    : hostWidth - hostWidthExtra;
+  const viewportHeightCandidate = Number.isFinite(metrics.viewportHeight)
     ? metrics.viewportHeight
-    : null;
+    : hostHeight - hostHeightExtra;
 
-  const displayWidthCandidate = Number.isFinite(measuredViewportWidth)
-    ? measuredViewportWidth
-    : Number.isFinite(hostWidth)
-      ? hostWidth - hostWidthExtra
-      : null;
-  const displayHeightCandidate = Number.isFinite(measuredViewportHeight)
-    ? measuredViewportHeight
-    : Number.isFinite(hostHeight)
-      ? hostHeight - hostHeightExtra
-      : null;
+  const viewportWidth = clampChartWidth(viewportWidthCandidate) ?? (hostWidth - hostWidthExtra);
+  const viewportHeight = clampChartHeight(viewportHeightCandidate) ?? (hostHeight - hostHeightExtra);
 
-  const fallbackDisplayWidth = parseChartNumber(frameWrap.dataset?.displayWidth);
-  const fallbackDisplayHeight = parseChartNumber(frameWrap.dataset?.displayHeight);
+  const safeViewportWidth = Math.max(CHART_MIN_WIDTH, Math.round(viewportWidth));
+  const safeViewportHeight = Math.max(CHART_MIN_HEIGHT, Math.round(viewportHeight));
 
-  const finalDisplayWidth =
-    clampChartWidth(displayWidthCandidate) ??
-    clampChartWidth(fallbackDisplayWidth) ??
-    resolvedBaseWidth;
-  const finalDisplayHeight =
-    clampChartHeight(displayHeightCandidate) ??
-    clampChartHeight(fallbackDisplayHeight) ??
-    resolvedBaseHeight;
+  const scaleX = resolvedBaseWidth ? safeViewportWidth / resolvedBaseWidth : 1;
+  const scaleY = resolvedBaseHeight ? safeViewportHeight / resolvedBaseHeight : 1;
+  const scale = Math.max(0.05, Math.min(8, Math.min(scaleX, scaleY)));
+  const displayWidthPx = Math.round(resolvedBaseWidth * scale);
+  const displayHeightPx = Math.round(resolvedBaseHeight * scale);
 
-  const hostWidthForStore = Math.max(
-    minHostWidth,
-    Math.round(finalDisplayWidth + hostWidthExtra),
-  );
-  const hostHeightForStore = Math.max(
-    minHostHeight,
-    Math.round(finalDisplayHeight + hostHeightExtra),
-  );
-
-  const scaleX = resolvedBaseWidth ? finalDisplayWidth / resolvedBaseWidth : 1;
-  const scaleY = resolvedBaseHeight ? finalDisplayHeight / resolvedBaseHeight : 1;
-  const scale = Math.min(scaleX, scaleY);
-  const scaledWidth = Math.round(resolvedBaseWidth * scale);
-  const scaledHeight = Math.round(resolvedBaseHeight * scale);
-  const offsetX = Math.max(0, (finalDisplayWidth - scaledWidth) / 2);
-  const offsetY = Math.max(0, (finalDisplayHeight - scaledHeight) / 2);
+  const offsetX = Math.max(0, (safeViewportWidth - displayWidthPx) / 2);
+  const offsetY = Math.max(0, (safeViewportHeight - displayHeightPx) / 2);
 
   if (embed instanceof HTMLElement) {
     embed.style.width = '100%';
     embed.style.height = '100%';
-    embed.style.minWidth = `${minHostWidth}px`;
-    embed.style.minHeight = `${minHostHeight}px`;
+    embed.style.minWidth = `${Math.max(CHART_MIN_WIDTH, safeViewportWidth)}px`;
+    embed.style.minHeight = `${Math.max(CHART_MIN_HEIGHT, safeViewportHeight)}px`;
+    embed.style.flex = '1 1 auto';
   }
 
   if (frameWrap instanceof HTMLElement) {
     frameWrap.style.width = '100%';
     frameWrap.style.height = '100%';
-    frameWrap.style.minWidth = `${CHART_MIN_WIDTH}px`;
-    frameWrap.style.minHeight = `${CHART_MIN_HEIGHT}px`;
+    frameWrap.style.minWidth = `${Math.max(CHART_MIN_WIDTH, safeViewportWidth)}px`;
+    frameWrap.style.minHeight = `${Math.max(CHART_MIN_HEIGHT, safeViewportHeight)}px`;
     frameWrap.dataset.width = String(resolvedBaseWidth);
     frameWrap.dataset.height = String(resolvedBaseHeight);
-    frameWrap.dataset.displayWidth = String(finalDisplayWidth);
-    frameWrap.dataset.displayHeight = String(finalDisplayHeight);
+    frameWrap.dataset.displayWidth = String(displayWidthPx);
+    frameWrap.dataset.displayHeight = String(displayHeightPx);
     frameWrap.dataset.scale = String(scale);
   }
 
@@ -374,10 +338,10 @@ function updateChartSizingForCard(
     cardEl.style.minHeight = `${minHostHeight}px`;
     cardEl.dataset.chartBaseWidth = String(resolvedBaseWidth);
     cardEl.dataset.chartBaseHeight = String(resolvedBaseHeight);
-    cardEl.dataset.chartDisplayWidth = String(finalDisplayWidth);
-    cardEl.dataset.chartDisplayHeight = String(finalDisplayHeight);
-    cardEl.dataset.chartHostWidth = String(hostWidthForStore);
-    cardEl.dataset.chartHostHeight = String(hostHeightForStore);
+    cardEl.dataset.chartDisplayWidth = String(displayWidthPx);
+    cardEl.dataset.chartDisplayHeight = String(displayHeightPx);
+    cardEl.dataset.chartHostWidth = String(hostWidth);
+    cardEl.dataset.chartHostHeight = String(hostHeight);
     cardEl.dataset.chartHostWidthExtra = String(hostWidthExtra);
     cardEl.dataset.chartHostHeightExtra = String(hostHeightExtra);
   }
@@ -2232,7 +2196,7 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
       const emb = document.createElement('div');
       emb.className = 'embed';
       emb.dataset.custom = '1';
-      emb.style.flex = '0 0 auto';
+      emb.style.flex = '1 1 auto';
       emb.style.resize = 'none';
 
       const frameWrap = document.createElement('div');
