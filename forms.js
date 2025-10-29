@@ -661,11 +661,16 @@ export function chartFormDialog(T, data = {}) {
     const MAX_AUTO_WIDTH = 2400;
 
     const dlg = document.createElement('dialog');
+    dlg.classList.add('chart-form-dialog');
     dlg.innerHTML = `<form method="dialog" id="chartForm">
       <fieldset class="form-section">
         <legend>${T.chartBasics || 'Pagrindiniai nustatymai'}</legend>
-        <label id="chartFormLabel">${T.itemTitle}<br><input name="title" required></label>
-        <label>${T.itemUrl}<br><textarea name="url" rows="3" required></textarea></label>
+        <label id="chartFormLabel" class="chart-form__field"><span class="chart-form__field-label">${
+          T.itemTitle
+        }</span><input name="title" required></label>
+        <label class="chart-form__field"><span class="chart-form__field-label">${
+          T.itemUrl
+        }</span><textarea name="url" rows="3" required></textarea></label>
       </fieldset>
       <fieldset class="form-section">
         <legend>${T.chartDisplay || 'Atvaizdavimo parametrai'}</legend>
@@ -836,6 +841,8 @@ export function chartFormDialog(T, data = {}) {
       previewFrame.style.transformOrigin = 'top left';
       previewWrap.style.height = `${displayHeight}px`;
       previewWrap.style.width = `${displayWidth}px`;
+      previewWrap.style.minHeight = `${displayHeight}px`;
+      previewWrap.style.minWidth = `${displayWidth}px`;
       previewWrap.dataset.scale = String(scale);
       previewWrap.dataset.height = String(baseHeight);
       previewWrap.dataset.width = String(baseWidth);

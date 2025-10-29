@@ -1937,7 +1937,7 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
       const emb = document.createElement('div');
       emb.className = 'embed';
       emb.dataset.custom = '1';
-      emb.style.flex = '1';
+      emb.style.flex = '0 0 auto';
       emb.style.resize = 'none';
 
       const frameWrap = document.createElement('div');
@@ -2003,8 +2003,12 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
         const displayWidth = computeDisplaySize(safeBaseWidth, scale) ?? safeBaseWidth;
         emb.style.minHeight = `${displayHeight}px`;
         emb.style.minWidth = `${displayWidth}px`;
+        emb.style.height = `${displayHeight}px`;
+        emb.style.width = `${displayWidth}px`;
         frameWrap.style.height = `${displayHeight}px`;
         frameWrap.style.width = `${displayWidth}px`;
+        frameWrap.style.minHeight = `${displayHeight}px`;
+        frameWrap.style.minWidth = `${displayWidth}px`;
         frameWrap.dataset.height = String(safeBaseHeight);
         frameWrap.dataset.width = String(safeBaseWidth);
         frameWrap.dataset.scale = String(scale);
