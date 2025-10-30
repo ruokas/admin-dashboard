@@ -1,4 +1,5 @@
 import { SIZE_MAP, sizeFromWidth, sizeFromHeight } from './sizes.js';
+import { getActiveTheme, resolveChartThemeUrl } from './theme-utils.js';
 
 let currentState;
 let persist;
@@ -15,6 +16,34 @@ const SNAP_THRESHOLD = GRID;
 const MIN_SIZE_ADJUSTER = Symbol('minSizeAdjuster');
 const RESIZE_HANDLE_SIZE = 20;
 const RESIZE_HANDLER_KEY = Symbol('resizeHandler');
+
+const CHART_SCALE_DEFAULT = 1;
+const CHART_SCALE_MIN = 0.5;
+const CHART_SCALE_MAX = 2;
+const CHART_SCALE_STEP = 0.05;
+
+function clampChartScale(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return CHART_SCALE_DEFAULT;
+  return Math.min(CHART_SCALE_MAX, Math.max(CHART_SCALE_MIN, num));
+}
+
+function formatChartScale(scale) {
+  return `${Math.round(scale * 100)}%`;
+}
+
+function applyChartScale(frame, iframe, scale) {
+  if (!frame || !iframe) return CHART_SCALE_DEFAULT;
+  const clamped = clampChartScale(scale);
+  frame.dataset.chartScale = clamped.toFixed(2);
+  iframe.style.transform = `scale(${clamped})`;
+  iframe.style.width = `${(100 / clamped).toFixed(4)}%`;
+  iframe.style.height = `${(100 / clamped).toFixed(4)}%`;
+  iframe.style.transformOrigin = 'top left';
+  return clamped;
+}
+
+
 
 let resizeGuideEl = null;
 let measureHostEl = null;
@@ -184,8 +213,8 @@ function measureIntrinsicContentSize(cardEl, innerEl = findCardInnerElement(card
     host.appendChild(clone);
     const rect = clone.getBoundingClientRect();
     const innerRect = cloneInner ? cloneInner.getBoundingClientRect() : null;
-    const width = Number.isFinite(rect.width) ? Math.ceil(rect.width) : 0;
-    const height = Number.isFinite(rect.height) ? Math.ceil(rect.height) : 0;
+    let width = Number.isFinite(rect.width) ? Math.ceil(rect.width) : 0;
+    let height = Number.isFinite(rect.height) ? Math.ceil(rect.height) : 0;
     const widthExtra = innerRect
       ? Math.max(0, Math.ceil(rect.width - innerRect.width))
       : 0;
@@ -250,8 +279,9 @@ function measureIntrinsicContentSize(cardEl, innerEl = findCardInnerElement(card
   const widthCandidate = Math.max(cardScrollWidth + borderX, innerScrollWidth + widthExtra);
   const heightCandidate = Math.max(cardScrollHeight + borderY, innerScrollHeight + heightExtra);
 
-  const width = Number.isFinite(widthCandidate) ? Math.ceil(widthCandidate) : 0;
-  const height = Number.isFinite(heightCandidate) ? Math.ceil(heightCandidate) : 0;
+  let width = Number.isFinite(widthCandidate) ? Math.ceil(widthCandidate) : 0;
+  let height = Number.isFinite(heightCandidate) ? Math.ceil(heightCandidate) : 0;
+
 
   cardEl.style.width = prevCard.width;
   cardEl.style.minWidth = prevCard.minWidth;
@@ -427,14 +457,16 @@ function applyIntrinsicMinSize(
   }
   if (!state.last || (!state.last.width && !state.last.height)) {
     const measured = measureIntrinsicContentSize(cardEl, innerEl);
-    state.last = { width: measured.width, height: measured.height };
+    const resolvedWidth = measured.width;
+    const resolvedHeight = measured.height;
+    state.last = { width: resolvedWidth, height: resolvedHeight };
     if (Number.isFinite(measured.widthExtra)) {
       state.hostPaddingWidth = Math.max(0, measured.widthExtra);
     }
     if (Number.isFinite(measured.heightExtra)) {
       state.hostPaddingHeight = Math.max(0, measured.heightExtra);
     }
-    applyMinSizeStyles(cardEl, measured.width, measured.height);
+    applyMinSizeStyles(cardEl, resolvedWidth, resolvedHeight);
   }
   scheduleIntrinsicUpdate(cardEl);
   return state.last;
@@ -664,13 +696,15 @@ function initResizeHandles(cardEl) {
     targets
       .filter((target, index) => target && target.isConnected && targets.indexOf(target) === index)
       .forEach((target) => {
-        if (Number.isFinite(nextWidth)) {
-          target.style.width = `${Math.max(0, nextWidth)}px`;
+        const widthValue = Number.isFinite(nextWidth) ? Math.max(0, nextWidth) : null;
+        const heightValue = Number.isFinite(nextHeight) ? Math.max(0, nextHeight) : null;
+        if (Number.isFinite(widthValue)) {
+          target.style.width = `${widthValue}px`;
         }
-        if (Number.isFinite(nextHeight)) {
-          target.style.height = `${Math.max(0, nextHeight)}px`;
+        if (Number.isFinite(heightValue)) {
+          target.style.height = `${heightValue}px`;
         }
-        rememberCardDimensions(target, nextWidth, nextHeight);
+        rememberCardDimensions(target, widthValue, heightValue);
       });
 
     activeResize.snapWidth = widthSnap?.value ?? null;
@@ -898,34 +932,41 @@ function applyResizeForElement(el, width, height, wSize, hSize) {
   const metadata = resolveSizeMetadata(finalWidth, finalHeight);
 
   applySize(el, finalWidth, finalHeight, wSize, hSize);
+  const appliedMetadata = metadata;
   if (el.dataset.id === 'reminders') {
     const prev = currentState.remindersCard || {};
     const changed =
-      prev.width !== finalWidth || prev.height !== finalHeight || prev.wSize !== wSize || prev.hSize !== hSize;
+      prev.width !== finalWidth ||
+      prev.height !== finalHeight ||
+      prev.wSize !== wSize ||
+      prev.hSize !== hSize;
     currentState.remindersCard = {
       ...prev,
       width: finalWidth,
       height: finalHeight,
       wSize,
       hSize,
-      sizePreset: metadata.sizePreset,
-      customWidth: metadata.customWidth,
-      customHeight: metadata.customHeight,
+      sizePreset: appliedMetadata.sizePreset,
+      customWidth: appliedMetadata.customWidth,
+      customHeight: appliedMetadata.customHeight,
     };
     return changed;
   }
   const sg = currentState.groups.find((x) => x.id === el.dataset.id);
   if (!sg) return false;
   const changed =
-    sg.width !== finalWidth || sg.height !== finalHeight || sg.wSize !== wSize || sg.hSize !== hSize;
+    sg.width !== finalWidth ||
+    sg.height !== finalHeight ||
+    sg.wSize !== wSize ||
+    sg.hSize !== hSize;
   sg.width = finalWidth;
   sg.height = finalHeight;
   sg.wSize = wSize;
   sg.hSize = hSize;
-  sg.sizePreset = metadata.sizePreset;
-  if (metadata.customWidth != null) sg.customWidth = metadata.customWidth;
+  sg.sizePreset = appliedMetadata.sizePreset;
+  if (appliedMetadata.customWidth != null) sg.customWidth = appliedMetadata.customWidth;
   else delete sg.customWidth;
-  if (metadata.customHeight != null) sg.customHeight = metadata.customHeight;
+  if (appliedMetadata.customHeight != null) sg.customHeight = appliedMetadata.customHeight;
   else delete sg.customHeight;
   delete sg.size;
   return changed;
@@ -1807,16 +1848,22 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
     if (g.type === 'chart') {
       const { section: grp, header: h, content } =
         createGroupStructure('chart', g.id);
-      const gWidth =
-        g.width ?? SIZE_MAP[g.wSize ?? 'md'].width;
-      const gHeight =
-        g.height ?? SIZE_MAP[g.hSize ?? 'md'].height;
-      const gWSize = g.wSize ?? sizeFromWidth(gWidth);
-      const gHSize = g.hSize ?? sizeFromHeight(gHeight);
-      applySize(grp, gWidth, gHeight, gWSize, gHSize);
+      const width = Number.isFinite(g.width)
+        ? g.width
+        : SIZE_MAP[g.wSize ?? 'md']?.width ?? SIZE_MAP.md.width;
+      const height = Number.isFinite(g.height)
+        ? g.height
+        : SIZE_MAP[g.hSize ?? 'md']?.height ?? SIZE_MAP.md.height;
+      const wSize = g.wSize ?? sizeFromWidth(width);
+      const hSize = g.hSize ?? sizeFromHeight(height);
+      applySize(grp, width, height, wSize, hSize);
+      if (!Number.isFinite(g.width)) g.width = width;
+      if (!Number.isFinite(g.height)) g.height = height;
+      if (!g.wSize) g.wSize = wSize;
+      if (!g.hSize) g.hSize = hSize;
       initResizeHandles(grp);
       grp.style.resize = editing ? 'both' : 'none';
-      grp.style.overflow = editing ? 'auto' : 'visible';
+      grp.style.overflow = 'hidden';
       if (editing) {
         grp.draggable = true;
         grp.addEventListener('dragstart', (e) => {
@@ -1850,62 +1897,246 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
         }
       });
 
+      const title = g.name || T.chart || 'Diagrama';
       h.innerHTML = `
         <div class="group-title">
           <span class="dot" aria-hidden="true"></span>
-          <h2 title="Tempkite, kad perrikiuotumėte" class="handle">${escapeHtml(g.name || '')}</h2>
+          <h2 title="Tempkite, kad perrikiuotumėte" class="handle">${escapeHtml(title)}</h2>
         </div>
         ${
           editing
             ? `<div class="group-actions">
-          <button type="button" title="${T.moveUp}" aria-label="${T.moveUp}" data-act="up">${I.arrowUp}</button>
-          <button type="button" title="${T.moveDown}" aria-label="${T.moveDown}" data-act="down">${I.arrowDown}</button>
           <button type="button" title="${T.editChart}" aria-label="${T.editChart}" data-act="edit">${I.pencil}</button>
           <button type="button" class="btn-danger" title="${T.deleteGroup}" aria-label="${T.deleteGroup}" data-act="del">${I.trash}</button>
         </div>`
             : ''
         }`;
-      h.style.setProperty('--dot-color', g.color || '#6ee7b7');
-
+      h.style.setProperty('--dot-color', '#38bdf8');
       h.addEventListener('click', (e) => {
         const btn = e.target.closest('button[data-act]');
         if (!btn) return;
-        const act = btn.dataset.act;
-        if (act === 'edit') return handlers.editChart(g.id);
-        if (act === 'del') {
-          handlers.confirmDialog(T.confirmDelChart).then((ok) => {
-            if (ok) handlers.removeGroup?.(g.id);
-          });
-          return;
-        }
-        if (act === 'up' || act === 'down') {
-          const idx = state.groups.findIndex((x) => x.id === g.id);
-          if (act === 'up' && idx > 0) {
-            const [moved] = state.groups.splice(idx, 1);
-            state.groups.splice(idx - 1, 0, moved);
+        if (btn.dataset.act === 'edit') {
+          handlers.editChart?.(g.id);
+        } else if (btn.dataset.act === 'del') {
+          if (handlers.confirmDialog) {
+            handlers
+              .confirmDialog(T.confirmDelChart || T.confirmDelGroup)
+              .then((ok) => {
+                if (ok) handlers.removeGroup?.(g.id);
+              });
+          } else {
+            handlers.removeGroup?.(g.id);
           }
-          if (act === 'down' && idx < state.groups.length - 1) {
-            const [moved] = state.groups.splice(idx, 1);
-            state.groups.splice(idx + 1, 0, moved);
-          }
-          persist();
-          render(state, editing, T, I, handlers, saveFn);
         }
       });
 
-      const emb = document.createElement('div');
-      emb.className = 'embed';
-      emb.dataset.custom = '1';
-      emb.style.flex = '1';
-      emb.style.resize = 'none';
-      emb.innerHTML = `<iframe src="${g.url}" loading="lazy" referrerpolicy="no-referrer"></iframe>`;
-      content.appendChild(emb);
+      const frameWrap = document.createElement('div');
+      frameWrap.className = 'chart-frame';
+      frameWrap.style.flex = '1 1 auto';
+      frameWrap.style.width = '100%';
+      frameWrap.style.height = '100%';
+
+      const iframe = document.createElement('iframe');
+      const activeTheme = getActiveTheme();
+      const themedUrl = resolveChartThemeUrl(g.url || '', activeTheme);
+      iframe.src = themedUrl;
+      iframe.loading = 'lazy';
+      iframe.referrerPolicy = 'no-referrer';
+      iframe.allowFullscreen = true;
+      iframe.title = g.name ? `${g.name}` : T.chartFrameTitle || 'Grafikas';
+      iframe.dataset.baseUrl = g.url || '';
+      iframe.dataset.themeApplied = activeTheme;
+
+      frameWrap.appendChild(iframe);
+
+      const initialScaleValue = Number.isFinite(g.scale)
+        ? g.scale
+        : CHART_SCALE_DEFAULT;
+      const initialScale = clampChartScale(initialScaleValue);
+      if (!Number.isFinite(g.scale) || g.scale !== initialScale) {
+        g.scale = initialScale;
+      }
+      applyChartScale(frameWrap, iframe, initialScale);
+
+      if (editing) {
+        grp.dataset.dragSuspended = grp.dataset.dragSuspended || '0';
+
+        const controls = document.createElement('div');
+        controls.className = 'chart-scale-controls';
+
+        const labelEl = document.createElement('span');
+        labelEl.className = 'chart-scale-controls__label';
+        labelEl.textContent = T.chartScaleLabel || 'Grafiko mastelis';
+
+        const minusBtn = document.createElement('button');
+        minusBtn.type = 'button';
+        minusBtn.className = 'chart-scale-controls__btn';
+        minusBtn.textContent = '−';
+        minusBtn.setAttribute(
+          'aria-label',
+          T.chartScaleDecrease || 'Sumažinti mastelį',
+        );
+
+        const slider = document.createElement('input');
+        slider.type = 'range';
+        slider.className = 'chart-scale-controls__slider';
+        slider.min = String(Math.round(CHART_SCALE_MIN * 100));
+        slider.max = String(Math.round(CHART_SCALE_MAX * 100));
+        slider.step = String(Math.round(CHART_SCALE_STEP * 100));
+        slider.value = String(Math.round(initialScale * 100));
+        slider.setAttribute('aria-label', T.chartScaleLabel || 'Grafiko mastelis');
+        slider.setAttribute('aria-valuemin', slider.min);
+        slider.setAttribute('aria-valuemax', slider.max);
+        slider.setAttribute('aria-valuenow', slider.value);
+        slider.setAttribute('aria-valuetext', formatChartScale(initialScale));
+
+        const plusBtn = document.createElement('button');
+        plusBtn.type = 'button';
+        plusBtn.className = 'chart-scale-controls__btn';
+        plusBtn.textContent = '+';
+        plusBtn.setAttribute(
+          'aria-label',
+          T.chartScaleIncrease || 'Padidinti mastelį',
+        );
+
+        const valueEl = document.createElement('output');
+        valueEl.className = 'chart-scale-controls__value';
+        valueEl.textContent = formatChartScale(initialScale);
+
+        const resetBtn = document.createElement('button');
+        resetBtn.type = 'button';
+        resetBtn.className = 'chart-scale-controls__reset';
+        resetBtn.textContent =
+          T.chartScaleReset || T.reset || 'Atstatyti mastelį';
+
+        controls.append(
+          labelEl,
+          minusBtn,
+          slider,
+          plusBtn,
+          valueEl,
+          resetBtn,
+        );
+        frameWrap.appendChild(controls);
+
+        let removeOutsidePointerHandler = null;
+
+        const resumeCardDrag = () => {
+          if (removeOutsidePointerHandler) {
+            removeOutsidePointerHandler();
+            removeOutsidePointerHandler = null;
+          }
+          if (!editing) return;
+          grp.dataset.dragSuspended = '0';
+          if (grp.dataset.resizing === '1') return;
+          grp.draggable = true;
+        };
+
+        const handleControlPointerDown = (event) => {
+          event.stopPropagation();
+          if (!editing) return;
+          grp.dataset.dragSuspended = '1';
+          grp.draggable = false;
+
+          if (removeOutsidePointerHandler) {
+            removeOutsidePointerHandler();
+            removeOutsidePointerHandler = null;
+          }
+
+          const handleOutsidePointerDown = (docEvent) => {
+            if (!editing) {
+              resumeCardDrag();
+              return;
+            }
+
+            if (!grp.contains(docEvent.target)) {
+              resumeCardDrag();
+            }
+          };
+
+          const release = () => {
+            document.removeEventListener('pointerup', release, true);
+            document.removeEventListener('pointercancel', release, true);
+            if (removeOutsidePointerHandler) {
+              removeOutsidePointerHandler();
+            }
+            removeOutsidePointerHandler = () => {
+              document.removeEventListener(
+                'pointerdown',
+                handleOutsidePointerDown,
+                true,
+              );
+              removeOutsidePointerHandler = null;
+            };
+            document.addEventListener('pointerdown', handleOutsidePointerDown, true);
+          };
+
+          document.addEventListener('pointerup', release, true);
+          document.addEventListener('pointercancel', release, true);
+        };
+
+        controls.addEventListener('pointerdown', handleControlPointerDown);
+        controls.addEventListener('dragstart', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        });
+
+        let currentScale = initialScale;
+
+        const persistScaleChange = (commit = false) => {
+          slider.setAttribute(
+            'aria-valuenow',
+            String(Math.round(currentScale * 100)),
+          );
+          slider.setAttribute('aria-valuetext', formatChartScale(currentScale));
+          valueEl.textContent = formatChartScale(currentScale);
+          if (commit && typeof persist === 'function') {
+            persist();
+          }
+        };
+
+        const setScale = (next, commit = false) => {
+          const applied = applyChartScale(frameWrap, iframe, next);
+          currentScale = applied;
+          g.scale = applied;
+          slider.value = String(Math.round(applied * 100));
+          persistScaleChange(commit);
+        };
+
+        slider.addEventListener('input', () => {
+          setScale(Number(slider.value) / 100, false);
+        });
+        slider.addEventListener('change', () => {
+          setScale(Number(slider.value) / 100, true);
+        });
+        minusBtn.addEventListener('click', (event) => {
+          event.preventDefault();
+          const next = Math.round((currentScale - CHART_SCALE_STEP) * 100) / 100;
+          setScale(next, true);
+          slider.focus();
+        });
+        plusBtn.addEventListener('click', (event) => {
+          event.preventDefault();
+          const next = Math.round((currentScale + CHART_SCALE_STEP) * 100) / 100;
+          setScale(next, true);
+          slider.focus();
+        });
+        resetBtn.addEventListener('click', (event) => {
+          event.preventDefault();
+          setScale(CHART_SCALE_DEFAULT, true);
+          slider.focus();
+        });
+
+        persistScaleChange(false);
+      }
+
+      content.appendChild(frameWrap);
       fragment.appendChild(grp);
       activeCardIds.add(g.id);
       registerCard(g.id, grp);
-      const inner = grp.querySelector('.embed');
-      setupMinSizeWatcher(grp, inner);
-      
+      rememberCardDimensions(grp, width, height);
+      setupMinSizeWatcher(grp, frameWrap);
+
       return;
     }
     const { section: grp, header: h, content } =

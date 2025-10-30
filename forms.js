@@ -651,9 +651,28 @@ export function chartFormDialog(T, data = {}) {
   return new Promise((resolve) => {
     const prevFocus = document.activeElement;
     const dlg = document.createElement('dialog');
-    dlg.innerHTML = `<form method="dialog" id="chartForm">
-      <label id="chartFormLabel">${T.itemTitle}<br><input name="title" required></label>
-      <label>${T.itemUrl}<br><input name="url" required></label>
+    dlg.classList.add('chart-form-dialog');
+    dlg.innerHTML = `<form method="dialog" id="chartForm" class="chart-form group-form">
+      <header class="group-form__header">
+        <h2 id="chartFormHeading">${escapeHtml(
+          T.chartDialogTitle || T.addChart || 'Naujas grafikas',
+        )}</h2>
+        <p class="group-form__description">${escapeHtml(
+          T.chartFormDescription ||
+            'Įrašykite grafiko pavadinimą ir nuorodą. Mastelį galėsite keisti redagavimo režime, tempiant kortelės kampus.',
+        )}</p>
+      </header>
+      <label class="group-form__field">
+        <span class="group-form__label">${escapeHtml(T.chartFormName || T.itemTitle)}</span>
+        <input name="title" autocomplete="off" required>
+      </label>
+      <label class="group-form__field">
+        <span class="group-form__label">${escapeHtml(T.chartFormUrl || T.itemUrl)}</span>
+        <input name="url" type="url" inputmode="url" required placeholder="https://">
+        <span class="group-form__hint">${escapeHtml(
+          T.chartFormUrlHint || 'Tinka tik https:// arba http:// adresai.',
+        )}</span>
+      </label>
       <p class="error" id="chartErr" role="status" aria-live="polite"></p>
       <menu>
         <button type="button" data-act="cancel">${T.cancel}</button>
@@ -661,44 +680,62 @@ export function chartFormDialog(T, data = {}) {
       </menu>
     </form>`;
     dlg.setAttribute('aria-modal', 'true');
-    dlg.setAttribute('aria-labelledby', 'chartFormLabel');
+    dlg.setAttribute('aria-labelledby', 'chartFormHeading');
     document.body.appendChild(dlg);
+
     const form = dlg.querySelector('form');
-    const err = dlg.querySelector('#chartErr');
     const cancel = form.querySelector('[data-act="cancel"]');
+    const err = form.querySelector('#chartErr');
+
     form.title.value = data.title || '';
     form.url.value = data.url || '';
 
-    function cleanup() {
-      form.removeEventListener('submit', submit);
-      cancel.removeEventListener('click', close);
+    function cleanup(result) {
+      cancel.removeEventListener('click', handleCancel);
+      form.removeEventListener('submit', handleSubmit);
+      dlg.removeEventListener('cancel', handleCancel);
+      dlg.close();
       dlg.remove();
       prevFocus?.focus();
+      resolve(result);
     }
 
-    function submit(e) {
-      e.preventDefault();
+    function handleCancel(event) {
+      event?.preventDefault?.();
+      cleanup(null);
+    }
+
+    function handleSubmit(event) {
+      event.preventDefault();
       const title = form.title.value.trim();
-      const url = form.url.value.trim();
-      if (!title || !url) {
+      const urlRaw = form.url.value.trim();
+      if (!title || !urlRaw) {
         err.textContent = T.required;
         return;
       }
-      resolve({ title, url });
-      cleanup();
+      try {
+        const u = new URL(urlRaw);
+        if (!/^https?:$/.test(u.protocol)) {
+          err.textContent = T.invalidUrl;
+          return;
+        }
+      } catch {
+        err.textContent = T.invalidUrl;
+        return;
+      }
+      cleanup({
+        title,
+        url: urlRaw,
+      });
     }
 
-    function close() {
-      resolve(null);
-      cleanup();
-    }
-
-    form.addEventListener('submit', submit);
-    cancel.addEventListener('click', close);
-    dlg.addEventListener('cancel', close);
+    cancel.addEventListener('click', handleCancel);
+    form.addEventListener('submit', handleSubmit);
+    dlg.addEventListener('cancel', handleCancel);
     dlg.showModal();
+
     const first = dlg.querySelector(
-      'input, select, textarea, button, [href], [tabindex]:not([tabindex="-1"])',
+      'input, textarea, button, [href], [tabindex]:not([tabindex="-1"])',
     );
     first?.focus();
   });

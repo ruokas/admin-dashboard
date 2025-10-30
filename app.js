@@ -26,6 +26,7 @@ import {
   parseReminderInput,
   hasReminderPayload,
 } from './reminder-input.js';
+import { getActiveTheme, resolveChartThemeUrl } from './theme-utils.js';
 
 const T = Tlt;
 // Hook future English localisation: fill T.en when translations are ready.
@@ -1139,22 +1140,18 @@ async function editGroup(gid) {
 async function addChart() {
   const res = await chartFormDialog(T);
   if (!res) return;
-  const parsed = parseIframe(res.url);
-  const cDims = SIZE_MAP.md;
-  const width = Number.isFinite(cDims.width) ? cDims.width : SIZE_MAP.md.width;
-  const height = Number.isFinite(cDims.height) ? cDims.height : SIZE_MAP.md.height;
   const chart = {
     id: uid(),
     type: 'chart',
     name: res.title,
-    url: parsed.src,
-    h: parsed.height ? parsed.height + 56 : undefined,
-    width,
-    height,
-    wSize: sizeFromWidth(width),
-    hSize: sizeFromHeight(height),
+    url: res.url,
+    width: Number.isFinite(SIZE_MAP.md.width) ? SIZE_MAP.md.width : 640,
+    height: Number.isFinite(SIZE_MAP.md.height) ? SIZE_MAP.md.height : 480,
+    scale: 1,
   };
-  applySizeMetadata(chart, width, height);
+  chart.wSize = sizeFromWidth(chart.width);
+  chart.hSize = sizeFromHeight(chart.height);
+  applySizeMetadata(chart, chart.width, chart.height);
   state.groups.push(chart);
   persistState();
   renderAll();
@@ -1230,14 +1227,24 @@ async function removeNoteCard(noteId) {
 async function editChart(gid) {
   const g = state.groups.find((x) => x.id === gid && x.type === 'chart');
   if (!g) return;
-  const res = await chartFormDialog(T, { title: g.name, url: g.url });
+  const res = await chartFormDialog(T, {
+    title: g.name,
+    url: g.url,
+  });
   if (!res) return;
-  const parsed = parseIframe(res.url);
   g.name = res.title;
-  g.url = parsed.src;
-  if (parsed.height) {
-    g.h = parsed.height + 56;
-  }
+  g.url = res.url;
+  delete g.frameHeight;
+  delete g.frameWidth;
+  delete g.h;
+  delete g.w;
+  const width = Number.isFinite(g.width) ? g.width : SIZE_MAP.md.width;
+  const height = Number.isFinite(g.height) ? g.height : SIZE_MAP.md.height;
+  g.width = width;
+  g.height = height;
+  g.wSize = sizeFromWidth(width);
+  g.hSize = sizeFromHeight(height);
+  applySizeMetadata(g, width, height);
   persistState();
   renderAll();
 }
@@ -1383,15 +1390,7 @@ function importJson(file) {
 }
 
 function applyTheme() {
-  let theme = localStorage.getItem('ed_dash_theme');
-  if (!theme) {
-    const prefersLight =
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia('(prefers-color-scheme: light)').matches;
-    // Pakeiskite numatytą temą, jei skyriui reikia kitokio starto varianto.
-    theme = prefersLight ? 'light' : 'dark';
-    localStorage.setItem('ed_dash_theme', theme);
-  }
+  const theme = getActiveTheme();
   const light = theme === 'light';
   document.documentElement.classList.toggle('theme-light', light);
   const label = light ? T.toDark : T.toLight;
@@ -1399,12 +1398,36 @@ function applyTheme() {
   themeBtn.innerHTML = `${icon}`;
   themeBtn.setAttribute('aria-label', label);
   themeBtn.title = label;
+  syncChartFrameThemes(theme);
 }
 
 function toggleTheme() {
   const curr = localStorage.getItem('ed_dash_theme') === 'light';
   localStorage.setItem('ed_dash_theme', curr ? 'dark' : 'light');
   applyTheme();
+}
+
+function syncChartFrameThemes(theme) {
+  const frames = document.querySelectorAll('.group--chart iframe');
+  frames.forEach((frame) => {
+    if (!(frame instanceof HTMLIFrameElement)) return;
+    const storedBase = typeof frame.dataset.baseUrl === 'string'
+      ? frame.dataset.baseUrl.trim()
+      : '';
+    const baseUrl = storedBase || frame.getAttribute('data-base-url') || frame.src;
+    const resolvedBase = typeof baseUrl === 'string' ? baseUrl.trim() : '';
+    const nextSrc = resolveChartThemeUrl(resolvedBase, theme);
+    if (!storedBase && resolvedBase) {
+      frame.dataset.baseUrl = resolvedBase;
+    }
+    if (frame.dataset.themeApplied === theme && frame.src === nextSrc) {
+      return;
+    }
+    frame.dataset.themeApplied = theme;
+    if (nextSrc && frame.src !== nextSrc) {
+      frame.src = nextSrc;
+    }
+  });
 }
 
 // Galimos spalvų schemos; pridėkite savo jei reikia
