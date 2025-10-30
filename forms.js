@@ -650,56 +650,29 @@ export function itemFormDialog(T, data = {}) {
 export function chartFormDialog(T, data = {}) {
   return new Promise((resolve) => {
     const prevFocus = document.activeElement;
-    const DEFAULT_PREVIEW_HEIGHT = 200;
-    const DEFAULT_PREVIEW_WIDTH = 360;
-    const MIN_AUTO_HEIGHT = 120;
-    const MAX_AUTO_HEIGHT = 2000;
-    const MIN_AUTO_WIDTH = 200;
-    const MAX_AUTO_WIDTH = 2400;
-
     const dlg = document.createElement('dialog');
     dlg.classList.add('chart-form-dialog');
-    dlg.innerHTML = `<form method="dialog" id="chartForm">
-      <header class="chart-form__header">
+    dlg.innerHTML = `<form method="dialog" id="chartForm" class="chart-form group-form">
+      <header class="group-form__header">
         <h2 id="chartFormHeading">${escapeHtml(
           T.chartDialogTitle || T.addChart || 'Naujas grafikas',
         )}</h2>
+        <p class="group-form__description">${escapeHtml(
+          T.chartFormDescription ||
+            'Įrašykite grafiko pavadinimą ir nuorodą. Mastelį galėsite keisti redagavimo režime, tempiant kortelės kampus.',
+        )}</p>
       </header>
-      <fieldset class="form-section">
-        <legend>${T.chartBasics || 'Pagrindiniai nustatymai'}</legend>
-        <label class="chart-form__field"><span class="chart-form__field-label">${
-          T.itemTitle
-        }</span><input name="title" required></label>
-        <label class="chart-form__field"><span class="chart-form__field-label">${
-          T.itemUrl
-        }</span><textarea name="url" rows="2" required></textarea></label>
-      </fieldset>
-      <section class="chart-preview" aria-live="polite">
-        <header class="chart-preview__header">
-          <h3>${T.chartPreview || 'Gyva peržiūra'}</h3>
-          <p class="chart-preview__meta">
-            <span>${
-              T.chartPreviewWidth || 'Numatomas plotis'
-            }: <strong data-chart-width-label>${DEFAULT_PREVIEW_WIDTH}px</strong></span>
-            <span>${
-              T.chartPreviewHeight || 'Numatomas aukštis'
-            }: <strong data-chart-height-label>${DEFAULT_PREVIEW_HEIGHT}px</strong></span>
-          </p>
-        </header>
-        <div class="chart-preview__frame" data-state="empty">
-          <div class="chart-preview__placeholder" data-chart-placeholder>${
-            T.chartPreviewPlaceholder || 'Įveskite nuorodą, kad pamatytumėte grafiką.'
-          }</div>
-          <iframe title="${
-            T.chartPreviewFrameTitle || 'Grafiko peržiūra'
-          }" loading="lazy" referrerpolicy="no-referrer" sandbox="allow-same-origin allow-scripts allow-forms"></iframe>
-        </div>
-        <p class="chart-preview__status" data-chart-status></p>
-        <p class="chart-preview__hint">${
-          T.chartResizeHint ||
-          'Išsaugojus koreguokite kortelės dydį redagavimo režime tempiant jos kampus (Shift – kelioms kortelėms).'
-        }</p>
-      </section>
+      <label class="group-form__field">
+        <span class="group-form__label">${escapeHtml(T.chartFormName || T.itemTitle)}</span>
+        <input name="title" autocomplete="off" required>
+      </label>
+      <label class="group-form__field">
+        <span class="group-form__label">${escapeHtml(T.chartFormUrl || T.itemUrl)}</span>
+        <input name="url" type="url" inputmode="url" required placeholder="https://">
+        <span class="group-form__hint">${escapeHtml(
+          T.chartFormUrlHint || 'Tinka tik https:// arba http:// adresai.',
+        )}</span>
+      </label>
       <p class="error" id="chartErr" role="status" aria-live="polite"></p>
       <menu>
         <button type="button" data-act="cancel">${T.cancel}</button>
@@ -711,277 +684,60 @@ export function chartFormDialog(T, data = {}) {
     document.body.appendChild(dlg);
 
     const form = dlg.querySelector('form');
-    const err = dlg.querySelector('#chartErr');
     const cancel = form.querySelector('[data-act="cancel"]');
-    const urlField = form.elements.url;
-    const titleField = form.elements.title;
-    const widthLabel = form.querySelector('[data-chart-width-label]');
-    const heightLabel = form.querySelector('[data-chart-height-label]');
-    const previewWrap = form.querySelector('.chart-preview__frame');
-    const previewFrame = previewWrap.querySelector('iframe');
-    const previewPlaceholder = form.querySelector('[data-chart-placeholder]');
-    const previewStatus = form.querySelector('[data-chart-status]');
+    const err = form.querySelector('#chartErr');
 
-    const initialHeight = [data.frameHeight, data.height, data.h]
-      .map((val) => Number(val))
-      .find((val) => Number.isFinite(val));
-    const initialWidth = [data.frameWidth, data.width, data.w]
-      .map((val) => Number(val))
-      .find((val) => Number.isFinite(val));
+    form.title.value = data.title || '';
+    form.url.value = data.url || '';
 
-    let derivedHeight = Number.isFinite(initialHeight)
-      ? Math.max(MIN_AUTO_HEIGHT, Math.min(MAX_AUTO_HEIGHT, initialHeight))
-      : null;
-    let derivedWidth = Number.isFinite(initialWidth)
-      ? Math.max(MIN_AUTO_WIDTH, Math.min(MAX_AUTO_WIDTH, initialWidth))
-      : null;
-    let currentSrc = '';
-    let hasLoaded = false;
-
-    const clampHeight = (value) => {
-      const numeric = Number.parseInt(value, 10);
-      if (!Number.isFinite(numeric)) return null;
-      return Math.min(MAX_AUTO_HEIGHT, Math.max(MIN_AUTO_HEIGHT, numeric));
-    };
-
-    const clampWidth = (value) => {
-      const numeric = Number.parseInt(value, 10);
-      if (!Number.isFinite(numeric)) return null;
-      return Math.min(MAX_AUTO_WIDTH, Math.max(MIN_AUTO_WIDTH, numeric));
-    };
-
-    const computeBaseHeight = () => {
-      if (derivedHeight) return derivedHeight;
-      return DEFAULT_PREVIEW_HEIGHT;
-    };
-
-    const computeBaseWidth = () => {
-      if (derivedWidth) return derivedWidth;
-      return DEFAULT_PREVIEW_WIDTH;
-    };
-
-    const parseEmbed = (value) => {
-      const raw = typeof value === 'string' ? value.trim() : '';
-      if (!raw) return { src: '', height: null, width: null };
-      if (/<iframe/i.test(raw)) {
-        try {
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(raw, 'text/html');
-          const iframe = doc.querySelector('iframe');
-          if (iframe) {
-            const srcAttr = iframe.getAttribute('src');
-            const heightAttr = iframe.getAttribute('height');
-            const widthAttr = iframe.getAttribute('width');
-            const parsedHeight = heightAttr ? Number.parseInt(heightAttr, 10) : null;
-            const parsedWidth = widthAttr ? Number.parseInt(widthAttr, 10) : null;
-            return {
-              src: srcAttr ? srcAttr.trim() : '',
-              height: Number.isFinite(parsedHeight) ? parsedHeight : null,
-              width: Number.isFinite(parsedWidth) ? parsedWidth : null,
-            };
-          }
-        } catch {
-          /* noop */
-        }
-      }
-      return { src: raw, height: null, width: null };
-    };
-
-    const isValidUrl = (value) => {
-      if (!value) return false;
-      try {
-        const u = new URL(value);
-        return u.protocol === 'https:' || u.protocol === 'http:';
-      } catch {
-        return false;
-      }
-    };
-
-    const applySizing = () => {
-      const baseHeight = computeBaseHeight();
-      const baseWidth = computeBaseWidth();
-      if (widthLabel) {
-        widthLabel.textContent = `${baseWidth}px`;
-      }
-      heightLabel.textContent = `${baseHeight}px`;
-      previewFrame.style.height = `${baseHeight}px`;
-      previewFrame.style.width = `${baseWidth}px`;
-      previewFrame.style.transform = 'none';
-      previewFrame.style.transformOrigin = 'top left';
-      previewWrap.style.height = `${baseHeight}px`;
-      previewWrap.style.width = `${baseWidth}px`;
-      previewWrap.style.minHeight = `${baseHeight}px`;
-      previewWrap.style.minWidth = `${baseWidth}px`;
-      previewWrap.dataset.scale = '1';
-      previewWrap.dataset.scaleX = '1';
-      previewWrap.dataset.scaleY = '1';
-      previewWrap.dataset.height = String(baseHeight);
-      previewWrap.dataset.width = String(baseWidth);
-      previewWrap.dataset.displayHeight = String(baseHeight);
-      previewWrap.dataset.displayWidth = String(baseWidth);
-    };
-
-    const measureFrameSize = () => {
-      try {
-        const doc = previewFrame.contentDocument;
-        if (!doc) return null;
-        const body = doc.body;
-        const root = doc.documentElement;
-        const bodyHeight = body ? Math.max(body.scrollHeight, body.offsetHeight) : 0;
-        const rootHeight = root ? Math.max(root.scrollHeight, root.offsetHeight) : 0;
-        const bodyWidth = body ? Math.max(body.scrollWidth, body.offsetWidth) : 0;
-        const rootWidth = root ? Math.max(root.scrollWidth, root.offsetWidth) : 0;
-        const measuredHeight = Math.max(bodyHeight, rootHeight);
-        const measuredWidth = Math.max(bodyWidth, rootWidth);
-        const safeHeight =
-          Number.isFinite(measuredHeight) && measuredHeight > 0
-            ? clampHeight(measuredHeight)
-            : null;
-        const safeWidth =
-          Number.isFinite(measuredWidth) && measuredWidth > 0
-            ? clampWidth(measuredWidth)
-            : null;
-        if (!safeHeight && !safeWidth) return null;
-        return {
-          height: safeHeight,
-          width: safeWidth,
-        };
-      } catch {
-        return null;
-      }
-    };
-
-    const updatePreview = () => {
-      err.textContent = '';
-      const raw = urlField.value.trim();
-      const { src, height, width } = parseEmbed(raw);
-      if (!raw) {
-        currentSrc = '';
-        previewFrame.removeAttribute('src');
-        previewWrap.dataset.state = 'empty';
-        previewStatus.textContent = '';
-        previewPlaceholder.hidden = false;
-        hasLoaded = false;
-        derivedHeight = null;
-        derivedWidth = null;
-        applySizing();
-        return;
-      }
-
-      if (!isValidUrl(src)) {
-        currentSrc = '';
-        previewFrame.removeAttribute('src');
-        previewWrap.dataset.state = 'error';
-        previewStatus.textContent = T.invalidUrl;
-        previewPlaceholder.hidden = true;
-        hasLoaded = false;
-        derivedHeight = null;
-        derivedWidth = null;
-        applySizing();
-        return;
-      }
-
-      previewWrap.dataset.state = currentSrc === src && hasLoaded ? 'ready' : 'loading';
-      previewStatus.textContent = currentSrc === src && hasLoaded ? '' : T.chartPreviewLoading || 'Kraunama…';
-      previewPlaceholder.hidden = true;
-      if (height) {
-        const clamped = clampHeight(height);
-        if (clamped) {
-          derivedHeight = clamped;
-        }
-      }
-      if (width) {
-        const clampedW = clampWidth(width);
-        if (clampedW) {
-          derivedWidth = clampedW;
-        }
-      }
-      if (currentSrc !== src) {
-        currentSrc = src;
-        hasLoaded = false;
-        previewFrame.src = src;
-      } else {
-        applySizing();
-      }
-    };
-
-    const handlePreviewLoad = () => {
-      hasLoaded = true;
-      if (!currentSrc) return;
-      previewWrap.dataset.state = 'ready';
-      previewStatus.textContent = '';
-      const measured = measureFrameSize();
-      if (measured) {
-        if (Number.isFinite(measured.height)) {
-          derivedHeight = measured.height;
-        }
-        if (Number.isFinite(measured.width)) {
-          derivedWidth = measured.width;
-        }
-      }
-      applySizing();
-    };
-    previewFrame.addEventListener('load', handlePreviewLoad);
-
-    function cleanup() {
-      form.removeEventListener('submit', submit);
-      cancel.removeEventListener('click', close);
-      urlField.removeEventListener('input', handleUrlInput);
-      previewFrame.removeEventListener('load', handlePreviewLoad);
+    function cleanup(result) {
+      cancel.removeEventListener('click', handleCancel);
+      form.removeEventListener('submit', handleSubmit);
+      dlg.removeEventListener('cancel', handleCancel);
+      dlg.close();
       dlg.remove();
       prevFocus?.focus();
+      resolve(result);
     }
 
-    const handleUrlInput = () => {
-      previewStatus.textContent = '';
-      updatePreview();
-    };
+    function handleCancel(event) {
+      event?.preventDefault?.();
+      cleanup(null);
+    }
 
-    function submit(e) {
-      e.preventDefault();
-      const title = titleField.value.trim();
-      const rawUrl = urlField.value.trim();
-      if (!title || !rawUrl) {
+    function handleSubmit(event) {
+      event.preventDefault();
+      const title = form.title.value.trim();
+      const urlRaw = form.url.value.trim();
+      if (!title || !urlRaw) {
         err.textContent = T.required;
         return;
       }
-      const { src } = parseEmbed(rawUrl);
-      if (!isValidUrl(src)) {
+      try {
+        const u = new URL(urlRaw);
+        if (!/^https?:$/.test(u.protocol)) {
+          err.textContent = T.invalidUrl;
+          return;
+        }
+      } catch {
         err.textContent = T.invalidUrl;
         return;
       }
-      const baseHeight = computeBaseHeight();
-      const baseWidth = computeBaseWidth();
-      resolve({
+      cleanup({
         title,
-        url: src,
-        frameHeight: baseHeight,
-        height: baseHeight,
-        frameWidth: baseWidth,
-        width: baseWidth,
+        url: urlRaw,
       });
-      cleanup();
     }
 
-    function close() {
-      resolve(null);
-      cleanup();
-    }
-
-    titleField.value = data.title || '';
-    urlField.value = data.url || '';
-    form.addEventListener('submit', submit);
-    cancel.addEventListener('click', close);
-    dlg.addEventListener('cancel', close);
-    urlField.addEventListener('input', handleUrlInput);
-
+    cancel.addEventListener('click', handleCancel);
+    form.addEventListener('submit', handleSubmit);
+    dlg.addEventListener('cancel', handleCancel);
     dlg.showModal();
+
     const first = dlg.querySelector(
-      'input, select, textarea, button, [href], [tabindex]:not([tabindex="-1"])',
+      'input, textarea, button, [href], [tabindex]:not([tabindex="-1"])',
     );
     first?.focus();
-    applySizing();
-    updatePreview();
   });
 }
 

@@ -253,23 +253,21 @@ a.item {
 }
 
 .chart-frame {
-  position: relative;
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: var(--surface);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--space-3);
   display: block;
 }
 
 .chart-frame iframe {
   display: block;
+  width: 100%;
+  height: 100%;
   border: 0;
   background: white;
-  transition: transform 0.2s ease;
-  position: absolute;
-  top: 0;
-  left: 0;
-  transform-origin: top left;
 }
 
 .empty {
@@ -335,165 +333,13 @@ dialog form {
 }
 
 
-dialog.chart-form-dialog {
-  width: min(640px, 94vw);
-  max-width: min(640px, 94vw);
-}
-
-.chart-form__header {
-  display: grid;
-  gap: var(--space-1);
-  margin-bottom: var(--space-3);
-}
-
-.chart-form__header h2 {
-  margin: 0;
-  font-size: var(--font-lg);
-  font-weight: 700;
-}
-
-.chart-form__field {
-  display: grid;
-  gap: var(--space-2);
-  align-items: flex-start;
-}
-
-.chart-form__field-label {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  font-size: var(--font-sm);
-  font-weight: 600;
-  color: var(--subtext);
-}
-
-.chart-form__field input,
-.chart-form__field textarea {
-  width: 100%;
-  max-width: 100%;
-  font-size: var(--font-md);
-  padding: var(--space-2);
-  border-radius: var(--space-2);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: color-mix(in srgb, var(--surface) 70%, transparent);
-  color: var(--text);
-}
-
-.chart-form__field textarea {
-  min-height: 72px;
-  resize: vertical;
-}
-
-.chart-form__field input:focus,
-.chart-form__field textarea:focus {
-  outline: 2px solid color-mix(in srgb, var(--accent) 65%, transparent);
-  outline-offset: 2px;
-}
-
-.chart-form__height input[type='number'] {
-  width: 100%;
-}
-
-.hint {
-  margin: 0;
-  font-size: var(--font-xs);
-  color: var(--subtext);
-}
-
-.chart-preview {
-  display: grid;
-  gap: var(--space-2);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--space-3);
-  padding: var(--space-2);
-  background: var(--surface-raised);
-}
-
-.chart-preview__header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-1);
-}
-
-.chart-preview__header h3 {
-  margin: 0;
-  font-size: var(--font-md);
-}
-
-.chart-preview__meta {
-  margin: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  font-size: var(--font-sm);
-  color: var(--subtext);
-}
-
-.chart-preview__frame {
-  position: relative;
-  border: 1px dashed var(--border-strong);
-  border-radius: var(--space-3);
-  min-height: 160px;
-  display: block;
-  overflow: hidden;
-  background: var(--surface);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.chart-preview__frame[data-state='loading'] {
-  border-style: solid;
-  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
-}
-
-.chart-preview__frame[data-state='error'] {
-  border-style: solid;
-  border-color: color-mix(in srgb, var(--danger) 60%, transparent);
-  background: color-mix(in srgb, var(--danger) 14%, transparent);
-}
-
-.chart-preview__placeholder {
-  text-align: center;
-  color: var(--subtext);
-  font-size: var(--font-sm);
-  padding: var(--space-4);
-}
-
-.chart-preview__frame[data-state='ready'] .chart-preview__placeholder,
-.chart-preview__frame[data-state='loading'] .chart-preview__placeholder,
-.chart-preview__frame[data-state='error'] .chart-preview__placeholder {
-  display: none;
-}
-
-.chart-preview__frame[data-state='empty'] iframe,
-.chart-preview__frame[data-state='error'] iframe {
-  display: none;
-}
-
-.chart-preview__frame iframe {
-  border: 0;
-  background: white;
-  position: absolute;
-  top: 0;
-  left: 0;
-  transform-origin: top left;
-}
-
-.chart-preview__status {
-  margin: 0;
-  font-size: var(--font-sm);
-  color: var(--subtext);
-}
-
-.chart-preview__hint {
-  margin: 0;
-  font-size: var(--font-xs);
-  color: var(--subtext);
-}
-
 dialog.item-form-dialog form {
   gap: var(--space-3);
+}
+
+dialog.chart-form-dialog {
+  width: min(520px, 94vw);
+  max-width: min(520px, 94vw);
 }
 
 .group-form {
