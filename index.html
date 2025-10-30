@@ -118,30 +118,64 @@
         <button id="editBtn" class="btn-outline" type="button">
           Redaguoti
         </button>
-        <button
-          id="importBtn"
-          class="btn-outline"
-          type="button"
+        <div
+          id="dataMenu"
+          class="data-menu"
+          data-open="0"
           data-editing-visible
         >
-          <svg class="icon" viewBox="0 0 24 24">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" /></svg
-          ><span>Importuoti</span>
-        </button>
-        <button
-          id="exportBtn"
-          class="btn-outline"
-          type="button"
-          data-editing-visible
-        >
-          <svg class="icon" viewBox="0 0 24 24">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="17 8 12 3 7 8" />
-            <line x1="12" y1="3" x2="12" y2="15" /></svg
-          ><span>Eksportuoti</span>
-        </button>
+          <button
+            id="dataMenuBtn"
+            class="btn-outline data-menu-toggle"
+            type="button"
+            aria-haspopup="true"
+            aria-expanded="false"
+            aria-controls="dataMenuList"
+          >
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2h-7.59a2 2 0 0 1-1.41-.59L9.59 1.41A2 2 0 0 0 8.17 1H4a2 2 0 0 0-2 2v17a2 2 0 0 0 2 2z"
+              />
+            </svg>
+            <span data-menu-label>Duomenys</span>
+            <svg class="chevron" viewBox="0 0 24 24" aria-hidden="true">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div
+            id="dataMenuList"
+            class="menu-panel"
+            role="menu"
+            aria-labelledby="dataMenuBtn"
+          >
+            <button
+              id="importBtn"
+              type="button"
+              role="menuitem"
+              data-menu-import
+            >
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              <span>Importuoti</span>
+            </button>
+            <button
+              id="exportBtn"
+              type="button"
+              role="menuitem"
+              data-menu-export
+            >
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+              <span>Eksportuoti</span>
+            </button>
+          </div>
+        </div>
         <button
           id="themeBtn"
           class="btn"

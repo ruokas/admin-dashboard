@@ -8,6 +8,7 @@ export const Tlt = {
   addRemindersCard: 'Pridėti priminimų kortelę',
   import: 'Importuoti',
   export: 'Eksportuoti',
+  dataMenu: 'Duomenys',
   theme: 'Tema',
   color: 'Spalva',
   customize: 'Tinkinti',
