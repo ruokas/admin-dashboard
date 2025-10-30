@@ -2019,7 +2019,13 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
         );
         frameWrap.appendChild(controls);
 
+        let removeOutsidePointerHandler = null;
+
         const resumeCardDrag = () => {
+          if (removeOutsidePointerHandler) {
+            removeOutsidePointerHandler();
+            removeOutsidePointerHandler = null;
+          }
           if (!editing) return;
           grp.dataset.dragSuspended = '0';
           if (grp.dataset.resizing === '1') return;
@@ -2032,10 +2038,37 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
           grp.dataset.dragSuspended = '1';
           grp.draggable = false;
 
+          if (removeOutsidePointerHandler) {
+            removeOutsidePointerHandler();
+            removeOutsidePointerHandler = null;
+          }
+
+          const handleOutsidePointerDown = (docEvent) => {
+            if (!editing) {
+              resumeCardDrag();
+              return;
+            }
+
+            if (!grp.contains(docEvent.target)) {
+              resumeCardDrag();
+            }
+          };
+
           const release = () => {
             document.removeEventListener('pointerup', release, true);
             document.removeEventListener('pointercancel', release, true);
-            resumeCardDrag();
+            if (removeOutsidePointerHandler) {
+              removeOutsidePointerHandler();
+            }
+            removeOutsidePointerHandler = () => {
+              document.removeEventListener(
+                'pointerdown',
+                handleOutsidePointerDown,
+                true,
+              );
+              removeOutsidePointerHandler = null;
+            };
+            document.addEventListener('pointerdown', handleOutsidePointerDown, true);
           };
 
           document.addEventListener('pointerup', release, true);
