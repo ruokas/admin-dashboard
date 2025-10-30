@@ -1959,6 +1959,8 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
       applyChartScale(frameWrap, iframe, initialScale);
 
       if (editing) {
+        grp.dataset.dragSuspended = grp.dataset.dragSuspended || '0';
+
         const controls = document.createElement('div');
         controls.className = 'chart-scale-controls';
 
@@ -2016,6 +2018,35 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
           resetBtn,
         );
         frameWrap.appendChild(controls);
+
+        const resumeCardDrag = () => {
+          if (!editing) return;
+          grp.dataset.dragSuspended = '0';
+          if (grp.dataset.resizing === '1') return;
+          grp.draggable = true;
+        };
+
+        const handleControlPointerDown = (event) => {
+          event.stopPropagation();
+          if (!editing) return;
+          grp.dataset.dragSuspended = '1';
+          grp.draggable = false;
+
+          const release = () => {
+            document.removeEventListener('pointerup', release, true);
+            document.removeEventListener('pointercancel', release, true);
+            resumeCardDrag();
+          };
+
+          document.addEventListener('pointerup', release, true);
+          document.addEventListener('pointercancel', release, true);
+        };
+
+        controls.addEventListener('pointerdown', handleControlPointerDown);
+        controls.addEventListener('dragstart', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        });
 
         let currentScale = initialScale;
 
