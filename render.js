@@ -247,14 +247,14 @@ function updateChartSizingForCard(
 
   const { baseWidth: overrideBaseWidth, baseHeight: overrideBaseHeight } = options || {};
 
-  const resolvedBaseWidth =
+  let resolvedBaseWidth =
     clampChartWidth(overrideBaseWidth) ??
     clampChartWidth(parseChartNumber(frameWrap.dataset?.width)) ??
     clampChartWidth(parseChartNumber(iframe.dataset?.baseWidth)) ??
     clampChartWidth(parseChartNumber(cardEl.dataset?.chartBaseWidth)) ??
     CHART_MIN_WIDTH;
 
-  const resolvedBaseHeight =
+  let resolvedBaseHeight =
     clampChartHeight(overrideBaseHeight) ??
     clampChartHeight(parseChartNumber(frameWrap.dataset?.height)) ??
     clampChartHeight(parseChartNumber(iframe.dataset?.baseHeight)) ??
@@ -295,19 +295,50 @@ function updateChartSizingForCard(
   const widthScale = resolvedBaseWidth ? safeViewportWidth / resolvedBaseWidth : 1;
   const heightScale = resolvedBaseHeight ? safeViewportHeight / resolvedBaseHeight : 1;
   const uniformScaleCandidate = Math.min(widthScale, heightScale);
-  const scale = clampScale(
+
+  const finiteScaleCandidate =
     Number.isFinite(uniformScaleCandidate) && uniformScaleCandidate > 0
       ? uniformScaleCandidate
-      : 1,
-  );
-  const displayWidthPx = Math.min(
-    safeViewportWidth,
-    Math.round(resolvedBaseWidth * scale),
-  );
-  const displayHeightPx = Math.min(
-    safeViewportHeight,
-    Math.round(resolvedBaseHeight * scale),
-  );
+      : 1;
+
+  const shouldScaleDown = finiteScaleCandidate < 1;
+
+  let scale = 1;
+  let displayWidthPx;
+  let displayHeightPx;
+
+  if (shouldScaleDown) {
+    scale = clampScale(finiteScaleCandidate);
+    displayWidthPx = Math.min(
+      safeViewportWidth,
+      Math.round(resolvedBaseWidth * scale),
+    );
+    displayHeightPx = Math.min(
+      safeViewportHeight,
+      Math.round(resolvedBaseHeight * scale),
+    );
+  } else {
+    scale = 1;
+    const expandedWidth = Math.round(resolvedBaseWidth * finiteScaleCandidate);
+    const expandedHeight = Math.round(resolvedBaseHeight * finiteScaleCandidate);
+    displayWidthPx = Math.min(safeViewportWidth, expandedWidth);
+    displayHeightPx = Math.min(safeViewportHeight, expandedHeight);
+    const nextBaseWidth = clampChartWidth(Math.max(resolvedBaseWidth, displayWidthPx));
+    const nextBaseHeight = clampChartHeight(Math.max(resolvedBaseHeight, displayHeightPx));
+    if (Number.isFinite(nextBaseWidth)) {
+      resolvedBaseWidth = nextBaseWidth;
+    }
+    if (Number.isFinite(nextBaseHeight)) {
+      resolvedBaseHeight = nextBaseHeight;
+    }
+  }
+
+  displayWidthPx = Number.isFinite(displayWidthPx)
+    ? Math.max(CHART_MIN_WIDTH, Math.round(displayWidthPx))
+    : Math.max(CHART_MIN_WIDTH, safeViewportWidth);
+  displayHeightPx = Number.isFinite(displayHeightPx)
+    ? Math.max(CHART_MIN_HEIGHT, Math.round(displayHeightPx))
+    : Math.max(CHART_MIN_HEIGHT, safeViewportHeight);
 
   const offsetX = Math.max(0, Math.round((safeViewportWidth - displayWidthPx) / 2));
   const offsetY = Math.max(0, Math.round((safeViewportHeight - displayHeightPx) / 2));
@@ -335,9 +366,11 @@ function updateChartSizingForCard(
   }
 
   if (iframe instanceof HTMLElement) {
-    iframe.style.width = `${resolvedBaseWidth}px`;
-    iframe.style.height = `${resolvedBaseHeight}px`;
-    iframe.style.transform = `scale(${scale})`;
+    const iframeWidth = shouldScaleDown ? resolvedBaseWidth : displayWidthPx;
+    const iframeHeight = shouldScaleDown ? resolvedBaseHeight : displayHeightPx;
+    iframe.style.width = `${iframeWidth}px`;
+    iframe.style.height = `${iframeHeight}px`;
+    iframe.style.transform = shouldScaleDown ? `scale(${scale})` : 'none';
     iframe.style.transformOrigin = 'top left';
     iframe.style.left = `${offsetX}px`;
     iframe.style.top = `${offsetY}px`;
@@ -2135,7 +2168,7 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
       applySize(grp, gWidth, gHeight, gWSize, gHSize);
       initResizeHandles(grp);
       grp.style.resize = editing ? 'both' : 'none';
-      grp.style.overflow = editing ? 'auto' : 'visible';
+      grp.style.overflow = 'hidden';
       if (editing) {
         grp.draggable = true;
         grp.addEventListener('dragstart', (e) => {
