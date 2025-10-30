@@ -291,11 +291,13 @@ function updateChartSizingForCard(
   const safeViewportWidth = Math.max(CHART_MIN_WIDTH, Math.round(viewportWidth));
   const safeViewportHeight = Math.max(CHART_MIN_HEIGHT, Math.round(viewportHeight));
 
-  const scaleX = resolvedBaseWidth ? safeViewportWidth / resolvedBaseWidth : 1;
-  const scaleY = resolvedBaseHeight ? safeViewportHeight / resolvedBaseHeight : 1;
-  const scale = Math.max(0.05, Math.min(8, Math.min(scaleX, scaleY)));
-  const displayWidthPx = Math.round(resolvedBaseWidth * scale);
-  const displayHeightPx = Math.round(resolvedBaseHeight * scale);
+  const clampScale = (value) => Math.max(0.05, Math.min(32, value));
+  const rawScaleX = resolvedBaseWidth ? safeViewportWidth / resolvedBaseWidth : 1;
+  const rawScaleY = resolvedBaseHeight ? safeViewportHeight / resolvedBaseHeight : 1;
+  const scaleX = clampScale(rawScaleX);
+  const scaleY = clampScale(rawScaleY);
+  const displayWidthPx = Math.round(resolvedBaseWidth * scaleX);
+  const displayHeightPx = Math.round(resolvedBaseHeight * scaleY);
 
   const offsetX = Math.max(0, (safeViewportWidth - displayWidthPx) / 2);
   const offsetY = Math.max(0, (safeViewportHeight - displayHeightPx) / 2);
@@ -317,20 +319,24 @@ function updateChartSizingForCard(
     frameWrap.dataset.height = String(resolvedBaseHeight);
     frameWrap.dataset.displayWidth = String(displayWidthPx);
     frameWrap.dataset.displayHeight = String(displayHeightPx);
-    frameWrap.dataset.scale = String(scale);
+    frameWrap.dataset.scaleX = String(scaleX);
+    frameWrap.dataset.scaleY = String(scaleY);
+    frameWrap.dataset.scale = String(Math.min(scaleX, scaleY));
   }
 
   if (iframe instanceof HTMLElement) {
     iframe.style.width = `${resolvedBaseWidth}px`;
     iframe.style.height = `${resolvedBaseHeight}px`;
-    iframe.style.transform = `scale(${scale})`;
+    iframe.style.transform = `scale(${scaleX}, ${scaleY})`;
     iframe.style.transformOrigin = 'top left';
     iframe.style.left = `${offsetX}px`;
     iframe.style.top = `${offsetY}px`;
     iframe.style.aspectRatio = 'auto';
     iframe.dataset.baseWidth = String(resolvedBaseWidth);
     iframe.dataset.baseHeight = String(resolvedBaseHeight);
-    iframe.dataset.scale = String(scale);
+    iframe.dataset.scaleX = String(scaleX);
+    iframe.dataset.scaleY = String(scaleY);
+    iframe.dataset.scale = String(Math.min(scaleX, scaleY));
   }
 
   if (cardEl instanceof HTMLElement) {
@@ -404,16 +410,19 @@ function measureIntrinsicContentSize(cardEl, innerEl = findCardInnerElement(card
     const storedDisplayHeight = parseNumeric(frame.dataset?.displayHeight);
     const baseWidth = parseNumeric(frame.dataset?.width);
     const baseHeight = parseNumeric(frame.dataset?.height);
-    const scale = parseNumeric(frame.dataset?.scale);
+    const scaleX =
+      parseNumeric(frame.dataset?.scaleX) ?? parseNumeric(frame.dataset?.scale);
+    const scaleY =
+      parseNumeric(frame.dataset?.scaleY) ?? parseNumeric(frame.dataset?.scale);
     const computedWidth = Number.isFinite(storedDisplayWidth)
       ? storedDisplayWidth
-      : Number.isFinite(baseWidth) && Number.isFinite(scale)
-        ? baseWidth * scale
+      : Number.isFinite(baseWidth) && Number.isFinite(scaleX)
+        ? baseWidth * scaleX
         : null;
     const computedHeight = Number.isFinite(storedDisplayHeight)
       ? storedDisplayHeight
-      : Number.isFinite(baseHeight) && Number.isFinite(scale)
-        ? baseHeight * scale
+      : Number.isFinite(baseHeight) && Number.isFinite(scaleY)
+        ? baseHeight * scaleY
         : null;
     const extraWidth = Number.isFinite(widthExtra) ? widthExtra : 0;
     const extraHeight = Number.isFinite(heightExtra) ? heightExtra : 0;
