@@ -292,15 +292,25 @@ function updateChartSizingForCard(
   const safeViewportHeight = Math.max(CHART_MIN_HEIGHT, Math.round(viewportHeight));
 
   const clampScale = (value) => Math.max(0.05, Math.min(32, value));
-  const rawScaleX = resolvedBaseWidth ? safeViewportWidth / resolvedBaseWidth : 1;
-  const rawScaleY = resolvedBaseHeight ? safeViewportHeight / resolvedBaseHeight : 1;
-  const scaleX = clampScale(rawScaleX);
-  const scaleY = clampScale(rawScaleY);
-  const displayWidthPx = Math.round(resolvedBaseWidth * scaleX);
-  const displayHeightPx = Math.round(resolvedBaseHeight * scaleY);
+  const widthScale = resolvedBaseWidth ? safeViewportWidth / resolvedBaseWidth : 1;
+  const heightScale = resolvedBaseHeight ? safeViewportHeight / resolvedBaseHeight : 1;
+  const uniformScaleCandidate = Math.min(widthScale, heightScale);
+  const scale = clampScale(
+    Number.isFinite(uniformScaleCandidate) && uniformScaleCandidate > 0
+      ? uniformScaleCandidate
+      : 1,
+  );
+  const displayWidthPx = Math.min(
+    safeViewportWidth,
+    Math.round(resolvedBaseWidth * scale),
+  );
+  const displayHeightPx = Math.min(
+    safeViewportHeight,
+    Math.round(resolvedBaseHeight * scale),
+  );
 
-  const offsetX = Math.max(0, (safeViewportWidth - displayWidthPx) / 2);
-  const offsetY = Math.max(0, (safeViewportHeight - displayHeightPx) / 2);
+  const offsetX = Math.max(0, Math.round((safeViewportWidth - displayWidthPx) / 2));
+  const offsetY = Math.max(0, Math.round((safeViewportHeight - displayHeightPx) / 2));
 
   if (embed instanceof HTMLElement) {
     embed.style.width = '100%';
@@ -319,24 +329,24 @@ function updateChartSizingForCard(
     frameWrap.dataset.height = String(resolvedBaseHeight);
     frameWrap.dataset.displayWidth = String(displayWidthPx);
     frameWrap.dataset.displayHeight = String(displayHeightPx);
-    frameWrap.dataset.scaleX = String(scaleX);
-    frameWrap.dataset.scaleY = String(scaleY);
-    frameWrap.dataset.scale = String(Math.min(scaleX, scaleY));
+    frameWrap.dataset.scaleX = String(scale);
+    frameWrap.dataset.scaleY = String(scale);
+    frameWrap.dataset.scale = String(scale);
   }
 
   if (iframe instanceof HTMLElement) {
     iframe.style.width = `${resolvedBaseWidth}px`;
     iframe.style.height = `${resolvedBaseHeight}px`;
-    iframe.style.transform = `scale(${scaleX}, ${scaleY})`;
+    iframe.style.transform = `scale(${scale})`;
     iframe.style.transformOrigin = 'top left';
     iframe.style.left = `${offsetX}px`;
     iframe.style.top = `${offsetY}px`;
     iframe.style.aspectRatio = 'auto';
     iframe.dataset.baseWidth = String(resolvedBaseWidth);
     iframe.dataset.baseHeight = String(resolvedBaseHeight);
-    iframe.dataset.scaleX = String(scaleX);
-    iframe.dataset.scaleY = String(scaleY);
-    iframe.dataset.scale = String(Math.min(scaleX, scaleY));
+    iframe.dataset.scaleX = String(scale);
+    iframe.dataset.scaleY = String(scale);
+    iframe.dataset.scale = String(scale);
   }
 
   if (cardEl instanceof HTMLElement) {
