@@ -157,6 +157,8 @@ export const Tlt = {
   moveUp: 'Perkelti aukštyn',
   moveDown: 'Perkelti žemyn',
   actions: 'Veiksmai',
+  groupQuickActions: 'Dažniausiai naudojami veiksmai',
+  groupEditActions: 'Redagavimo veiksmai',
   preview: 'Peržiūra',
   edit: 'Redaguoti',
   reset: 'Atstatyti',
