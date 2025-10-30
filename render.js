@@ -1,4 +1,5 @@
 import { SIZE_MAP, sizeFromWidth, sizeFromHeight } from './sizes.js';
+import { getActiveTheme, resolveChartThemeUrl } from './theme-utils.js';
 
 let currentState;
 let persist;
@@ -1891,7 +1892,15 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
         if (btn.dataset.act === 'edit') {
           handlers.editChart?.(g.id);
         } else if (btn.dataset.act === 'del') {
-          handlers.removeGroup?.(g.id);
+          if (handlers.confirmDialog) {
+            handlers
+              .confirmDialog(T.confirmDelChart || T.confirmDelGroup)
+              .then((ok) => {
+                if (ok) handlers.removeGroup?.(g.id);
+              });
+          } else {
+            handlers.removeGroup?.(g.id);
+          }
         }
       });
 
@@ -1902,7 +1911,9 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
       frameWrap.style.height = '100%';
 
       const iframe = document.createElement('iframe');
-      iframe.src = g.url;
+      const activeTheme = getActiveTheme();
+      const themedUrl = resolveChartThemeUrl(g.url || '', activeTheme);
+      iframe.src = themedUrl;
       iframe.loading = 'lazy';
       iframe.referrerPolicy = 'no-referrer';
       iframe.allowFullscreen = true;
@@ -1910,6 +1921,8 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
       iframe.style.width = '100%';
       iframe.style.height = '100%';
       iframe.style.border = '0';
+      iframe.dataset.baseUrl = g.url || '';
+      iframe.dataset.themeApplied = activeTheme;
 
       frameWrap.appendChild(iframe);
       content.appendChild(frameWrap);

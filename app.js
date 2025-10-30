@@ -26,6 +26,7 @@ import {
   parseReminderInput,
   hasReminderPayload,
 } from './reminder-input.js';
+import { getActiveTheme, resolveChartThemeUrl } from './theme-utils.js';
 
 const T = Tlt;
 // Hook future English localisation: fill T.en when translations are ready.
@@ -1389,15 +1390,7 @@ function importJson(file) {
 }
 
 function applyTheme() {
-  let theme = localStorage.getItem('ed_dash_theme');
-  if (!theme) {
-    const prefersLight =
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia('(prefers-color-scheme: light)').matches;
-    // Pakeiskite numatytą temą, jei skyriui reikia kitokio starto varianto.
-    theme = prefersLight ? 'light' : 'dark';
-    localStorage.setItem('ed_dash_theme', theme);
-  }
+  const theme = getActiveTheme();
   const light = theme === 'light';
   document.documentElement.classList.toggle('theme-light', light);
   const label = light ? T.toDark : T.toLight;
@@ -1405,12 +1398,36 @@ function applyTheme() {
   themeBtn.innerHTML = `${icon}`;
   themeBtn.setAttribute('aria-label', label);
   themeBtn.title = label;
+  syncChartFrameThemes(theme);
 }
 
 function toggleTheme() {
   const curr = localStorage.getItem('ed_dash_theme') === 'light';
   localStorage.setItem('ed_dash_theme', curr ? 'dark' : 'light');
   applyTheme();
+}
+
+function syncChartFrameThemes(theme) {
+  const frames = document.querySelectorAll('.group--chart iframe');
+  frames.forEach((frame) => {
+    if (!(frame instanceof HTMLIFrameElement)) return;
+    const storedBase = typeof frame.dataset.baseUrl === 'string'
+      ? frame.dataset.baseUrl.trim()
+      : '';
+    const baseUrl = storedBase || frame.getAttribute('data-base-url') || frame.src;
+    const resolvedBase = typeof baseUrl === 'string' ? baseUrl.trim() : '';
+    const nextSrc = resolveChartThemeUrl(resolvedBase, theme);
+    if (!storedBase && resolvedBase) {
+      frame.dataset.baseUrl = resolvedBase;
+    }
+    if (frame.dataset.themeApplied === theme && frame.src === nextSrc) {
+      return;
+    }
+    frame.dataset.themeApplied = theme;
+    if (nextSrc && frame.src !== nextSrc) {
+      frame.src = nextSrc;
+    }
+  });
 }
 
 // Galimos spalvų schemos; pridėkite savo jei reikia
