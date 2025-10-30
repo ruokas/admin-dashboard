@@ -2189,19 +2189,38 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
           <span class="dot" aria-hidden="true"></span>
           <h2 title="Tempkite, kad perrikiuotumėte" class="handle">${escapeHtml(g.name)}</h2>
         </div>
-        ${
-          editing
-            ? `<div class="group-actions">
-          <button type="button" title="${T.moveUp}" aria-label="${T.moveUp}" data-act="up">${I.arrowUp}</button>
-          <button type="button" title="${T.moveDown}" aria-label="${T.moveDown}" data-act="down">${I.arrowDown}</button>
-          <button type="button" title="${T.openAll}" aria-label="${T.openAll}" data-act="openAll">${I.arrowUpRight}</button>
-          <button type="button" title="${T.addItem}" aria-label="${T.addItem}" data-act="add">${I.plus}</button>
-          <button type="button" title="${T.editGroup}" aria-label="${T.editGroup}" data-act="edit">${I.pencil}</button>
-          <button type="button" class="btn-danger" title="${T.deleteGroup}" aria-label="${T.deleteGroup}" data-act="del">${I.trash}</button>
-        </div>`
-            : ''
-        }`;
+        <div class="group-actions" role="group" aria-label="${T.actions}">
+          <div class="group-actions__always" role="group" aria-label="${T.groupQuickActions}">
+            <button type="button" title="${T.openAll}" aria-label="${T.openAll}" data-act="openAll">${I.arrowUpRight}</button>
+          </div>
+          ${
+            editing
+              ? `<div class="group-actions__edit" role="group" aria-label="${T.groupEditActions}">
+            <button type="button" title="${T.moveUp}" aria-label="${T.moveUp}" data-act="up">${I.arrowUp}</button>
+            <button type="button" title="${T.moveDown}" aria-label="${T.moveDown}" data-act="down">${I.arrowDown}</button>
+            <button type="button" title="${T.addItem}" aria-label="${T.addItem}" data-act="add">${I.plus}</button>
+            <button type="button" title="${T.editGroup}" aria-label="${T.editGroup}" data-act="edit">${I.pencil}</button>
+            <button type="button" class="btn-danger" title="${T.deleteGroup}" aria-label="${T.deleteGroup}" data-act="del">${I.trash}</button>
+          </div>`
+              : ''
+          }
+        </div>`;
     h.style.setProperty('--dot-color', g.color || '#6ee7b7');
+
+    const openAllLinks = () => {
+      g.items
+        .filter((i) => i.type === 'link')
+        .forEach((i) => window.open(i.url, '_blank'));
+    };
+
+    const openAllBtn = h.querySelector('[data-act="openAll"]');
+    if (openAllBtn) {
+      openAllBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        openAllLinks();
+      });
+    }
 
     h.addEventListener('click', (e) => {
       const btn = e.target.closest('button[data-act]');
@@ -2230,9 +2249,7 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
         return;
       }
       if (act === 'openAll') {
-        g.items
-          .filter((i) => i.type === 'link')
-          .forEach((i) => window.open(i.url, '_blank'));
+        openAllLinks();
       }
     });
 
