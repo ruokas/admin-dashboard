@@ -336,17 +336,6 @@ function resolveChartLayout(cardEl, desiredWidth, desiredHeight, options = {}) {
   displayWidth = Math.min(viewportWidth, Math.max(CHART_MIN_WIDTH, displayWidth));
   displayHeight = Math.min(viewportHeight, Math.max(CHART_MIN_HEIGHT, displayHeight));
 
-  if (scale >= 1) {
-    if (displayWidth > baseWidth) {
-      baseWidth = displayWidth;
-    }
-    if (displayHeight > baseHeight) {
-      baseHeight = displayHeight;
-    }
-  }
-
-  const shouldScaleDown = scale < 1;
-  const appliedScale = shouldScaleDown ? scale : 1;
   const offsetX = Math.max(0, Math.round((viewportWidth - displayWidth) / 2));
   const offsetY = Math.max(0, Math.round((viewportHeight - displayHeight) / 2));
 
@@ -364,8 +353,7 @@ function resolveChartLayout(cardEl, desiredWidth, desiredHeight, options = {}) {
     baseHeight: Math.max(CHART_MIN_HEIGHT, safeBaseHeight),
     displayWidth: Math.max(CHART_MIN_WIDTH, safeDisplayWidth),
     displayHeight: Math.max(CHART_MIN_HEIGHT, safeDisplayHeight),
-    scale: appliedScale,
-    shouldScaleDown,
+    scale,
     hostWidth: Math.max(minHostWidth, safeHostWidth),
     hostHeight: Math.max(minHostHeight, safeHostHeight),
     minHostWidth,
@@ -402,7 +390,6 @@ function updateChartSizingForCard(
     displayWidth: displayWidthPx,
     displayHeight: displayHeightPx,
     scale,
-    shouldScaleDown,
     hostWidth,
     hostHeight,
     minHostWidth,
@@ -458,11 +445,11 @@ function updateChartSizingForCard(
   }
 
   if (iframe instanceof HTMLElement) {
-    const iframeWidth = shouldScaleDown ? baseWidth : displayWidthPx;
-    const iframeHeight = shouldScaleDown ? baseHeight : displayHeightPx;
+    const iframeWidth = Number.isFinite(baseWidth) ? baseWidth : displayWidthPx;
+    const iframeHeight = Number.isFinite(baseHeight) ? baseHeight : displayHeightPx;
     iframe.style.width = `${iframeWidth}px`;
     iframe.style.height = `${iframeHeight}px`;
-    iframe.style.transform = shouldScaleDown ? `scale(${scale})` : 'none';
+    iframe.style.transform = `scale(${scale})`;
     iframe.style.transformOrigin = 'top left';
     iframe.style.left = `${offsetX}px`;
     iframe.style.top = `${offsetY}px`;
