@@ -9,6 +9,133 @@ function escapeHtml(str = '') {
     .replace(/'/g, '&#39;');
 }
 
+function toArray(value, fallback = []) {
+  if (Array.isArray(value) && value.length) return value;
+  return fallback;
+}
+
+function parseShortcutEntry(entry) {
+  if (typeof entry !== 'string') return null;
+  const [keysPart, descPart] = entry.split(':');
+  if (!keysPart || !descPart) return null;
+  const keys = keysPart
+    .split('+')
+    .map((k) => k.trim())
+    .filter(Boolean);
+  if (!keys.length) return null;
+  const description = descPart.trim();
+  if (!description) return null;
+  return { keys, description };
+}
+
+export function helpDialog(T) {
+  return new Promise((resolve) => {
+    const prevFocus = document.activeElement;
+    const dlg = document.createElement('dialog');
+    dlg.classList.add('help-dialog');
+
+    const title = T.helpTitle || 'Spartus naudojimo gidas';
+    const intro = T.helpIntro ||
+      'Kelios gairės, kaip greitai pradėti dirbti su skydeliu.';
+    const quickItems = toArray(T.helpQuickItems, [
+      'Paspauskite „Redaguoti“, kad keistumėte pavadinimą, ikoną ir įjungtumėte kortelių tvarkymą.',
+      'Sukurkite grupes (pvz., „Pamaina“, „Formos“) ir įrašus su nuorodomis ar įterpimais.',
+      'Korteles galite tempti ir keisti jų dydį – laikykite Shift, kad pažymėtumėte kelias.',
+      'Įjunkite priminimų kortelę ir naudokite laikmačius dažniausioms užduotims.',
+    ]);
+    const shortcutEntries = toArray(T.helpShortcuts, [
+      '/: Fokusuoja paiešką',
+      'Ctrl + K: Įjungia pridėjimo meniu',
+      '?: Atidaro pagalbos langą',
+    ]);
+    const shortcuts = shortcutEntries
+      .map((entry) => parseShortcutEntry(entry))
+      .filter(Boolean);
+    const tips = toArray(T.helpTips, [
+      'Eksportuokite JSON failą prieš dalindamiesi skydeliu – turėsite atsarginę kopiją.',
+      'Tema keičiama viršuje esančiu mėnulio/saulės mygtuku.',
+      'Mygtukas „🖼 Paveikslėlis“ leidžia įkelti logotipą, „✕ Pašalinti“ – išvalyti ikoną.',
+    ]);
+    const quickHtml = quickItems
+      .map((item) => `<li>${escapeHtml(item)}</li>`)
+      .join('');
+    const shortcutsHtml = shortcuts
+      .map((entry) => {
+        const keysHtml = entry.keys
+          .map((key) => `<kbd>${escapeHtml(key)}</kbd>`)
+          .join('<span class="help-dialog__shortcut-plus">+</span>');
+        return `<li class="help-dialog__shortcut"><span class="help-dialog__shortcut-keys">${keysHtml}</span><span class="help-dialog__shortcut-desc">${escapeHtml(entry.description)}</span></li>`;
+      })
+      .join('');
+    const tipsHtml = tips
+      .map((item) => `<li>${escapeHtml(item)}</li>`)
+      .join('');
+
+    const quickSection = quickItems.length
+      ? `<section class="help-dialog__section"><h3 class="help-dialog__section-title">${escapeHtml(
+          T.helpQuickTitle || 'Dažniausi veiksmai',
+        )}</h3><ol class="help-dialog__list help-dialog__list--numbered">${quickHtml}</ol></section>`
+      : '';
+    const shortcutSection = shortcuts.length
+      ? `<section class="help-dialog__section"><h3 class="help-dialog__section-title">${escapeHtml(
+          T.helpShortcutsTitle || 'Klaviatūros trumpiniai',
+        )}</h3><ul class="help-dialog__shortcuts">${shortcutsHtml}</ul></section>`
+      : '';
+    const tipsSection = tips.length
+      ? `<section class="help-dialog__section"><h3 class="help-dialog__section-title">${escapeHtml(
+          T.helpTipsTitle || 'Papildomi patarimai',
+        )}</h3><ul class="help-dialog__list help-dialog__list--bullets">${tipsHtml}</ul></section>`
+      : '';
+
+    const closeLabel = T.helpClose || T.cancel || 'Uždaryti';
+    const iconHtml = I.help || '';
+
+    dlg.innerHTML = `<form method="dialog" class="help-dialog__form" id="helpDialogForm"><div class="help-dialog__header"><h2 class="help-dialog__title" id="helpDialogLabel"><span class="help-dialog__title-icon" aria-hidden="true">${iconHtml}</span>${escapeHtml(
+      title,
+    )}</h2><p class="help-dialog__intro">${escapeHtml(intro)}</p></div><div class="help-dialog__sections">${
+      quickSection + shortcutSection + tipsSection
+    }</div><menu><button type="submit" class="btn-outline" data-act="close">${escapeHtml(
+      closeLabel,
+    )}</button></menu></form>`;
+
+    dlg.setAttribute('aria-modal', 'true');
+    dlg.setAttribute('aria-labelledby', 'helpDialogLabel');
+    document.body.appendChild(dlg);
+    const form = dlg.querySelector('form');
+    const closeBtn = form.querySelector('[data-act="close"]');
+
+    function cleanup() {
+      form.removeEventListener('submit', submit);
+      closeBtn?.removeEventListener('click', close);
+      dlg.removeEventListener('cancel', close);
+      dlg.remove();
+      prevFocus?.focus();
+      resolve();
+    }
+
+    function close() {
+      dlg.close();
+      cleanup();
+    }
+
+    function submit(e) {
+      e.preventDefault();
+      close();
+    }
+
+    form.addEventListener('submit', submit);
+    closeBtn?.addEventListener('click', (event) => {
+      event.preventDefault();
+      close();
+    });
+    dlg.addEventListener('cancel', close);
+    dlg.showModal();
+    if (closeBtn instanceof HTMLElement) {
+      closeBtn.focus();
+    }
+  });
+}
+
 function formatDateTime(ts) {
   try {
     return new Date(ts).toLocaleString('lt-LT').replace(',', '');
@@ -64,8 +191,9 @@ export function remindersDialog(T, entries = [], onAction = () => {}) {
       if (!action) return;
       const li = btn.closest('li');
       const key = li?.dataset.key;
-      if (!key) return;
-      const result = await onAction(action, key);
+      if (!key && action !== 'quick') return;
+      const meta = { ...btn.dataset };
+      const result = await onAction(action, key, meta);
       const shouldRemove =
         result?.removed || (action === 'remove' && result !== false);
       if (shouldRemove) {
@@ -95,18 +223,121 @@ export function remindersDialog(T, entries = [], onAction = () => {}) {
 
 export function groupFormDialog(T, data = {}) {
   return new Promise((resolve) => {
+    const HEX_COLOR_RE = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
+    const DEFAULT_GROUP_COLOR = '#10b981';
+
+    function expandHex(hex) {
+      if (!HEX_COLOR_RE.test(hex)) return null;
+      const lower = hex.toLowerCase();
+      if (lower.length === 4) {
+        return (
+          '#' +
+          lower
+            .slice(1)
+            .split('')
+            .map((ch) => ch + ch)
+            .join('')
+        );
+      }
+      return lower;
+    }
+
+    function hexToRgb(hex) {
+      const normalized = expandHex(hex);
+      if (!normalized) return null;
+      return {
+        r: Number.parseInt(normalized.slice(1, 3), 16),
+        g: Number.parseInt(normalized.slice(3, 5), 16),
+        b: Number.parseInt(normalized.slice(5, 7), 16),
+      };
+    }
+
+    function toHexChannel(n) {
+      return Math.max(0, Math.min(255, Math.round(n)))
+        .toString(16)
+        .padStart(2, '0');
+    }
+
+    function mixHex(base, target, ratio) {
+      const src = hexToRgb(base);
+      const dst = hexToRgb(target);
+      if (!src || !dst) return base;
+      const clampRatio = Math.max(0, Math.min(1, Number(ratio)));
+      const r = src.r + (dst.r - src.r) * clampRatio;
+      const g = src.g + (dst.g - src.g) * clampRatio;
+      const b = src.b + (dst.b - src.b) * clampRatio;
+      return `#${toHexChannel(r)}${toHexChannel(g)}${toHexChannel(b)}`;
+    }
+
+    function normalizeHex(hex, fallback = DEFAULT_GROUP_COLOR) {
+      const expanded = expandHex(hex);
+      if (expanded) return expanded;
+      if (HEX_COLOR_RE.test(hex)) return hex.toLowerCase();
+      return fallback;
+    }
+
+    function makeAutoGradient(hex) {
+      const normalized = expandHex(hex);
+      if (!normalized) {
+        return `linear-gradient(135deg, ${hex}, ${hex})`;
+      }
+      const bright = mixHex(normalized, '#ffffff', 0.38);
+      const mid = mixHex(normalized, '#ffffff', 0.12);
+      const deep = mixHex(normalized, '#000000', 0.18);
+      return `linear-gradient(135deg, ${bright}, ${mid}, ${deep})`;
+    }
+
+    const paletteColors = [
+      { value: DEFAULT_GROUP_COLOR, label: 'Ryški žalia' },
+      { value: '#0ea5e9', label: 'Ryški žydra' },
+      { value: '#6366f1', label: 'Gilus mėlynas' },
+      { value: '#a855f7', label: 'Sodri violetinė' },
+      { value: '#ec4899', label: 'Ryški avietinė' },
+      { value: '#f97316', label: 'Ryški oranžinė' },
+      { value: '#ef4444', label: 'Sodri raudona' },
+      { value: '#facc15', label: 'Ryški gelsva' },
+    ];
     const prevFocus = document.activeElement;
     const dlg = document.createElement('dialog');
-    dlg.innerHTML = `<form method="dialog" id="groupForm">
-      <label id="groupFormLabel">${T.groupName}<br><input name="name" required></label>
-      <label>${T.groupColor}<br><input name="color" type="color" value="#6ee7b7"></label>
-      <label>${T.groupSize}<br>
-        <select name="size">
-          <option value="sm">${T.sizeSm}</option>
-          <option value="md">${T.sizeMd}</option>
-          <option value="lg">${T.sizeLg}</option>
-        </select>
+    const paletteButtons = paletteColors
+      .map((c) => {
+        const norm = normalizeHex(c.value);
+        const gradient = makeAutoGradient(norm);
+        return `<button type="button" data-color="${norm}" style="--swatch:${norm};--swatch-gradient:${gradient}" aria-label="${escapeHtml(
+          c.label,
+        )}" aria-pressed="false"></button>`;
+      })
+      .join('');
+    dlg.innerHTML = `<form method="dialog" id="groupForm" class="group-form">
+      <header class="group-form__header">
+        <h2 id="groupFormLabel">${escapeHtml(
+          T.groupDialogTitle || 'Nauja kortelė',
+        )}</h2>
+      </header>
+      <label class="group-form__field">
+        <span class="group-form__label">${escapeHtml(T.groupName)}</span>
+        <input name="name" required autocomplete="off">
       </label>
+      <section class="group-form__field" aria-labelledby="groupColorLabel">
+        <div class="group-form__label-row">
+          <span id="groupColorLabel" class="group-form__label">${escapeHtml(
+            T.groupColor,
+          )}</span>
+        </div>
+        <div class="group-form__color">
+          <div class="group-form__palette" role="listbox" aria-labelledby="groupColorLabel">
+            ${paletteButtons}
+          </div>
+          <label class="group-form__custom-color">
+            <input name="color" type="color" value="${DEFAULT_GROUP_COLOR}" aria-label="${escapeHtml(
+              T.groupColorCustom || 'Pasirinktinė spalva',
+            )}">
+            <span class="group-form__custom-label">${escapeHtml(
+              T.groupColorCustom || 'Pasirinktinė spalva',
+            )}</span>
+          </label>
+        </div>
+      </section>
       <p class="error" id="groupErr" role="status" aria-live="polite"></p>
       <menu>
         <button type="button" data-act="cancel">${T.cancel}</button>
@@ -119,13 +350,73 @@ export function groupFormDialog(T, data = {}) {
     const form = dlg.querySelector('form');
     const err = dlg.querySelector('#groupErr');
     const cancel = form.querySelector('[data-act="cancel"]');
+    const defaultColor = normalizeHex(data.color || DEFAULT_GROUP_COLOR);
     form.name.value = data.name || '';
-    form.color.value = data.color || '#6ee7b7';
-    form.size.value = data.size || 'md';
+    form.color.value = defaultColor;
+    const palette = Array.from(
+      dlg.querySelectorAll('.group-form__palette button[data-color]'),
+    );
+    function updatePaletteSelection(value) {
+      palette.forEach((btn) => {
+        const selected = btn.dataset.color?.toLowerCase() === value.toLowerCase();
+        btn.setAttribute('aria-pressed', selected ? 'true' : 'false');
+      });
+    }
+
+    function applyColor(value) {
+      if (!value) return;
+      const normalized = normalizeHex(value);
+      form.color.value = normalized;
+      form.color.style.setProperty('--custom-swatch', normalized);
+      updatePaletteSelection(normalized);
+    }
+
+    const paletteContainer = dlg.querySelector('.group-form__palette');
+
+    function handlePaletteClick(e) {
+      const btn = e.target.closest('button[data-color]');
+      if (!btn) return;
+      e.preventDefault();
+      applyColor(btn.dataset.color);
+      btn.focus();
+    }
+
+    function handlePaletteKeydown(e) {
+      if (!['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) {
+        return;
+      }
+      const current = document.activeElement;
+      const index = palette.indexOf(current);
+      if (index === -1) return;
+      e.preventDefault();
+      let nextIndex = index;
+      if (e.key === 'Home') nextIndex = 0;
+      else if (e.key === 'End') nextIndex = palette.length - 1;
+      else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') nextIndex = Math.min(palette.length - 1, index + 1);
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') nextIndex = Math.max(0, index - 1);
+      const next = palette[nextIndex];
+      next?.focus();
+      if (next?.dataset.color) {
+        applyColor(next.dataset.color);
+      }
+    }
+
+    function handleColorInput(e) {
+      applyColor(e.target.value);
+    }
+
+    paletteContainer?.addEventListener('click', handlePaletteClick);
+    paletteContainer?.addEventListener('keydown', handlePaletteKeydown);
+    form.color.addEventListener('input', handleColorInput);
+
+    applyColor(defaultColor);
 
     function cleanup() {
       form.removeEventListener('submit', submit);
       cancel.removeEventListener('click', close);
+      paletteContainer?.removeEventListener('click', handlePaletteClick);
+      paletteContainer?.removeEventListener('keydown', handlePaletteKeydown);
+      form.color.removeEventListener('input', handleColorInput);
       dlg.remove();
       prevFocus?.focus();
     }
@@ -137,7 +428,8 @@ export function groupFormDialog(T, data = {}) {
         err.textContent = T.required;
         return;
       }
-      resolve({ name, color: form.color.value, size: form.size.value });
+      const normalized = normalizeHex(form.color.value || DEFAULT_GROUP_COLOR);
+      resolve({ name, color: normalized });
       cleanup();
     }
 
@@ -183,36 +475,87 @@ export function itemFormDialog(T, data = {}) {
       'shield',
       'alert',
     ];
+    const iconLabels = {
+      none: 'Be piktogramos',
+      globe: 'Interneto nuoroda',
+      table: 'Lentelė',
+      chart: 'Diagrama',
+      puzzle: 'Integracija',
+      book: 'Gairės',
+      file: 'Dokumentas',
+      folder: 'Aplankas',
+      mail: 'El. paštas',
+      phone: 'Telefonas',
+      star: 'Svarbu',
+      home: 'Pagrindinis',
+      link: 'Nuoroda',
+      camera: 'Kamera',
+      calendar: 'Kalendorius',
+      clock: 'Laikmatis',
+      user: 'Kontaktas',
+      clipboard: 'Ataskaita',
+      chat: 'Pokalbis',
+      video: 'Vaizdo įrašas',
+      map: 'Žemėlapis',
+      shield: 'Sauga',
+      alert: 'Įspėjimas',
+      ...(T.iconLabels || {}),
+    };
     const iconButtons = iconKeys
-      .map(
-        (k) =>
-          `<button type="button" data-val="${k}" title="${k}">${I[k]}</button>`,
-      )
+      .map((k) => {
+        const label = escapeHtml(iconLabels[k] || k);
+        return `<button type="button" role="option" data-val="${k}" title="${label}" aria-label="${label}" aria-selected="false">${I[k]}</button>`;
+      })
       .join('');
     const prevFocus = document.activeElement;
     const dlg = document.createElement('dialog');
+    dlg.classList.add('item-form-dialog');
+    const isEditing = Boolean(data && Object.keys(data).length);
+    const formTitle = escapeHtml(
+      isEditing
+        ? T.itemFormTitleEdit || T.editItem || T.edit || 'Redaguoti įrašą'
+        : T.itemFormTitleCreate || T.addItem || 'Pridėti įrašą',
+    );
+    const formSubtitle = escapeHtml(
+      T.itemFormSubtitle || 'Įveskite nuorodos duomenis.',
+    );
+    const resolvedType = data.type || 'link';
     dlg.innerHTML = `<form method="dialog" id="itemForm">
-      <label id="itemFormLabel">${T.itemType}<br>
-        <select name="type">
-          <option value="link">link</option>
-          <option value="sheet">sheet</option>
-          <option value="chart">chart</option>
-          <option value="embed">embed</option>
-        </select>
-      </label>
-      <label>${T.itemTitle}<br><input name="title" required></label>
-      <label>${T.itemUrl}<br><input name="url" type="url" required></label>
-      <label>${T.itemIcon}<br>
-        <div class="icon-picker">
-          <button type="button" data-val="">–</button>${iconButtons}
-          <input type="hidden" name="icon">
-        </div>
-      </label>
-      <label>${T.itemNote}<br><textarea name="note" rows="2"></textarea></label>
+      <header class="item-form__header">
+        <h2 class="item-form__title" id="itemFormLabel">${formTitle}</h2>
+        <p class="item-form__subtitle">${formSubtitle}</p>
+      </header>
+      <div class="item-form__grid">
+        <label class="item-form__field item-form__field--full">
+          <span class="item-form__label">${escapeHtml(T.itemTitle)}</span>
+          <input name="title" required>
+        </label>
+        <label class="item-form__field item-form__field--full">
+          <span class="item-form__label">${escapeHtml(T.itemUrl)}</span>
+          <input name="url" type="url" required>
+        </label>
+        <label class="item-form__field item-form__field--full">
+          <span class="item-form__label">${escapeHtml(T.itemIcon)}</span>
+          <div class="icon-picker" role="listbox">
+            <button type="button" role="option" data-val="" title="${escapeHtml(
+              (T.iconLabels && T.iconLabels.none) || iconLabels.none,
+            )}" aria-label="${escapeHtml(
+              (T.iconLabels && T.iconLabels.none) || iconLabels.none,
+            )}" aria-selected="false">–</button>${iconButtons}
+            <input type="hidden" name="icon">
+          </div>
+        </label>
+        <label class="item-form__field item-form__field--full">
+          <span class="item-form__label">${escapeHtml(T.itemNote)}</span>
+          <textarea name="note" rows="2"></textarea>
+        </label>
+      </div>
       <p class="error" id="itemErr" role="status" aria-live="polite"></p>
-      <menu>
-        <button type="button" data-act="cancel">${T.cancel}</button>
-        <button type="submit" class="btn-accent">${T.save}</button>
+      <menu class="item-form__actions">
+        <button type="button" class="btn-outline" data-act="cancel">${escapeHtml(
+          T.cancel,
+        )}</button>
+        <button type="submit" class="btn-accent">${escapeHtml(T.save)}</button>
       </menu>
     </form>`;
     dlg.setAttribute('aria-modal', 'true');
@@ -223,7 +566,6 @@ export function itemFormDialog(T, data = {}) {
     const cancel = form.querySelector('[data-act="cancel"]');
     const picker = form.querySelector('.icon-picker');
     const iconInput = form.icon;
-    form.type.value = data.type || 'link';
     form.title.value = data.title || '';
     form.url.value = data.url || '';
     iconInput.value = data.icon || '';
@@ -232,7 +574,16 @@ export function itemFormDialog(T, data = {}) {
     const initBtn = picker.querySelector(
       `button[data-val="${iconInput.value}"]`,
     );
-    if (initBtn) initBtn.classList.add('selected');
+    if (initBtn) {
+      initBtn.classList.add('selected');
+      initBtn.setAttribute('aria-selected', 'true');
+    }
+
+    picker
+      .querySelectorAll('button')
+      .forEach((btn) =>
+        btn.setAttribute('aria-selected', btn.classList.contains('selected') ? 'true' : 'false'),
+      );
 
     picker.addEventListener('click', (e) => {
       const btn = e.target.closest('button');
@@ -240,7 +591,11 @@ export function itemFormDialog(T, data = {}) {
       iconInput.value = btn.dataset.val;
       picker
         .querySelectorAll('button')
-        .forEach((b) => b.classList.toggle('selected', b === btn));
+        .forEach((b) => {
+          const isSelected = b === btn;
+          b.classList.toggle('selected', isSelected);
+          b.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+        });
     });
 
     function cleanup() {
@@ -253,6 +608,7 @@ export function itemFormDialog(T, data = {}) {
     function submit(e) {
       e.preventDefault();
       const formData = Object.fromEntries(new FormData(form));
+      formData.type = resolvedType;
       formData.title = formData.title.trim();
       formData.url = formData.url.trim();
       formData.icon = formData.icon.trim();
@@ -295,9 +651,28 @@ export function chartFormDialog(T, data = {}) {
   return new Promise((resolve) => {
     const prevFocus = document.activeElement;
     const dlg = document.createElement('dialog');
-    dlg.innerHTML = `<form method="dialog" id="chartForm">
-      <label id="chartFormLabel">${T.itemTitle}<br><input name="title" required></label>
-      <label>${T.itemUrl}<br><input name="url" required></label>
+    dlg.classList.add('chart-form-dialog');
+    dlg.innerHTML = `<form method="dialog" id="chartForm" class="chart-form group-form">
+      <header class="group-form__header">
+        <h2 id="chartFormHeading">${escapeHtml(
+          T.chartDialogTitle || T.addChart || 'Naujas grafikas',
+        )}</h2>
+        <p class="group-form__description">${escapeHtml(
+          T.chartFormDescription ||
+            'Įrašykite grafiko pavadinimą ir nuorodą. Mastelį galėsite keisti redagavimo režime, tempiant kortelės kampus.',
+        )}</p>
+      </header>
+      <label class="group-form__field">
+        <span class="group-form__label">${escapeHtml(T.chartFormName || T.itemTitle)}</span>
+        <input name="title" autocomplete="off" required>
+      </label>
+      <label class="group-form__field">
+        <span class="group-form__label">${escapeHtml(T.chartFormUrl || T.itemUrl)}</span>
+        <input name="url" type="url" inputmode="url" required placeholder="https://">
+        <span class="group-form__hint">${escapeHtml(
+          T.chartFormUrlHint || 'Tinka tik https:// arba http:// adresai.',
+        )}</span>
+      </label>
       <p class="error" id="chartErr" role="status" aria-live="polite"></p>
       <menu>
         <button type="button" data-act="cancel">${T.cancel}</button>
@@ -305,44 +680,62 @@ export function chartFormDialog(T, data = {}) {
       </menu>
     </form>`;
     dlg.setAttribute('aria-modal', 'true');
-    dlg.setAttribute('aria-labelledby', 'chartFormLabel');
+    dlg.setAttribute('aria-labelledby', 'chartFormHeading');
     document.body.appendChild(dlg);
+
     const form = dlg.querySelector('form');
-    const err = dlg.querySelector('#chartErr');
     const cancel = form.querySelector('[data-act="cancel"]');
+    const err = form.querySelector('#chartErr');
+
     form.title.value = data.title || '';
     form.url.value = data.url || '';
 
-    function cleanup() {
-      form.removeEventListener('submit', submit);
-      cancel.removeEventListener('click', close);
+    function cleanup(result) {
+      cancel.removeEventListener('click', handleCancel);
+      form.removeEventListener('submit', handleSubmit);
+      dlg.removeEventListener('cancel', handleCancel);
+      dlg.close();
       dlg.remove();
       prevFocus?.focus();
+      resolve(result);
     }
 
-    function submit(e) {
-      e.preventDefault();
+    function handleCancel(event) {
+      event?.preventDefault?.();
+      cleanup(null);
+    }
+
+    function handleSubmit(event) {
+      event.preventDefault();
       const title = form.title.value.trim();
-      const url = form.url.value.trim();
-      if (!title || !url) {
+      const urlRaw = form.url.value.trim();
+      if (!title || !urlRaw) {
         err.textContent = T.required;
         return;
       }
-      resolve({ title, url });
-      cleanup();
+      try {
+        const u = new URL(urlRaw);
+        if (!/^https?:$/.test(u.protocol)) {
+          err.textContent = T.invalidUrl;
+          return;
+        }
+      } catch {
+        err.textContent = T.invalidUrl;
+        return;
+      }
+      cleanup({
+        title,
+        url: urlRaw,
+      });
     }
 
-    function close() {
-      resolve(null);
-      cleanup();
-    }
-
-    form.addEventListener('submit', submit);
-    cancel.addEventListener('click', close);
-    dlg.addEventListener('cancel', close);
+    cancel.addEventListener('click', handleCancel);
+    form.addEventListener('submit', handleSubmit);
+    dlg.addEventListener('cancel', handleCancel);
     dlg.showModal();
+
     const first = dlg.querySelector(
-      'input, select, textarea, button, [href], [tabindex]:not([tabindex="-1"])',
+      'input, textarea, button, [href], [tabindex]:not([tabindex="-1"])',
     );
     first?.focus();
   });
@@ -355,53 +748,340 @@ export function notesDialog(
     text: '',
     size: 20,
     padding: 20,
-    color: '#fef08a',
+    color: '#facc15',
   },
 ) {
   return new Promise((resolve) => {
+    const HEX_COLOR_RE = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
+    const DEFAULT_NOTE_COLOR = '#facc15';
+
+    function expandHex(hex) {
+      if (!HEX_COLOR_RE.test(hex)) return null;
+      const lower = hex.toLowerCase();
+      if (lower.length === 4) {
+        return (
+          '#' +
+          lower
+            .slice(1)
+            .split('')
+            .map((ch) => ch + ch)
+            .join('')
+        );
+      }
+      return lower;
+    }
+
+    function hexToRgb(hex) {
+      const normalized = expandHex(hex);
+      if (!normalized) return null;
+      return {
+        r: Number.parseInt(normalized.slice(1, 3), 16),
+        g: Number.parseInt(normalized.slice(3, 5), 16),
+        b: Number.parseInt(normalized.slice(5, 7), 16),
+      };
+    }
+
+    function mixHex(base, target, ratio) {
+      const src = hexToRgb(base);
+      const dst = hexToRgb(target);
+      if (!src || !dst) return base;
+      const clampRatio = Math.max(0, Math.min(1, Number(ratio)));
+      const r = src.r + (dst.r - src.r) * clampRatio;
+      const g = src.g + (dst.g - src.g) * clampRatio;
+      const b = src.b + (dst.b - src.b) * clampRatio;
+      const toHex = (n) =>
+        Math.max(0, Math.min(255, Math.round(n)))
+          .toString(16)
+          .padStart(2, '0');
+      return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+    }
+
+    function normalizeHex(hex, fallback = DEFAULT_NOTE_COLOR) {
+      if (typeof hex !== 'string') return fallback;
+      const trimmed = hex.trim();
+      if (HEX_COLOR_RE.test(trimmed)) {
+        return expandHex(trimmed) || fallback;
+      }
+      return fallback;
+    }
+
+    function makeAutoGradient(hex) {
+      const normalized = expandHex(hex);
+      if (!normalized) {
+        return `linear-gradient(135deg, ${hex}, ${hex})`;
+      }
+      const bright = mixHex(normalized, '#ffffff', 0.35);
+      const deep = mixHex(normalized, '#000000', 0.15);
+      return `linear-gradient(135deg, ${bright}, ${normalized}, ${deep})`;
+    }
+
+    const paletteColors = [
+      { value: '#10b981', label: 'Ryški žalia' },
+      { value: '#0ea5e9', label: 'Ryški žydra' },
+      { value: '#6366f1', label: 'Gilus mėlynas' },
+      { value: '#a855f7', label: 'Sodri violetinė' },
+      { value: '#ec4899', label: 'Ryški avietinė' },
+      { value: '#f97316', label: 'Ryški oranžinė' },
+      { value: '#ef4444', label: 'Sodri raudona' },
+      { value: DEFAULT_NOTE_COLOR, label: 'Ryški gelsva' },
+    ];
+
+    const SIZE_MIN = 12;
+    const SIZE_MAX = 44;
+    const PADDING_MIN = 4;
+    const PADDING_MAX = 64;
+
     const prevFocus = document.activeElement;
     const dlg = document.createElement('dialog');
-    dlg.innerHTML = `<form method="dialog" id="notesForm">
-      <label id="notesFormLabel">${T.noteTitle}<br><input name="title" type="text"></label>
-      <label>${T.notes}<br><textarea name="note" rows="8"></textarea></label>
-      <label>${T.noteSize}<br><input name="size" type="number" min="10" max="48"></label>
-      <label>${T.notePadding}<br><input name="padding" type="number" min="0" max="100"></label>
-      <label>${T.noteColor}<br><input name="color" type="color"></label>
+    const paletteButtons = paletteColors
+      .map((c) => {
+        const norm = normalizeHex(c.value);
+        const gradient = makeAutoGradient(norm);
+        return `<button type="button" data-color="${norm}" style="--swatch:${norm};--swatch-gradient:${gradient}" aria-label="${escapeHtml(
+          c.label,
+        )}" aria-pressed="false"></button>`;
+      })
+      .join('');
+
+    const subtitle = escapeHtml(
+      T.noteDialogSubtitle || 'Aprašykite svarbiausius veiksmus ar priminimus vienoje vietoje.',
+    );
+
+    dlg.innerHTML = `<form method="dialog" id="notesForm" class="group-form note-form">
+      <header class="group-form__header note-form__header">
+        <h2 id="notesFormLabel">${escapeHtml(
+          T.noteDialogTitle || T.addNote || 'Nauja pastabų kortelė',
+        )}</h2>
+        <p class="group-form__description">${subtitle}</p>
+      </header>
+      <section class="group-form__field">
+        <label class="group-form__label" for="noteTitleInput">${escapeHtml(
+          T.noteTitle || 'Pastabų pavadinimas',
+        )}</label>
+        <input id="noteTitleInput" name="title" type="text" autocomplete="off" placeholder="${escapeHtml(
+          T.noteTitleHint || '',
+        )}">
+      </section>
+      <section class="group-form__field note-form__field">
+        <div class="group-form__label-row">
+          <label class="group-form__label" for="noteBodyInput">${escapeHtml(
+            T.notes || 'Pastabos',
+          )}</label>
+          <span class="group-form__hint" data-note-char-count>0</span>
+        </div>
+        <textarea id="noteBodyInput" name="note" rows="8" placeholder="${escapeHtml(
+          T.noteContentPlaceholder || '',
+        )}"></textarea>
+      </section>
+      <section class="group-form__field">
+        <span class="group-form__label">${escapeHtml(
+          T.noteAppearanceTitle || 'Išvaizda',
+        )}</span>
+        <div class="note-form__options">
+          <label class="note-form__option" for="noteSizeInput">
+            <span>${escapeHtml(T.noteFontLabel || 'Šrifto dydis')}</span>
+            <div class="note-form__slider">
+              <input
+                id="noteSizeInput"
+                name="size"
+                type="range"
+                min="12"
+                max="44"
+                step="1"
+                aria-describedby="noteSizeValue"
+              >
+              <output id="noteSizeValue" data-note-size-output aria-live="polite"></output>
+            </div>
+          </label>
+          <label class="note-form__option" for="notePaddingInput">
+            <span>${escapeHtml(T.notePaddingLabel || 'Kortelės paraštės')}</span>
+            <div class="note-form__slider">
+              <input
+                id="notePaddingInput"
+                name="padding"
+                type="range"
+                min="4"
+                max="64"
+                step="1"
+                aria-describedby="notePaddingValue"
+              >
+              <output id="notePaddingValue" data-note-padding-output aria-live="polite"></output>
+            </div>
+          </label>
+        </div>
+      </section>
+      <section class="group-form__field" aria-labelledby="noteColorLabel">
+        <div class="group-form__label-row">
+          <span id="noteColorLabel" class="group-form__label">${escapeHtml(
+            T.noteColor || 'Kortelės spalva',
+          )}</span>
+        </div>
+        <div class="group-form__color note-form__colors">
+          <div class="group-form__palette" role="listbox" aria-labelledby="noteColorLabel">
+            ${paletteButtons}
+          </div>
+          <label class="group-form__custom-color note-form__custom-color">
+            <input name="color" type="color" aria-label="${escapeHtml(
+              T.groupColorCustom || 'Pasirinktinė spalva',
+            )}">
+            <span class="group-form__custom-label">${escapeHtml(
+              T.groupColorCustom || 'Pasirinktinė spalva',
+            )}</span>
+          </label>
+        </div>
+      </section>
       <menu>
         <button type="button" data-act="cancel">${T.cancel}</button>
         <button type="submit" class="btn-accent">${T.save}</button>
       </menu>
     </form>`;
+
     dlg.setAttribute('aria-modal', 'true');
     dlg.setAttribute('aria-labelledby', 'notesFormLabel');
     document.body.appendChild(dlg);
+
     const form = dlg.querySelector('form');
     const cancel = form.querySelector('[data-act="cancel"]');
-    form.title.value = data.title || '';
-    form.note.value = data.text || '';
-    const initSize = Number.parseInt(data.size, 10);
-    const initPadding = Number.parseInt(data.padding, 10);
-    form.size.value = Number.isFinite(initSize) ? initSize : 20;
-    form.padding.value = Number.isFinite(initPadding) ? initPadding : 20;
-    form.color.value = data.color || '#fef08a';
+    const noteInput = form.note;
+    const titleInput = form.title;
+    const sizeSlider = form.size;
+    const paddingSlider = form.padding;
+    const colorInput = form.color;
+    const charCountEl = form.querySelector('[data-note-char-count]');
+    const sizeOutput = form.querySelector('[data-note-size-output]');
+    const paddingOutput = form.querySelector('[data-note-padding-output]');
+    const paletteContainer = form.querySelector('.group-form__palette');
+    const paletteButtonsEls = Array.from(
+      form.querySelectorAll('.group-form__palette button[data-color]'),
+    );
+
+    const initialSize = Number.isFinite(Number.parseInt(data.size, 10))
+      ? Number.parseInt(data.size, 10)
+      : 20;
+    const initialPadding = Number.isFinite(Number.parseInt(data.padding, 10))
+      ? Number.parseInt(data.padding, 10)
+      : 20;
+    const initialColor = normalizeHex(data.color || DEFAULT_NOTE_COLOR);
+
+    const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+    const initialSizeValue = clamp(initialSize, SIZE_MIN, SIZE_MAX);
+    const initialPaddingValue = clamp(initialPadding, PADDING_MIN, PADDING_MAX);
+
+    titleInput.value = data.title || '';
+    noteInput.value = data.text || '';
+    sizeSlider.min = SIZE_MIN.toString();
+    sizeSlider.max = SIZE_MAX.toString();
+    paddingSlider.min = PADDING_MIN.toString();
+    paddingSlider.max = PADDING_MAX.toString();
+    sizeSlider.value = initialSizeValue.toString();
+    paddingSlider.value = initialPaddingValue.toString();
+    colorInput.value = initialColor;
+
+    function updateCharCount() {
+      const count = noteInput.value.length;
+      const template = T.noteCharCount || '{count} simbolių';
+      charCountEl.textContent = template.replace('{count}', count.toString());
+    }
+
+    function updateSliderOutput(slider, output, fallback) {
+      if (!output) return;
+      const value = Number.parseInt(slider.value, 10);
+      const min = Number.parseInt(slider.min, 10);
+      const max = Number.parseInt(slider.max, 10);
+      const safeValue = Number.isFinite(value)
+        ? clamp(
+            value,
+            Number.isFinite(min) ? min : value,
+            Number.isFinite(max) ? max : value,
+          )
+        : fallback;
+      output.textContent = `${safeValue} px`;
+    }
+
+    function handleSizeSliderInput() {
+      updateSliderOutput(sizeSlider, sizeOutput, initialSizeValue);
+    }
+
+    function handlePaddingSliderInput() {
+      updateSliderOutput(paddingSlider, paddingOutput, initialPaddingValue);
+    }
+
+    function updatePaletteSelection(value) {
+      paletteButtonsEls.forEach((btn) => {
+        const selected = btn.dataset.color?.toLowerCase() === value.toLowerCase();
+        btn.setAttribute('aria-pressed', selected ? 'true' : 'false');
+      });
+    }
+
+    function applyColor(value) {
+      if (!value) return;
+      const normalized = normalizeHex(value, DEFAULT_NOTE_COLOR);
+      colorInput.value = normalized;
+      colorInput.style.setProperty('--custom-swatch', normalized);
+      updatePaletteSelection(normalized);
+    }
+
+    function handlePaletteClick(e) {
+      const btn = e.target.closest('button[data-color]');
+      if (!btn) return;
+      e.preventDefault();
+      applyColor(btn.dataset.color);
+      btn.focus();
+    }
+
+    function handlePaletteKeydown(e) {
+      if (!['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) {
+        return;
+      }
+      const current = document.activeElement;
+      const index = paletteButtonsEls.indexOf(current);
+      if (index === -1) return;
+      e.preventDefault();
+      let nextIndex = index;
+      if (e.key === 'Home') nextIndex = 0;
+      else if (e.key === 'End') nextIndex = paletteButtonsEls.length - 1;
+      else if (e.key === 'ArrowRight' || e.key === 'ArrowDown')
+        nextIndex = Math.min(paletteButtonsEls.length - 1, index + 1);
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp')
+        nextIndex = Math.max(0, index - 1);
+      const next = paletteButtonsEls[nextIndex];
+      next?.focus();
+      if (next?.dataset.color) {
+        applyColor(next.dataset.color);
+      }
+    }
+
+    function handleColorInput(e) {
+      applyColor(e.target.value);
+    }
 
     function cleanup() {
       form.removeEventListener('submit', submit);
       cancel.removeEventListener('click', close);
+      paletteContainer?.removeEventListener('click', handlePaletteClick);
+      paletteContainer?.removeEventListener('keydown', handlePaletteKeydown);
+      noteInput.removeEventListener('input', updateCharCount);
+      sizeSlider.removeEventListener('input', handleSizeSliderInput);
+      paddingSlider.removeEventListener('input', handlePaddingSliderInput);
+      colorInput.removeEventListener('input', handleColorInput);
       dlg.remove();
       prevFocus?.focus();
     }
 
     function submit(e) {
       e.preventDefault();
-      const sizeVal = Number.parseInt(form.size.value, 10);
-      const paddingVal = Number.parseInt(form.padding.value, 10);
+      const sizeVal = Number.parseInt(sizeSlider.value, 10);
+      const paddingVal = Number.parseInt(paddingSlider.value, 10);
       resolve({
-        title: form.title.value.trim(),
-        text: form.note.value.trim(),
-        size: Number.isFinite(sizeVal) ? sizeVal : 20,
-        padding: Number.isFinite(paddingVal) ? paddingVal : 20,
-        color: form.color.value || '#fef08a',
+        title: titleInput.value.trim(),
+        text: noteInput.value.trim(),
+        size: Number.isFinite(sizeVal)
+          ? clamp(sizeVal, SIZE_MIN, SIZE_MAX)
+          : initialSizeValue,
+        padding: Number.isFinite(paddingVal)
+          ? clamp(paddingVal, PADDING_MIN, PADDING_MAX)
+          : initialPaddingValue,
+        color: colorInput.value || DEFAULT_NOTE_COLOR,
       });
       cleanup();
     }
@@ -411,9 +1091,21 @@ export function notesDialog(
       cleanup();
     }
 
+    paletteContainer?.addEventListener('click', handlePaletteClick);
+    paletteContainer?.addEventListener('keydown', handlePaletteKeydown);
+    colorInput.addEventListener('input', handleColorInput);
+    noteInput.addEventListener('input', updateCharCount);
+    sizeSlider.addEventListener('input', handleSizeSliderInput);
+    paddingSlider.addEventListener('input', handlePaddingSliderInput);
     form.addEventListener('submit', submit);
     cancel.addEventListener('click', close);
     dlg.addEventListener('cancel', close);
+
+    applyColor(initialColor);
+    updateCharCount();
+    updateSliderOutput(sizeSlider, sizeOutput, initialSizeValue);
+    updateSliderOutput(paddingSlider, paddingOutput, initialPaddingValue);
+
     dlg.showModal();
     const first = dlg.querySelector(
       'input, select, textarea, button, [href], [tabindex]:not([tabindex="-1"])',

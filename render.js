@@ -1,5 +1,5 @@
 import { SIZE_MAP, sizeFromWidth, sizeFromHeight } from './sizes.js';
-import { countGroupItems } from './stats.js';
+import { getActiveTheme, resolveChartThemeUrl } from './theme-utils.js';
 
 let currentState;
 let persist;
@@ -15,6 +15,74 @@ const SNAP_THRESHOLD = GRID;
 
 const MIN_SIZE_ADJUSTER = Symbol('minSizeAdjuster');
 const RESIZE_HANDLE_SIZE = 20;
+const RESIZE_HANDLER_KEY = Symbol('resizeHandler');
+
+const CHART_SCALE_DEFAULT = 1;
+const CHART_SCALE_MIN = 0.5;
+const CHART_SCALE_MAX = 2;
+const CHART_SCALE_STEP = 0.05;
+
+function clampChartScale(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return CHART_SCALE_DEFAULT;
+  return Math.min(CHART_SCALE_MAX, Math.max(CHART_SCALE_MIN, num));
+}
+
+function formatChartScale(scale) {
+  return `${Math.round(scale * 100)}%`;
+}
+
+function applyChartScale(frame, iframe, scale) {
+  if (!frame || !iframe) return CHART_SCALE_DEFAULT;
+  const clamped = clampChartScale(scale);
+  frame.dataset.chartScale = clamped.toFixed(2);
+  iframe.style.transform = `scale(${clamped})`;
+  iframe.style.width = `${(100 / clamped).toFixed(4)}%`;
+  iframe.style.height = `${(100 / clamped).toFixed(4)}%`;
+  iframe.style.transformOrigin = 'top left';
+  return clamped;
+}
+
+
+
+let resizeGuideEl = null;
+let measureHostEl = null;
+
+const cardRegistry = new Map();
+const cardDimensions = new WeakMap();
+
+const intrinsicStates = new WeakMap();
+const intrinsicPendingCards = new Set();
+let intrinsicFrameToken = null;
+
+function createGroupStructure(type, id) {
+  const section = document.createElement('section');
+  const classes = ['group'];
+  if (type) classes.push(`group--${type}`);
+  section.className = classes.join(' ');
+  if (id != null) {
+    section.dataset.id = id;
+  }
+  section.dataset.resizing = '0';
+
+  const header = document.createElement('div');
+  header.className = 'group-header';
+
+  const content = document.createElement('div');
+  content.className = 'group-content';
+
+  const footer = document.createElement('div');
+  footer.className = 'group-footer';
+  footer.hidden = true;
+
+  section.append(header, content, footer);
+
+  return { section, header, content, footer };
+}
+
+export function render(state, editing, T, I, handlers, saveFn) {
+  renderGroups(state, editing, T, I, handlers, saveFn);
+}
 
 function prefersReducedMotion() {
   return (
@@ -26,7 +94,7 @@ function prefersReducedMotion() {
 
 function findCardInnerElement(cardEl) {
   if (!cardEl) return null;
-  const preferred = ['group-body', 'items', 'embed'];
+  const preferred = ['group-content', 'group-body', 'items', 'embed'];
   for (const child of cardEl.children) {
     if (!child || !child.classList) continue;
     for (const cls of preferred) {
@@ -38,61 +106,201 @@ function findCardInnerElement(cardEl) {
   return cardEl.firstElementChild || null;
 }
 
+function ensureMeasureHost() {
+  if (measureHostEl && measureHostEl.isConnected) {
+    return measureHostEl;
+  }
+  if (typeof document === 'undefined' || !document?.body) {
+    return null;
+  }
+  const host = document.createElement('div');
+  host.setAttribute('aria-hidden', 'true');
+  host.style.position = 'absolute';
+  host.style.left = '-10000px';
+  host.style.top = '-10000px';
+  host.style.visibility = 'hidden';
+  host.style.pointerEvents = 'none';
+  host.style.width = 'auto';
+  host.style.height = 'auto';
+  host.style.overflow = 'visible';
+  document.body.appendChild(host);
+  measureHostEl = host;
+  return host;
+}
+
+function registerCard(id, el) {
+  if (!id || !el) return;
+  cardRegistry.set(id, el);
+}
+
+function rememberCardDimensions(el, width, height) {
+  if (!el) return;
+  cardDimensions.set(el, {
+    width: Number.isFinite(width) ? Math.round(width) : null,
+    height: Number.isFinite(height) ? Math.round(height) : null,
+  });
+}
+
+function getCardDimensions(el) {
+  if (!el) {
+    return { width: 0, height: 0 };
+  }
+  const cached = cardDimensions.get(el);
+  if (
+    cached &&
+    Number.isFinite(cached.width) &&
+    Number.isFinite(cached.height)
+  ) {
+    return cached;
+  }
+  if (!el.isConnected) {
+    return { width: 0, height: 0 };
+  }
+  const rect = el.getBoundingClientRect();
+  const next = {
+    width: Number.isFinite(rect?.width) ? Math.round(rect.width) : 0,
+    height: Number.isFinite(rect?.height) ? Math.round(rect.height) : 0,
+  };
+  cardDimensions.set(el, next);
+  return next;
+}
+
+function cleanupCardRegistry(activeIds = new Set()) {
+  cardRegistry.forEach((el, id) => {
+    if (!activeIds.has(id) || !el?.isConnected) {
+      cardRegistry.delete(id);
+      if (el) {
+        cardDimensions.delete(el);
+      }
+    }
+  });
+}
+
 function measureIntrinsicContentSize(cardEl, innerEl = findCardInnerElement(cardEl)) {
   if (!cardEl || !innerEl) {
-    return { width: 0, height: 0 };
+    return { width: 0, height: 0, widthExtra: 0, heightExtra: 0 };
+  }
+
+  const host = ensureMeasureHost();
+  if (host) {
+    const clone = cardEl.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.dataset.resizing = '0';
+    clone.style.position = 'relative';
+    clone.style.visibility = 'visible';
+    clone.style.pointerEvents = 'none';
+    clone.style.width = 'auto';
+    clone.style.minWidth = '0';
+    clone.style.maxWidth = 'none';
+    clone.style.height = 'auto';
+    clone.style.minHeight = '0';
+    clone.style.maxHeight = 'none';
+    clone.style.flex = '0 0 auto';
+    clone.style.transform = 'none';
+    clone.style.transition = 'none';
+
+    const cloneInner = findCardInnerElement(clone);
+    if (cloneInner) {
+      cloneInner.style.width = 'auto';
+      cloneInner.style.minWidth = '0';
+      cloneInner.style.maxWidth = 'none';
+      cloneInner.style.height = 'auto';
+      cloneInner.style.minHeight = '0';
+      cloneInner.style.maxHeight = 'none';
+      cloneInner.style.flex = '0 0 auto';
+    }
+
+    host.appendChild(clone);
+    const rect = clone.getBoundingClientRect();
+    const innerRect = cloneInner ? cloneInner.getBoundingClientRect() : null;
+    let width = Number.isFinite(rect.width) ? Math.ceil(rect.width) : 0;
+    let height = Number.isFinite(rect.height) ? Math.ceil(rect.height) : 0;
+    const widthExtra = innerRect
+      ? Math.max(0, Math.ceil(rect.width - innerRect.width))
+      : 0;
+    const heightExtra = innerRect
+      ? Math.max(0, Math.ceil(rect.height - innerRect.height))
+      : 0;
+    host.removeChild(clone);
+    return { width, height, widthExtra, heightExtra };
   }
 
   const prevCard = {
     width: cardEl.style.width,
     minWidth: cardEl.style.minWidth,
+    maxWidth: cardEl.style.maxWidth,
     height: cardEl.style.height,
     minHeight: cardEl.style.minHeight,
+    maxHeight: cardEl.style.maxHeight,
   };
   const prevInner = {
     width: innerEl.style.width,
     minWidth: innerEl.style.minWidth,
+    maxWidth: innerEl.style.maxWidth,
     height: innerEl.style.height,
     minHeight: innerEl.style.minHeight,
+    maxHeight: innerEl.style.maxHeight,
   };
 
-  cardEl.style.width = 'max-content';
+  cardEl.style.width = '';
   cardEl.style.minWidth = '';
+  cardEl.style.maxWidth = 'none';
   cardEl.style.height = 'auto';
   cardEl.style.minHeight = '';
-  innerEl.style.width = 'max-content';
+  cardEl.style.maxHeight = 'none';
+  innerEl.style.width = 'auto';
   innerEl.style.minWidth = '';
-  innerEl.style.height = 'max-content';
+  innerEl.style.maxWidth = 'none';
+  innerEl.style.height = 'auto';
   innerEl.style.minHeight = '';
+  innerEl.style.maxHeight = 'none';
 
-  // Force layout while constraints are lifted to capture natural size.
-  const innerRect = innerEl.getBoundingClientRect();
-  const cardRect = cardEl.getBoundingClientRect();
-  const innerWidth = Math.max(innerRect.width, innerEl.scrollWidth);
-  const innerHeight = Math.max(innerRect.height, innerEl.scrollHeight);
-  const widthExtra = Math.max(0, cardRect.width - innerRect.width);
-  const heightExtra = Math.max(0, cardRect.height - innerRect.height);
+  const parseSize = (value) => {
+    const numeric = Number.parseFloat(value);
+    return Number.isFinite(numeric) ? numeric : 0;
+  };
 
-  let width = Math.max(innerWidth + widthExtra, cardRect.width);
-  let height = Math.max(innerHeight + heightExtra, cardRect.height);
+  let borderX = 0;
+  let borderY = 0;
+  if (typeof window !== 'undefined' && cardEl instanceof HTMLElement) {
+    const computed = window.getComputedStyle(cardEl);
+    borderX = parseSize(computed.borderLeftWidth) + parseSize(computed.borderRightWidth);
+    borderY = parseSize(computed.borderTopWidth) + parseSize(computed.borderBottomWidth);
+  }
 
-  width = Number.isFinite(width) ? Math.ceil(width) : 0;
-  height = Number.isFinite(height) ? Math.ceil(height) : 0;
+  const cardScrollWidth = Math.max(0, cardEl.scrollWidth);
+  const cardScrollHeight = Math.max(0, cardEl.scrollHeight);
+  const innerScrollWidth = Math.max(0, innerEl.scrollWidth);
+  const innerScrollHeight = Math.max(0, innerEl.scrollHeight);
+
+  const widthExtra = Math.max(0, cardScrollWidth - innerScrollWidth) + borderX;
+  const heightExtra = Math.max(0, cardScrollHeight - innerScrollHeight) + borderY;
+
+  const widthCandidate = Math.max(cardScrollWidth + borderX, innerScrollWidth + widthExtra);
+  const heightCandidate = Math.max(cardScrollHeight + borderY, innerScrollHeight + heightExtra);
+
+  let width = Number.isFinite(widthCandidate) ? Math.ceil(widthCandidate) : 0;
+  let height = Number.isFinite(heightCandidate) ? Math.ceil(heightCandidate) : 0;
+
 
   cardEl.style.width = prevCard.width;
   cardEl.style.minWidth = prevCard.minWidth;
+  cardEl.style.maxWidth = prevCard.maxWidth;
   cardEl.style.height = prevCard.height;
   cardEl.style.minHeight = prevCard.minHeight;
+  cardEl.style.maxHeight = prevCard.maxHeight;
   innerEl.style.width = prevInner.width;
   innerEl.style.minWidth = prevInner.minWidth;
+  innerEl.style.maxWidth = prevInner.maxWidth;
   innerEl.style.height = prevInner.height;
   innerEl.style.minHeight = prevInner.minHeight;
+  innerEl.style.maxHeight = prevInner.maxHeight;
 
-  return { width, height };
+  return { width, height, widthExtra, heightExtra };
 }
 
-function applyIntrinsicMinSize(cardEl, innerEl = findCardInnerElement(cardEl)) {
-  const { width, height } = measureIntrinsicContentSize(cardEl, innerEl);
+function applyMinSizeStyles(cardEl, width, height) {
+  if (!cardEl) return;
   const widthPx = width > 0 ? `${width}px` : '';
   const heightPx = height > 0 ? `${height}px` : '';
   if (cardEl.style.minWidth !== widthPx) {
@@ -101,7 +309,167 @@ function applyIntrinsicMinSize(cardEl, innerEl = findCardInnerElement(cardEl)) {
   if (cardEl.style.minHeight !== heightPx) {
     cardEl.style.minHeight = heightPx;
   }
-  return { width, height };
+}
+
+function computeIntrinsicSizeFromState(state) {
+  if (!state || !state.cardEl || !state.innerEl) {
+    return { width: 0, height: 0 };
+  }
+  const measured = measureIntrinsicContentSize(state.cardEl, state.innerEl);
+  if (Number.isFinite(measured.widthExtra)) {
+    state.hostPaddingWidth = Math.max(0, measured.widthExtra);
+  }
+  if (Number.isFinite(measured.heightExtra)) {
+    state.hostPaddingHeight = Math.max(0, measured.heightExtra);
+  }
+  return { width: measured.width, height: measured.height };
+}
+
+function scheduleIntrinsicUpdate(cardEl) {
+  if (!cardEl || !intrinsicStates.has(cardEl)) return;
+  intrinsicPendingCards.add(cardEl);
+  if (intrinsicFrameToken != null) return;
+  if (typeof requestAnimationFrame === 'function') {
+    intrinsicFrameToken = requestAnimationFrame(() => {
+      intrinsicFrameToken = null;
+      queueMicrotask(() => {
+        intrinsicPendingCards.forEach((el) => {
+          if (el?.dataset?.resizing === '1') {
+            return;
+          }
+          const state = intrinsicStates.get(el);
+          if (!state) return;
+          const size = computeIntrinsicSizeFromState(state);
+          state.last = size;
+          applyMinSizeStyles(el, size.width, size.height);
+        });
+        intrinsicPendingCards.clear();
+      });
+    });
+  } else {
+    queueMicrotask(() => {
+      intrinsicPendingCards.forEach((el) => {
+        if (el?.dataset?.resizing === '1') {
+          return;
+        }
+        const state = intrinsicStates.get(el);
+        if (!state) return;
+        const size = computeIntrinsicSizeFromState(state);
+        state.last = size;
+        applyMinSizeStyles(el, size.width, size.height);
+      });
+      intrinsicPendingCards.clear();
+    });
+  }
+}
+
+function cleanupIntrinsicState(cardEl) {
+  const state = intrinsicStates.get(cardEl);
+  if (!state) return;
+  if (state.observers?.length) {
+    state.observers.forEach((disconnect) => {
+      try {
+        disconnect();
+      } catch {}
+    });
+    state.observers = [];
+  }
+  if (state.removalCleanup) {
+    try {
+      state.removalCleanup();
+    } catch {}
+    state.removalCleanup = null;
+  }
+  intrinsicPendingCards.delete(cardEl);
+  intrinsicStates.delete(cardEl);
+  if (cardEl[MIN_SIZE_ADJUSTER]) {
+    delete cardEl[MIN_SIZE_ADJUSTER];
+  }
+}
+
+function ensureIntrinsicState(cardEl, innerEl = findCardInnerElement(cardEl)) {
+  if (!cardEl || !innerEl) return null;
+  let state = intrinsicStates.get(cardEl);
+  if (!state) {
+    state = {
+      cardEl,
+      innerEl,
+      observers: [],
+      last: { width: 0, height: 0 },
+      hostRect: null,
+      innerRect: null,
+      innerScrollWidth: 0,
+      innerScrollHeight: 0,
+      removalCleanup: null,
+      hostPaddingWidth: 0,
+      hostPaddingHeight: 0,
+    };
+    intrinsicStates.set(cardEl, state);
+  } else if (state.innerEl !== innerEl) {
+    if (state.observers?.length) {
+      state.observers.forEach((disconnect) => {
+        try {
+          disconnect();
+        } catch {}
+      });
+    }
+    state.observers = [];
+    state.innerEl = innerEl;
+    state.last = { width: 0, height: 0 };
+    state.hostPaddingWidth = 0;
+    state.hostPaddingHeight = 0;
+  }
+
+  if (!state.observers.length && typeof ResizeObserver === 'function') {
+    const hostObserver = new ResizeObserver((entries) => {
+      const entry = entries?.[entries.length - 1];
+      state.hostRect = entry?.contentRect || null;
+      scheduleIntrinsicUpdate(cardEl);
+    });
+    hostObserver.observe(cardEl);
+    const innerObserver = new ResizeObserver((entries) => {
+      const entry = entries?.[entries.length - 1];
+      state.innerRect = entry?.contentRect || null;
+      state.innerScrollWidth = innerEl.scrollWidth;
+      state.innerScrollHeight = innerEl.scrollHeight;
+      scheduleIntrinsicUpdate(cardEl);
+    });
+    innerObserver.observe(innerEl);
+    state.observers.push(() => hostObserver.disconnect());
+    state.observers.push(() => innerObserver.disconnect());
+  }
+
+  return state;
+}
+
+function applyIntrinsicMinSize(
+  cardEl,
+  innerEl = findCardInnerElement(cardEl),
+  options = {},
+) {
+  const { forceMeasure = false } = options || {};
+  const state = ensureIntrinsicState(cardEl, innerEl);
+  if (!state) {
+    return { width: 0, height: 0 };
+  }
+  if (forceMeasure) {
+    state.last = { width: 0, height: 0 };
+  }
+  if (!state.last || (!state.last.width && !state.last.height)) {
+    const measured = measureIntrinsicContentSize(cardEl, innerEl);
+    const resolvedWidth = measured.width;
+    const resolvedHeight = measured.height;
+    state.last = { width: resolvedWidth, height: resolvedHeight };
+    if (Number.isFinite(measured.widthExtra)) {
+      state.hostPaddingWidth = Math.max(0, measured.widthExtra);
+    }
+    if (Number.isFinite(measured.heightExtra)) {
+      state.hostPaddingHeight = Math.max(0, measured.heightExtra);
+    }
+    applyMinSizeStyles(cardEl, resolvedWidth, resolvedHeight);
+  }
+  scheduleIntrinsicUpdate(cardEl);
+  return state.last;
 }
 
 function isWithinResizeHandle(cardEl, event) {
@@ -113,13 +481,98 @@ function isWithinResizeHandle(cardEl, event) {
   );
 }
 
+function getGroupLabel(cardEl) {
+  if (!cardEl) return '';
+  const title = cardEl.querySelector('.group-title h2');
+  if (title && title.textContent) {
+    const trimmed = title.textContent.trim();
+    if (trimmed) return trimmed;
+  }
+  if (cardEl.dataset?.id) {
+    return `#${cardEl.dataset.id}`;
+  }
+  return 'Kortelė';
+}
+
+function ensureResizeGuide() {
+  if (resizeGuideEl && resizeGuideEl.isConnected) return resizeGuideEl;
+  const guide = document.createElement('div');
+  guide.className = 'resize-guide';
+  guide.setAttribute('aria-hidden', 'true');
+  guide.hidden = true;
+  guide.innerHTML = `
+    <div class="resize-guide__outline"></div>
+    <div class="resize-guide__label resize-guide__label--width"></div>
+    <div class="resize-guide__label resize-guide__label--height"></div>
+  `;
+  document.body.appendChild(guide);
+  resizeGuideEl = guide;
+  return guide;
+}
+
+function hideResizeGuide() {
+  if (!resizeGuideEl) return;
+  resizeGuideEl.hidden = true;
+}
+
+function updateResizeGuide(rect, widthSnap, heightSnap) {
+  if (!rect) {
+    hideResizeGuide();
+    return;
+  }
+  const guide = ensureResizeGuide();
+  guide.style.left = `${Math.round(rect.left)}px`;
+  guide.style.top = `${Math.round(rect.top)}px`;
+  guide.style.width = `${Math.round(rect.width)}px`;
+  guide.style.height = `${Math.round(rect.height)}px`;
+  const widthLabel = guide.querySelector('.resize-guide__label--width');
+  const heightLabel = guide.querySelector('.resize-guide__label--height');
+  if (widthLabel) {
+    if (widthSnap) {
+      widthLabel.textContent = `Plotis: ${widthSnap.value}px • ${widthSnap.label}`;
+      widthLabel.hidden = false;
+    } else {
+      widthLabel.hidden = true;
+    }
+  }
+  if (heightLabel) {
+    if (heightSnap) {
+      heightLabel.textContent = `Aukštis: ${heightSnap.value}px • ${heightSnap.label}`;
+      heightLabel.hidden = false;
+    } else {
+      heightLabel.hidden = true;
+    }
+  }
+  guide.hidden = !widthSnap && !heightSnap;
+}
+
 let activeResize = null;
 
 function beginCardResize(cardEl, event) {
   if (!cardEl) return;
   cardEl.dataset.resizing = '1';
   cardEl.draggable = false;
-  const intrinsicSize = applyIntrinsicMinSize(cardEl);
+  const isMultiSelection = selectedGroups.length > 1 && selectedGroups.includes(cardEl);
+  const resizeTargets = (isMultiSelection ? selectedGroups : [cardEl]).filter(
+    (el) => el && el.isConnected,
+  );
+  const intrinsicSizes = new Map();
+  let aggregatedMinWidth = 0;
+  let aggregatedMinHeight = 0;
+  resizeTargets.forEach((target) => {
+    const size = applyIntrinsicMinSize(target, undefined, { forceMeasure: true }) || {
+      width: 0,
+      height: 0,
+    };
+    intrinsicSizes.set(target, size);
+    if (Number.isFinite(size.width)) {
+      aggregatedMinWidth = Math.max(aggregatedMinWidth, size.width);
+    }
+    if (Number.isFinite(size.height)) {
+      aggregatedMinHeight = Math.max(aggregatedMinHeight, size.height);
+    }
+  });
+  const intrinsicSize = intrinsicSizes.get(cardEl) || { width: 0, height: 0 };
   const rect = cardEl.getBoundingClientRect();
   const computed =
     typeof window !== 'undefined' && cardEl instanceof HTMLElement
@@ -128,11 +581,17 @@ function beginCardResize(cardEl, event) {
   const minWidthCandidates = [
     Number.parseFloat(cardEl.style.minWidth),
     Number.isFinite(intrinsicSize?.width) ? intrinsicSize.width : NaN,
+    Number.isFinite(aggregatedMinWidth) && aggregatedMinWidth > 0
+      ? aggregatedMinWidth
+      : NaN,
     computed ? Number.parseFloat(computed.minWidth) : NaN,
   ].filter((val) => Number.isFinite(val) && val > 0);
   const minHeightCandidates = [
     Number.parseFloat(cardEl.style.minHeight),
     Number.isFinite(intrinsicSize?.height) ? intrinsicSize.height : NaN,
+    Number.isFinite(aggregatedMinHeight) && aggregatedMinHeight > 0
+      ? aggregatedMinHeight
+      : NaN,
     computed ? Number.parseFloat(computed.minHeight) : NaN,
   ].filter((val) => Number.isFinite(val) && val > 0);
   activeResize = {
@@ -143,62 +602,202 @@ function beginCardResize(cardEl, event) {
     startHeight: rect.height,
     minWidth: minWidthCandidates.length ? Math.max(...minWidthCandidates) : 0,
     minHeight: minHeightCandidates.length ? Math.max(...minHeightCandidates) : 0,
+    pointerId: event?.pointerId,
+    targets: resizeTargets,
   };
+  resizeTargets.forEach((target) => {
+    target.dataset.resizing = '1';
+    target.draggable = false;
+    if (target !== cardEl) {
+      target.style.minWidth = '';
+      target.style.minHeight = '';
+    }
+  });
   if (cardEl.dataset?.id) {
     resizingElements.add(cardEl.dataset.id);
   }
 }
 
-function setupMinSizeWatcher(cardEl, innerEl) {
-  if (!cardEl || !innerEl || typeof ResizeObserver === 'undefined') return;
-  const adjustMinSize = () => {
-    if (!cardEl.isConnected || !innerEl.isConnected) return;
-    applyIntrinsicMinSize(cardEl, innerEl);
-  };
-
-  let frameId = null;
-  const scheduleAdjust = () => {
-    if (typeof requestAnimationFrame !== 'function') {
-      adjustMinSize();
-      return;
+function finalizeActiveResize() {
+  const changed = applyPendingResizes();
+  const allowDrag = document.body.classList.contains('editing');
+  document.querySelectorAll('.group').forEach((g) => {
+    g.dataset.resizing = '0';
+    g.style.minWidth = '';
+    g.style.minHeight = '';
+    g.draggable = allowDrag;
+    const adjust = g[MIN_SIZE_ADJUSTER];
+    if (typeof adjust === 'function') {
+      adjust();
     }
-    if (frameId != null) return;
-    frameId = requestAnimationFrame(() => {
-      frameId = null;
-      adjustMinSize();
+  });
+  activeResize = null;
+  hideResizeGuide();
+  if (changed && typeof persist === 'function') {
+    persist();
+  }
+}
+
+function initResizeHandles(cardEl) {
+  if (!cardEl || cardEl[RESIZE_HANDLER_KEY]) return;
+
+  const handlePointerMove = (event) => {
+    if (!activeResize || activeResize.el !== cardEl) return;
+    const { startX, startY, startWidth, startHeight, minWidth, minHeight } = activeResize;
+    const deltaX = event.clientX - startX;
+    const deltaY = event.clientY - startY;
+    let nextWidth = startWidth + deltaX;
+    let nextHeight = startHeight + deltaY;
+    if (Number.isFinite(minWidth)) nextWidth = Math.max(minWidth, nextWidth);
+    if (Number.isFinite(minHeight)) nextHeight = Math.max(minHeight, nextHeight);
+    if (Number.isFinite(nextWidth)) {
+      nextWidth = Math.max(0, Math.round(nextWidth));
+    }
+    if (Number.isFinite(nextHeight)) {
+      nextHeight = Math.max(0, Math.round(nextHeight));
+    }
+
+    let widthSnap = null;
+    let heightSnap = null;
+    let bestWidthDiff = SNAP_THRESHOLD + 1;
+    let bestHeightDiff = SNAP_THRESHOLD + 1;
+    const allGroups = Array.from(document.querySelectorAll('.group'));
+    allGroups.forEach((group) => {
+      if (!group || group === cardEl) return;
+      const rect = group.getBoundingClientRect();
+      const widthCandidate = Math.round(rect.width);
+      const heightCandidate = Math.round(rect.height);
+      if (Number.isFinite(nextWidth)) {
+        const diffW = Math.abs(widthCandidate - nextWidth);
+        if (diffW <= SNAP_THRESHOLD && diffW < bestWidthDiff) {
+          bestWidthDiff = diffW;
+          widthSnap = { value: widthCandidate, label: getGroupLabel(group) };
+        }
+      }
+      if (Number.isFinite(nextHeight)) {
+        const diffH = Math.abs(heightCandidate - nextHeight);
+        if (diffH <= SNAP_THRESHOLD && diffH < bestHeightDiff) {
+          bestHeightDiff = diffH;
+          heightSnap = { value: heightCandidate, label: getGroupLabel(group) };
+        }
+      }
     });
+
+    if (widthSnap) {
+      nextWidth = widthSnap.value;
+    }
+    if (heightSnap) {
+      nextHeight = heightSnap.value;
+    }
+
+    const targets = Array.isArray(activeResize.targets) && activeResize.targets.length
+      ? activeResize.targets
+      : [cardEl];
+    targets
+      .filter((target, index) => target && target.isConnected && targets.indexOf(target) === index)
+      .forEach((target) => {
+        const widthValue = Number.isFinite(nextWidth) ? Math.max(0, nextWidth) : null;
+        const heightValue = Number.isFinite(nextHeight) ? Math.max(0, nextHeight) : null;
+        if (Number.isFinite(widthValue)) {
+          target.style.width = `${widthValue}px`;
+        }
+        if (Number.isFinite(heightValue)) {
+          target.style.height = `${heightValue}px`;
+        }
+        rememberCardDimensions(target, widthValue, heightValue);
+      });
+
+    activeResize.snapWidth = widthSnap?.value ?? null;
+    activeResize.snapHeight = heightSnap?.value ?? null;
+
+    if (widthSnap || heightSnap) {
+      const rect = cardEl.getBoundingClientRect();
+      updateResizeGuide(rect, widthSnap, heightSnap);
+    } else {
+      hideResizeGuide();
+    }
+
+    event.preventDefault();
   };
 
-  const mo = new ResizeObserver(() => scheduleAdjust());
-  mo.observe(innerEl);
+  const handlePointerUp = (event) => {
+    if (activeResize && activeResize.el === cardEl && cardEl.releasePointerCapture) {
+      try {
+        cardEl.releasePointerCapture(activeResize.pointerId);
+      } catch {}
+    }
+    cardEl.removeEventListener('pointermove', handlePointerMove);
+    cardEl.removeEventListener('pointerup', handlePointerUp);
+    cardEl.removeEventListener('pointercancel', handlePointerUp);
+    finalizeActiveResize();
+    event.preventDefault();
+  };
+
+  const handlePointerDown = (event) => {
+    if (!document.body.classList.contains('editing')) return;
+    if (event.button != null && event.button !== 0 && event.pointerType !== 'touch') return;
+    if (!isWithinResizeHandle(cardEl, event)) return;
+    beginCardResize(cardEl, event);
+    if (!activeResize) return;
+    if (cardEl.setPointerCapture && Number.isFinite(event.pointerId)) {
+      try {
+        cardEl.setPointerCapture(event.pointerId);
+      } catch {}
+    }
+    cardEl.addEventListener('pointermove', handlePointerMove);
+    cardEl.addEventListener('pointerup', handlePointerUp);
+    cardEl.addEventListener('pointercancel', handlePointerUp);
+    event.preventDefault();
+  };
+
+  cardEl.addEventListener('pointerdown', handlePointerDown);
+  cardEl[RESIZE_HANDLER_KEY] = {
+    destroy() {
+      cardEl.removeEventListener('pointerdown', handlePointerDown);
+      cardEl.removeEventListener('pointermove', handlePointerMove);
+      cardEl.removeEventListener('pointerup', handlePointerUp);
+      cardEl.removeEventListener('pointercancel', handlePointerUp);
+    },
+  };
+}
+
+function setupMinSizeWatcher(cardEl, innerEl) {
+  if (!cardEl || !innerEl) return;
+  const state = ensureIntrinsicState(cardEl, innerEl);
+  if (!state) return;
+
+  const adjustMinSize = () => {
+    if (!cardEl.isConnected) return;
+    scheduleIntrinsicUpdate(cardEl);
+  };
+
+  state.adjust = adjustMinSize;
   cardEl[MIN_SIZE_ADJUSTER] = adjustMinSize;
   adjustMinSize();
 
   let cleaned = false;
-  let removalObserver = null;
   const cleanup = () => {
     if (cleaned) return;
     cleaned = true;
-    if (frameId != null && typeof cancelAnimationFrame === 'function') {
-      cancelAnimationFrame(frameId);
-      frameId = null;
-    }
-    mo.disconnect();
-    if (removalObserver) {
-      removalObserver.disconnect();
-      removalObserver = null;
-    }
-    if (cardEl[MIN_SIZE_ADJUSTER] === adjustMinSize) {
-      delete cardEl[MIN_SIZE_ADJUSTER];
-    }
+    cleanupIntrinsicState(cardEl);
   };
+
+  if (state.removalCleanup) {
+    try {
+      state.removalCleanup();
+    } catch {}
+    state.removalCleanup = null;
+  }
 
   const watchParent = (node) => {
     if (!node || typeof MutationObserver !== 'function') return;
-    if (removalObserver) {
-      removalObserver.disconnect();
+    if (state.removalCleanup) {
+      try {
+        state.removalCleanup();
+      } catch {}
+      state.removalCleanup = null;
     }
-    removalObserver = new MutationObserver(() => {
+    const removalObserver = new MutationObserver(() => {
       if (!cardEl.isConnected) {
         cleanup();
         return;
@@ -208,6 +807,9 @@ function setupMinSizeWatcher(cardEl, innerEl) {
       }
     });
     removalObserver.observe(node, { childList: true });
+    state.removalCleanup = () => {
+      removalObserver.disconnect();
+    };
   };
 
   if (typeof MutationObserver === 'function') {
@@ -278,25 +880,42 @@ function formatDueLabel(ts) {
 }
 
 function applySize(el, width, height, wSize = sizeFromWidth(width), hSize = sizeFromHeight(height)) {
-  const widthPreset = SIZE_MAP[wSize]?.width;
-  const heightPreset = SIZE_MAP[hSize]?.height;
-  const finalWidth = Number.isFinite(widthPreset) ? widthPreset : width;
-  const finalHeight = Number.isFinite(heightPreset) ? heightPreset : height;
-
-  if (Number.isFinite(finalWidth)) {
-    el.style.width = `${finalWidth}px`;
+  if (Number.isFinite(width)) {
+    el.style.width = `${Math.round(width)}px`;
   } else {
     el.style.removeProperty('width');
   }
 
-  if (Number.isFinite(finalHeight)) {
-    el.style.height = `${finalHeight}px`;
+  if (Number.isFinite(height)) {
+    el.style.height = `${Math.round(height)}px`;
   } else {
     el.style.removeProperty('height');
   }
 
   el.classList.remove('w-sm', 'w-md', 'w-lg', 'h-sm', 'h-md', 'h-lg');
   el.classList.add(`w-${wSize}`, `h-${hSize}`);
+
+  rememberCardDimensions(el, width, height);
+}
+
+function resolveSizeMetadata(width, height) {
+  const widthMatch = Object.entries(SIZE_MAP).find(([, dims]) => {
+    const preset = Number.isFinite(dims?.width) ? Math.round(dims.width) : NaN;
+    return Number.isFinite(preset) && Number.isFinite(width) && Math.round(width) === preset;
+  });
+  const heightMatch = Object.entries(SIZE_MAP).find(([, dims]) => {
+    const preset = Number.isFinite(dims?.height) ? Math.round(dims.height) : NaN;
+    return Number.isFinite(preset) && Number.isFinite(height) && Math.round(height) === preset;
+  });
+  const metadata = {
+    sizePreset: {
+      width: widthMatch ? widthMatch[0] : null,
+      height: heightMatch ? heightMatch[0] : null,
+    },
+    customWidth: widthMatch ? null : Number.isFinite(width) ? Math.round(width) : null,
+    customHeight: heightMatch ? null : Number.isFinite(height) ? Math.round(height) : null,
+  };
+  return metadata;
 }
 
 const resizingElements = new Set();
@@ -304,114 +923,105 @@ const resizingElements = new Set();
 function applyResizeForElement(el, width, height, wSize, hSize) {
   const widthPreset = SIZE_MAP[wSize]?.width;
   const heightPreset = SIZE_MAP[hSize]?.height;
-  const finalWidth = Number.isFinite(widthPreset) ? widthPreset : width;
-  const finalHeight = Number.isFinite(heightPreset) ? heightPreset : height;
+  const widthMatchesPreset =
+    Number.isFinite(widthPreset) && Number.isFinite(width) && Math.round(width) === Math.round(widthPreset);
+  const heightMatchesPreset =
+    Number.isFinite(heightPreset) && Number.isFinite(height) && Math.round(height) === Math.round(heightPreset);
+  const finalWidth = widthMatchesPreset ? widthPreset : width;
+  const finalHeight = heightMatchesPreset ? heightPreset : height;
+  const metadata = resolveSizeMetadata(finalWidth, finalHeight);
 
   applySize(el, finalWidth, finalHeight, wSize, hSize);
+  const appliedMetadata = metadata;
   if (el.dataset.id === 'reminders') {
     const prev = currentState.remindersCard || {};
     const changed =
-      prev.width !== finalWidth || prev.height !== finalHeight || prev.wSize !== wSize || prev.hSize !== hSize;
+      prev.width !== finalWidth ||
+      prev.height !== finalHeight ||
+      prev.wSize !== wSize ||
+      prev.hSize !== hSize;
     currentState.remindersCard = {
       ...prev,
       width: finalWidth,
       height: finalHeight,
       wSize,
       hSize,
+      sizePreset: appliedMetadata.sizePreset,
+      customWidth: appliedMetadata.customWidth,
+      customHeight: appliedMetadata.customHeight,
     };
     return changed;
   }
   const sg = currentState.groups.find((x) => x.id === el.dataset.id);
   if (!sg) return false;
   const changed =
-    sg.width !== finalWidth || sg.height !== finalHeight || sg.wSize !== wSize || sg.hSize !== hSize;
+    sg.width !== finalWidth ||
+    sg.height !== finalHeight ||
+    sg.wSize !== wSize ||
+    sg.hSize !== hSize;
   sg.width = finalWidth;
   sg.height = finalHeight;
   sg.wSize = wSize;
   sg.hSize = hSize;
+  sg.sizePreset = appliedMetadata.sizePreset;
+  if (appliedMetadata.customWidth != null) sg.customWidth = appliedMetadata.customWidth;
+  else delete sg.customWidth;
+  if (appliedMetadata.customHeight != null) sg.customHeight = appliedMetadata.customHeight;
+  else delete sg.customHeight;
   delete sg.size;
   return changed;
 }
 
 function applyPendingResizes() {
   if (!resizingElements.size) return false;
-  const allGroups = Array.from(document.querySelectorAll('.group'));
   let changed = false;
   const processed = new Set();
   resizingElements.forEach((id) => {
     if (!id || processed.has(id)) return;
     processed.add(id);
-    const baseEl = allGroups.find((g) => g.dataset.id === id);
-    if (!baseEl) return;
+    const baseEl = cardRegistry.get(id);
+    if (!baseEl || !baseEl.isConnected) {
+      if (baseEl) {
+        cardDimensions.delete(baseEl);
+      }
+      cardRegistry.delete(id);
+      return;
+    }
     const rect = baseEl.getBoundingClientRect();
     let baseW = Math.round(rect.width / GRID) * GRID;
     let baseH = Math.round(rect.height / GRID) * GRID;
-    allGroups
-      .filter((g) => g !== baseEl)
-      .forEach((g) => {
-        const gRect = g.getBoundingClientRect();
-        if (Math.abs(baseW - Math.round(gRect.width)) <= SNAP_THRESHOLD) {
-          baseW = Math.round(gRect.width);
-        }
-        if (Math.abs(baseH - Math.round(gRect.height)) <= SNAP_THRESHOLD) {
-          baseH = Math.round(gRect.height);
-        }
-      });
+    cardRegistry.forEach((otherEl) => {
+      if (!otherEl || otherEl === baseEl || !otherEl.isConnected) return;
+      const dims = getCardDimensions(otherEl);
+      if (Math.abs(baseW - Math.round(dims.width)) <= SNAP_THRESHOLD) {
+        baseW = Math.round(dims.width);
+      }
+      if (Math.abs(baseH - Math.round(dims.height)) <= SNAP_THRESHOLD) {
+        baseH = Math.round(dims.height);
+      }
+    });
     const wSize = sizeFromWidth(baseW);
     const hSize = sizeFromHeight(baseH);
-    const finalWidth = Number.isFinite(SIZE_MAP[wSize]?.width) ? SIZE_MAP[wSize].width : baseW;
-    const finalHeight = Number.isFinite(SIZE_MAP[hSize]?.height) ? SIZE_MAP[hSize].height : baseH;
+    const presetWidth = SIZE_MAP[wSize]?.width;
+    const presetHeight = SIZE_MAP[hSize]?.height;
+    const finalWidth =
+      Number.isFinite(presetWidth) && Math.round(baseW) === Math.round(presetWidth)
+        ? presetWidth
+        : baseW;
+    const finalHeight =
+      Number.isFinite(presetHeight) && Math.round(baseH) === Math.round(presetHeight)
+        ? presetHeight
+        : baseH;
     const targets = selectedGroups.includes(baseEl) ? selectedGroups : [baseEl];
     targets.forEach((target) => {
       const didChange = applyResizeForElement(target, finalWidth, finalHeight, wSize, hSize);
       if (didChange) changed = true;
+      rememberCardDimensions(target, finalWidth, finalHeight);
     });
   });
   resizingElements.clear();
   return changed;
 }
-
-document.addEventListener('mousemove', (event) => {
-  if (!activeResize || !activeResize.el) return;
-  const { el, startX, startY, startWidth, startHeight, minWidth, minHeight } =
-    activeResize;
-  if (el.dataset.resizing !== '1') {
-    activeResize = null;
-    return;
-  }
-  const deltaX = event.clientX - startX;
-  const deltaY = event.clientY - startY;
-  let nextWidth = startWidth + deltaX;
-  let nextHeight = startHeight + deltaY;
-  if (Number.isFinite(minWidth)) nextWidth = Math.max(minWidth, nextWidth);
-  if (Number.isFinite(minHeight)) nextHeight = Math.max(minHeight, nextHeight);
-  if (Number.isFinite(nextWidth)) {
-    el.style.width = `${Math.max(0, Math.round(nextWidth))}px`;
-  }
-  if (Number.isFinite(nextHeight)) {
-    el.style.height = `${Math.max(0, Math.round(nextHeight))}px`;
-  }
-  event.preventDefault();
-});
-
-document.addEventListener('mouseup', () => {
-  const changed = applyPendingResizes();
-  const allowDrag = document.body.classList.contains('editing');
-  document.querySelectorAll('.group').forEach((g) => {
-    g.dataset.resizing = '0';
-    g.style.minWidth = '';
-    g.style.minHeight = '';
-    g.draggable = allowDrag;
-    const adjust = g[MIN_SIZE_ADJUSTER];
-    if (typeof adjust === 'function') {
-      adjust();
-    }
-  });
-  activeResize = null;
-  if (changed) {
-    persist();
-  }
-});
 
 document.addEventListener('click', (e) => {
   if (
@@ -473,6 +1083,40 @@ function escapeHtml(str) {
   );
 }
 
+function createEmptyState(iconHtml, text, action) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'empty-state';
+  wrapper.innerHTML = `
+    <div class="empty-state__icon" aria-hidden="true">${iconHtml || ''}</div>
+    <p class="empty-state__text">${escapeHtml(text || '')}</p>
+  `;
+  if (
+    action &&
+    typeof action.actionLabel === 'string' &&
+    action.actionLabel.trim() !== '' &&
+    typeof action.onAction === 'function'
+  ) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'empty-state__action';
+    button.textContent = action.actionLabel;
+    button.addEventListener('click', (event) => {
+      try {
+        const result = action.onAction(event);
+        if (result && typeof result.then === 'function') {
+          result.catch((err) =>
+            console.error('empty-state action failed', err),
+          );
+        }
+      } catch (err) {
+        console.error('empty-state action failed', err);
+      }
+    });
+    wrapper.appendChild(button);
+  }
+  return wrapper;
+}
+
 function previewItem(it, mount) {
   const existing = mount.nextElementSibling;
   if (existing && existing.classList.contains('embed')) {
@@ -498,11 +1142,10 @@ function previewItem(it, mount) {
   mount.after(wrap);
 }
 
-export function render(state, editing, T, I, handlers, saveFn) {
+export function renderGroups(state, editing, T, I, handlers, saveFn) {
   currentState = state;
   persist = saveFn;
   const groupsEl = document.getElementById('groups');
-  const statsEl = document.getElementById('stats');
   const searchEl = document.getElementById('q');
   const reduceMotion = prefersReducedMotion();
   const previousGroupRects = new Map();
@@ -573,8 +1216,13 @@ export function render(state, editing, T, I, handlers, saveFn) {
   }
   reminderEntryCache = new Map();
 
-  const q = (searchEl.value || '').toLowerCase().trim();
-  groupsEl.innerHTML = '';
+  const q = (searchEl?.value || '').toLowerCase().trim();
+  if (!groupsEl) {
+    cleanupCardRegistry(new Set());
+    return;
+  }
+  const fragment = document.createDocumentFragment();
+  const activeCardIds = new Set();
   function handleDrop(e) {
     e.preventDefault();
     const fromId = e.dataTransfer.getData('text/group');
@@ -626,6 +1274,40 @@ export function render(state, editing, T, I, handlers, saveFn) {
       return groupMap.get(id);
     })
     .filter(Boolean);
+  const hasAnyGroups = Array.isArray(state.groups) && state.groups.length > 0;
+  const hasRemindersCard = Boolean(state.remindersCard?.enabled);
+
+  if (!hasAnyGroups && !hasRemindersCard) {
+    groupsEl.classList.add('is-empty');
+    const performAddGroup = () => {
+      if (typeof handlers?.beginAddGroup === 'function') {
+        handlers.beginAddGroup();
+        return;
+      }
+      if (typeof handlers?.addGroup === 'function') {
+        handlers.addGroup();
+      }
+    };
+    const emptyMessage =
+      T.emptyGroups ||
+      T.empty ||
+      'Dar nėra sukurtų grupių. Įjunkite redagavimą ir sukurkite pirmą kortelę.';
+    const emptyAction =
+      typeof handlers?.beginAddGroup === 'function' ||
+      typeof handlers?.addGroup === 'function'
+        ? {
+            actionLabel: T.emptyGroupsAction || T.addGroup || 'Pridėti grupę',
+            onAction: () => performAddGroup(),
+          }
+        : undefined;
+    const emptyState = createEmptyState(I.folder, emptyMessage, emptyAction);
+    fragment.appendChild(emptyState);
+    groupsEl.replaceChildren(fragment);
+    cleanupCardRegistry(new Set());
+    return;
+  }
+
+  groupsEl.classList.remove('is-empty');
   allGroups.forEach((g) => {
     if (g.id === 'reminders') {
       const reminderHandlers = handlers.reminders || {};
@@ -633,10 +1315,8 @@ export function render(state, editing, T, I, handlers, saveFn) {
         (typeof reminderHandlers.cardState === 'function'
           ? reminderHandlers.cardState()
           : state.remindersCard) || {};
-      const remGrp = document.createElement('section');
-      remGrp.className = 'group reminders-card';
-      remGrp.dataset.id = 'reminders';
-      remGrp.dataset.resizing = '0';
+      const { section: remGrp, header, content: body } =
+        createGroupStructure('reminders', 'reminders');
       const rWidth =
         cardState.width ?? SIZE_MAP[cardState.wSize || 'md']?.width ?? 360;
       const rHeight =
@@ -644,15 +1324,10 @@ export function render(state, editing, T, I, handlers, saveFn) {
       const rWSize = cardState.wSize || sizeFromWidth(rWidth);
       const rHSize = cardState.hSize || sizeFromHeight(rHeight);
       applySize(remGrp, rWidth, rHeight, rWSize, rHSize);
+      initResizeHandles(remGrp);
       remGrp.style.resize = editing ? 'both' : 'none';
       remGrp.style.overflow = editing ? 'auto' : 'visible';
       if (editing) {
-        remGrp.addEventListener('mousedown', (e) => {
-          if (isWithinResizeHandle(remGrp, e)) {
-            e.preventDefault();
-            beginCardResize(remGrp, e);
-          }
-        });
         remGrp.draggable = true;
         remGrp.addEventListener('dragstart', (e) => {
           if (remGrp.dataset.resizing === '1') {
@@ -685,14 +1360,12 @@ export function render(state, editing, T, I, handlers, saveFn) {
           remGrp.classList.remove('selected');
         }
       });
-      const header = document.createElement('div');
-      header.className = 'group-header';
       const titleText = (cardState.title || '').trim() ||
         T.remindersCardTitle ||
         T.reminders;
       header.innerHTML = `
         <div class="group-title">
-          <span class="dot" style="background:#38bdf8"></span>
+          <span class="dot" aria-hidden="true"></span>
           <h2 data-reminders-title>${escapeHtml(titleText)}</h2>
         </div>
         ${
@@ -703,6 +1376,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
             : ''
         }
       `;
+      header.style.setProperty('--dot-color', '#38bdf8');
       const titleEl = header.querySelector('[data-reminders-title]');
       if (titleEl) {
         titleEl.contentEditable = editing;
@@ -732,11 +1406,6 @@ export function render(state, editing, T, I, handlers, saveFn) {
           }
         }
       });
-      remGrp.appendChild(header);
-
-      const body = document.createElement('div');
-      body.className = 'reminders-card-body';
-
       const controlsWrap = document.createElement('div');
       controlsWrap.className = 'reminder-controls';
 
@@ -812,28 +1481,21 @@ export function render(state, editing, T, I, handlers, saveFn) {
       form.className = 'reminder-form';
       form.setAttribute('data-reminder-form', '1');
       form.innerHTML = `
-        <label>
-          <span>${escapeHtml(T.reminderName)}</span>
-          <input name="title" placeholder="${escapeHtml(
-            T.reminderNamePH || ''
-          )}" autocomplete="off">
-        </label>
-        <label>
-          <span>${escapeHtml(T.reminderMode)}</span>
-          <select name="reminderMode">
-            <option value="minutes">${escapeHtml(T.reminderAfter)}</option>
-            <option value="datetime">${escapeHtml(T.reminderExactTime)}</option>
-          </select>
-        </label>
-        <div class="reminder-form-section" data-reminder-section="minutes">
-          <label>
-            <span>${escapeHtml(T.reminderMinutes)}</span>
-            <input name="reminderMinutes" type="number" min="1" step="1">
+        <div class="reminder-form-fields">
+          <label class="reminder-field reminder-field--full" data-reminder-field="title">
+            <span>${escapeHtml(T.reminderName)}</span>
+            <input name="title" placeholder="${escapeHtml(
+              T.reminderNamePH || ''
+            )}" autocomplete="off">
           </label>
-          <div class="reminder-quick-fill" data-reminder-quick-fill></div>
-        </div>
-        <div class="reminder-form-section" data-reminder-section="datetime">
-          <label>
+          <div class="reminder-form-row">
+            <label class="reminder-field" data-reminder-field="minutes">
+              <span>${escapeHtml(T.reminderMinutes)}</span>
+              <input name="reminderMinutes" type="number" min="1" step="1">
+            </label>
+            <div class="reminder-quick-fill" data-reminder-quick-fill></div>
+          </div>
+          <label class="reminder-field reminder-field--full" data-reminder-field="datetime">
             <span>${escapeHtml(T.reminderExactTime)}</span>
             <input name="reminderAt" type="datetime-local">
           </label>
@@ -863,7 +1525,6 @@ export function render(state, editing, T, I, handlers, saveFn) {
         : { editingId: null, values: null, error: '' };
       const values = formState?.values || {};
       form.title.value = values.title || '';
-      form.reminderMode.value = values.reminderMode || 'minutes';
       form.reminderMinutes.value = values.reminderMinutes || '';
       form.reminderAt.value = values.reminderAt || '';
       const errorEl = form.querySelector('[data-reminder-error]');
@@ -887,22 +1548,31 @@ export function render(state, editing, T, I, handlers, saveFn) {
         if (cancelBtn) cancelBtn.hidden = true;
         form.classList.remove('is-editing');
       }
-      const updateMode = () => {
-        const mode = form.reminderMode.value || 'minutes';
-        form
-          .querySelectorAll('[data-reminder-section]')
-          .forEach((section) => {
-            section.hidden = section.dataset.reminderSection !== mode;
-          });
+      const setActiveMode = (mode) => {
+        const next = mode === 'datetime' ? 'datetime' : 'minutes';
+        form.setAttribute('data-active-mode', next);
       };
-      updateMode();
-      form.reminderMode.addEventListener('change', updateMode);
+      const initialMode = values.reminderMode
+        ? values.reminderMode
+        : values.reminderAt
+          ? 'datetime'
+          : 'minutes';
+      setActiveMode(initialMode);
+      form.reminderMinutes.addEventListener('input', () => {
+        if (form.reminderMinutes.value) setActiveMode('minutes');
+      });
+      form.reminderAt.addEventListener('input', () => {
+        if (form.reminderAt.value) setActiveMode('datetime');
+      });
       quickFill?.addEventListener('click', (event) => {
         const btn = event.target.closest('button[data-minutes]');
         if (!btn) return;
-        form.reminderMode.value = 'minutes';
         form.reminderMinutes.value = btn.dataset.minutes || '';
-        updateMode();
+        setActiveMode('minutes');
+        form.reminderMinutes.dispatchEvent(new Event('input', { bubbles: true }));
+        if (typeof form.reminderMinutes.focus === 'function') {
+          form.reminderMinutes.focus();
+        }
       });
       quickButtons.addEventListener('click', (event) => {
         const btn = event.target.closest('button[data-minutes]');
@@ -911,12 +1581,12 @@ export function render(state, editing, T, I, handlers, saveFn) {
         if (Number.isFinite(minutes) && reminderHandlers.quick) {
           reminderHandlers.quick(minutes);
         }
+        setActiveMode('minutes');
       });
       form.addEventListener('submit', (event) => {
         event.preventDefault();
         if (typeof reminderHandlers.submit === 'function') {
           const payload = Object.fromEntries(new FormData(form));
-          payload.reminderMode = payload.reminderMode || 'minutes';
           reminderHandlers.submit(payload);
         }
       });
@@ -929,6 +1599,7 @@ export function render(state, editing, T, I, handlers, saveFn) {
 
       const listSection = document.createElement('section');
       listSection.className = 'reminder-list-section';
+      listSection.dataset.state = 'empty';
       listSection.innerHTML = `
         <h3>${escapeHtml(T.remindersUpcoming)}</h3>
         <div class="reminder-empty" data-reminder-empty>${escapeHtml(
@@ -949,11 +1620,22 @@ export function render(state, editing, T, I, handlers, saveFn) {
         reminderEntryCache = new Map(sorted.map((entry) => [entry.key, entry]));
         if (!listEl) return;
         listEl.innerHTML = '';
-        if (!sorted.length) {
-          if (emptyEl) emptyEl.hidden = false;
+        const hasItems = sorted.length > 0;
+        if (!hasItems) {
+          if (emptyEl) {
+            emptyEl.hidden = false;
+            emptyEl.setAttribute('aria-hidden', 'false');
+          }
+          listEl.hidden = true;
+          listSection.dataset.state = 'empty';
           return;
         }
-        if (emptyEl) emptyEl.hidden = true;
+        if (emptyEl) {
+          emptyEl.hidden = true;
+          emptyEl.setAttribute('aria-hidden', 'true');
+        }
+        listEl.hidden = false;
+        listSection.dataset.state = 'has-items';
         sorted.forEach((entry) => {
           const li = document.createElement('li');
           li.dataset.key = entry.key;
@@ -1067,18 +1749,17 @@ export function render(state, editing, T, I, handlers, saveFn) {
       });
       body.appendChild(listSection);
 
-      remGrp.appendChild(body);
-      groupsEl.appendChild(remGrp);
-      const inner = remGrp.querySelector('.group-body');
+      fragment.appendChild(remGrp);
+      activeCardIds.add('reminders');
+      registerCard('reminders', remGrp);
+      const inner = remGrp.querySelector('.group-content');
       setupMinSizeWatcher(remGrp, inner);
-      
+
       return;
     }
     if (g.type === 'note') {
-      const noteGrp = document.createElement('section');
-      noteGrp.className = 'group note-card';
-      noteGrp.dataset.id = g.id;
-      noteGrp.dataset.resizing = '0';
+      const { section: noteGrp, header: h, content } =
+        createGroupStructure('note', g.id);
       const fallbackW = SIZE_MAP[g.wSize ?? 'md']?.width ?? SIZE_MAP.md.width;
       const fallbackH = SIZE_MAP[g.hSize ?? 'md']?.height ?? SIZE_MAP.md.height;
       const nWidth = Number.isFinite(g.width) ? g.width : fallbackW;
@@ -1086,15 +1767,10 @@ export function render(state, editing, T, I, handlers, saveFn) {
       const nWSize = g.wSize || sizeFromWidth(nWidth);
       const nHSize = g.hSize || sizeFromHeight(nHeight);
       applySize(noteGrp, nWidth, nHeight, nWSize, nHSize);
+      initResizeHandles(noteGrp);
       noteGrp.style.resize = editing ? 'both' : 'none';
       noteGrp.style.overflow = editing ? 'auto' : 'visible';
       if (editing) {
-        noteGrp.addEventListener('mousedown', (e) => {
-          if (isWithinResizeHandle(noteGrp, e)) {
-            e.preventDefault();
-            beginCardResize(noteGrp, e);
-          }
-        });
         noteGrp.draggable = true;
         noteGrp.addEventListener('dragstart', (e) => {
           if (noteGrp.dataset.resizing === '1') {
@@ -1125,13 +1801,11 @@ export function render(state, editing, T, I, handlers, saveFn) {
           noteGrp.classList.remove('selected');
         }
       });
-      const h = document.createElement('div');
-      h.className = 'group-header';
       const dotColor = g.color || '#fef08a';
       const headerTitle = escapeHtml(g.title || g.name || T.notes);
       h.innerHTML = `
         <div class="group-title">
-          <span class="dot" style="background:${dotColor}"></span>
+          <span class="dot" aria-hidden="true"></span>
           <h2>${headerTitle}</h2>
         </div>
         ${
@@ -1142,65 +1816,64 @@ export function render(state, editing, T, I, handlers, saveFn) {
         </div>`
             : ''
         }`;
+      h.style.setProperty('--dot-color', dotColor);
       h.addEventListener('click', (e) => {
         const btn = e.target.closest('button');
         if (!btn) return;
         if (btn.dataset.act === 'edit') handlers.notes?.edit?.(g.id);
         if (btn.dataset.act === 'del') handlers.notes?.remove?.(g.id);
       });
-      noteGrp.appendChild(h);
       const itemsWrap = document.createElement('div');
       itemsWrap.className = 'items';
       const itemsScroll = document.createElement('div');
       itemsScroll.className = 'items-scroll';
       const p = document.createElement('p');
-      p.style.whiteSpace = 'pre-wrap';
-      p.style.overflowWrap = 'anywhere';
-      p.style.wordBreak = 'break-word';
+      p.className = 'note-content';
       const padding = Number.isFinite(g.padding) ? g.padding : 20;
       const fontSize = Number.isFinite(g.fontSize) ? g.fontSize : 20;
-      p.style.padding = padding + 'px';
-      p.style.fontSize = fontSize + 'px';
+      noteGrp.style.setProperty('--note-padding', `${padding}px`);
+      noteGrp.style.setProperty('--note-font-size', `${fontSize}px`);
       p.textContent = g.text || '';
       itemsScroll.appendChild(p);
       itemsWrap.appendChild(itemsScroll);
-      noteGrp.appendChild(itemsWrap);
-      groupsEl.appendChild(noteGrp);
+      content.appendChild(itemsWrap);
+      fragment.appendChild(noteGrp);
+      activeCardIds.add(g.id);
+      registerCard(g.id, noteGrp);
       const inner = noteGrp.querySelector('.items');
       setupMinSizeWatcher(noteGrp, inner);
       
       return;
     }
     if (g.type === 'chart') {
-      const grp = document.createElement('section');
-      grp.className = 'group';
-      grp.dataset.id = g.id;
-      grp.dataset.resizing = '0';
-      const gWidth =
-        g.width ?? SIZE_MAP[g.wSize ?? 'md'].width;
-      const gHeight =
-        g.height ?? SIZE_MAP[g.hSize ?? 'md'].height;
-      const gWSize = g.wSize ?? sizeFromWidth(gWidth);
-      const gHSize = g.hSize ?? sizeFromHeight(gHeight);
-      applySize(grp, gWidth, gHeight, gWSize, gHSize);
+      const { section: grp, header: h, content } =
+        createGroupStructure('chart', g.id);
+      const width = Number.isFinite(g.width)
+        ? g.width
+        : SIZE_MAP[g.wSize ?? 'md']?.width ?? SIZE_MAP.md.width;
+      const height = Number.isFinite(g.height)
+        ? g.height
+        : SIZE_MAP[g.hSize ?? 'md']?.height ?? SIZE_MAP.md.height;
+      const wSize = g.wSize ?? sizeFromWidth(width);
+      const hSize = g.hSize ?? sizeFromHeight(height);
+      applySize(grp, width, height, wSize, hSize);
+      if (!Number.isFinite(g.width)) g.width = width;
+      if (!Number.isFinite(g.height)) g.height = height;
+      if (!g.wSize) g.wSize = wSize;
+      if (!g.hSize) g.hSize = hSize;
+      initResizeHandles(grp);
       grp.style.resize = editing ? 'both' : 'none';
-      grp.style.overflow = editing ? 'auto' : 'visible';
-    if (editing) {
-      grp.addEventListener('mousedown', (e) => {
-        if (isWithinResizeHandle(grp, e)) {
-          e.preventDefault();
-          beginCardResize(grp, e);
-        }
-      });
-      grp.draggable = true;
-      grp.addEventListener('dragstart', (e) => {
-        if (grp.dataset.resizing === '1') {
-          e.preventDefault();
-          return;
-        }
-        e.dataTransfer.setData('text/group', g.id);
-        grp.style.opacity = 0.5;
-      });
+      grp.style.overflow = 'hidden';
+      if (editing) {
+        grp.draggable = true;
+        grp.addEventListener('dragstart', (e) => {
+          if (grp.dataset.resizing === '1') {
+            e.preventDefault();
+            return;
+          }
+          e.dataTransfer.setData('text/group', g.id);
+          grp.style.opacity = 0.5;
+        });
         grp.addEventListener('dragend', () => {
           grp.style.opacity = 1;
         });
@@ -1224,74 +1897,250 @@ export function render(state, editing, T, I, handlers, saveFn) {
         }
       });
 
-      const h = document.createElement('div');
-      h.className = 'group-header';
+      const title = g.name || T.chart || 'Diagrama';
       h.innerHTML = `
         <div class="group-title">
-          <button type="button" class="toggle" data-collapse title="${g.collapsed ? T.expand : T.collapse}" aria-label="${g.collapsed ? T.expand : T.collapse}">${g.collapsed ? I.arrowDown : I.arrowUp}</button>
-          <span class="dot" style="background:${g.color || '#6ee7b7'}"></span>
-          <h2 title="Tempkite, kad perrikiuotumėte" class="handle">${escapeHtml(g.name || '')}</h2>
+          <span class="dot" aria-hidden="true"></span>
+          <h2 title="Tempkite, kad perrikiuotumėte" class="handle">${escapeHtml(title)}</h2>
         </div>
         ${
           editing
             ? `<div class="group-actions">
-          <button type="button" title="${T.moveUp}" aria-label="${T.moveUp}" data-act="up">${I.arrowUp}</button>
-          <button type="button" title="${T.moveDown}" aria-label="${T.moveDown}" data-act="down">${I.arrowDown}</button>
           <button type="button" title="${T.editChart}" aria-label="${T.editChart}" data-act="edit">${I.pencil}</button>
           <button type="button" class="btn-danger" title="${T.deleteGroup}" aria-label="${T.deleteGroup}" data-act="del">${I.trash}</button>
         </div>`
             : ''
         }`;
-
+      h.style.setProperty('--dot-color', '#38bdf8');
       h.addEventListener('click', (e) => {
-        const btn = e.target.closest('button');
+        const btn = e.target.closest('button[data-act]');
         if (!btn) return;
-        if (btn.dataset.collapse !== undefined) {
-          handlers.toggleCollapse(g.id);
-          return;
-        }
-        const act = btn.dataset.act;
-        if (act === 'edit') return handlers.editChart(g.id);
-        if (act === 'del') {
-          handlers.confirmDialog(T.confirmDelChart).then((ok) => {
-            if (ok) handlers.removeGroup?.(g.id);
-          });
-          return;
-        }
-        if (act === 'up' || act === 'down') {
-          const idx = state.groups.findIndex((x) => x.id === g.id);
-          if (act === 'up' && idx > 0) {
-            const [moved] = state.groups.splice(idx, 1);
-            state.groups.splice(idx - 1, 0, moved);
+        if (btn.dataset.act === 'edit') {
+          handlers.editChart?.(g.id);
+        } else if (btn.dataset.act === 'del') {
+          if (handlers.confirmDialog) {
+            handlers
+              .confirmDialog(T.confirmDelChart || T.confirmDelGroup)
+              .then((ok) => {
+                if (ok) handlers.removeGroup?.(g.id);
+              });
+          } else {
+            handlers.removeGroup?.(g.id);
           }
-          if (act === 'down' && idx < state.groups.length - 1) {
-            const [moved] = state.groups.splice(idx, 1);
-            state.groups.splice(idx + 1, 0, moved);
-          }
-          persist();
-          render(state, editing, T, I, handlers, saveFn);
         }
       });
 
-      grp.appendChild(h);
-      const emb = document.createElement('div');
-      emb.className = 'embed';
-      emb.dataset.custom = '1';
-      emb.style.flex = '1';
-      emb.style.resize = 'none';
-      emb.innerHTML = `<iframe src="${g.url}" loading="lazy" referrerpolicy="no-referrer"></iframe>`;
-      grp.appendChild(emb);
-      if (g.collapsed) grp.classList.add('collapsed');
-      groupsEl.appendChild(grp);
-      const inner = grp.querySelector('.embed');
-      setupMinSizeWatcher(grp, inner);
-      
+      const frameWrap = document.createElement('div');
+      frameWrap.className = 'chart-frame';
+      frameWrap.style.flex = '1 1 auto';
+      frameWrap.style.width = '100%';
+      frameWrap.style.height = '100%';
+
+      const iframe = document.createElement('iframe');
+      const activeTheme = getActiveTheme();
+      const themedUrl = resolveChartThemeUrl(g.url || '', activeTheme);
+      iframe.src = themedUrl;
+      iframe.loading = 'lazy';
+      iframe.referrerPolicy = 'no-referrer';
+      iframe.allowFullscreen = true;
+      iframe.title = g.name ? `${g.name}` : T.chartFrameTitle || 'Grafikas';
+      iframe.dataset.baseUrl = g.url || '';
+      iframe.dataset.themeApplied = activeTheme;
+
+      frameWrap.appendChild(iframe);
+
+      const initialScaleValue = Number.isFinite(g.scale)
+        ? g.scale
+        : CHART_SCALE_DEFAULT;
+      const initialScale = clampChartScale(initialScaleValue);
+      if (!Number.isFinite(g.scale) || g.scale !== initialScale) {
+        g.scale = initialScale;
+      }
+      applyChartScale(frameWrap, iframe, initialScale);
+
+      if (editing) {
+        grp.dataset.dragSuspended = grp.dataset.dragSuspended || '0';
+
+        const controls = document.createElement('div');
+        controls.className = 'chart-scale-controls';
+
+        const labelEl = document.createElement('span');
+        labelEl.className = 'chart-scale-controls__label';
+        labelEl.textContent = T.chartScaleLabel || 'Grafiko mastelis';
+
+        const minusBtn = document.createElement('button');
+        minusBtn.type = 'button';
+        minusBtn.className = 'chart-scale-controls__btn';
+        minusBtn.textContent = '−';
+        minusBtn.setAttribute(
+          'aria-label',
+          T.chartScaleDecrease || 'Sumažinti mastelį',
+        );
+
+        const slider = document.createElement('input');
+        slider.type = 'range';
+        slider.className = 'chart-scale-controls__slider';
+        slider.min = String(Math.round(CHART_SCALE_MIN * 100));
+        slider.max = String(Math.round(CHART_SCALE_MAX * 100));
+        slider.step = String(Math.round(CHART_SCALE_STEP * 100));
+        slider.value = String(Math.round(initialScale * 100));
+        slider.setAttribute('aria-label', T.chartScaleLabel || 'Grafiko mastelis');
+        slider.setAttribute('aria-valuemin', slider.min);
+        slider.setAttribute('aria-valuemax', slider.max);
+        slider.setAttribute('aria-valuenow', slider.value);
+        slider.setAttribute('aria-valuetext', formatChartScale(initialScale));
+
+        const plusBtn = document.createElement('button');
+        plusBtn.type = 'button';
+        plusBtn.className = 'chart-scale-controls__btn';
+        plusBtn.textContent = '+';
+        plusBtn.setAttribute(
+          'aria-label',
+          T.chartScaleIncrease || 'Padidinti mastelį',
+        );
+
+        const valueEl = document.createElement('output');
+        valueEl.className = 'chart-scale-controls__value';
+        valueEl.textContent = formatChartScale(initialScale);
+
+        const resetBtn = document.createElement('button');
+        resetBtn.type = 'button';
+        resetBtn.className = 'chart-scale-controls__reset';
+        resetBtn.textContent =
+          T.chartScaleReset || T.reset || 'Atstatyti mastelį';
+
+        controls.append(
+          labelEl,
+          minusBtn,
+          slider,
+          plusBtn,
+          valueEl,
+          resetBtn,
+        );
+        frameWrap.appendChild(controls);
+
+        let removeOutsidePointerHandler = null;
+
+        const resumeCardDrag = () => {
+          if (removeOutsidePointerHandler) {
+            removeOutsidePointerHandler();
+            removeOutsidePointerHandler = null;
+          }
+          if (!editing) return;
+          grp.dataset.dragSuspended = '0';
+          if (grp.dataset.resizing === '1') return;
+          grp.draggable = true;
+        };
+
+        const handleControlPointerDown = (event) => {
+          event.stopPropagation();
+          if (!editing) return;
+          grp.dataset.dragSuspended = '1';
+          grp.draggable = false;
+
+          if (removeOutsidePointerHandler) {
+            removeOutsidePointerHandler();
+            removeOutsidePointerHandler = null;
+          }
+
+          const handleOutsidePointerDown = (docEvent) => {
+            if (!editing) {
+              resumeCardDrag();
+              return;
+            }
+
+            if (!grp.contains(docEvent.target)) {
+              resumeCardDrag();
+            }
+          };
+
+          const release = () => {
+            document.removeEventListener('pointerup', release, true);
+            document.removeEventListener('pointercancel', release, true);
+            if (removeOutsidePointerHandler) {
+              removeOutsidePointerHandler();
+            }
+            removeOutsidePointerHandler = () => {
+              document.removeEventListener(
+                'pointerdown',
+                handleOutsidePointerDown,
+                true,
+              );
+              removeOutsidePointerHandler = null;
+            };
+            document.addEventListener('pointerdown', handleOutsidePointerDown, true);
+          };
+
+          document.addEventListener('pointerup', release, true);
+          document.addEventListener('pointercancel', release, true);
+        };
+
+        controls.addEventListener('pointerdown', handleControlPointerDown);
+        controls.addEventListener('dragstart', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        });
+
+        let currentScale = initialScale;
+
+        const persistScaleChange = (commit = false) => {
+          slider.setAttribute(
+            'aria-valuenow',
+            String(Math.round(currentScale * 100)),
+          );
+          slider.setAttribute('aria-valuetext', formatChartScale(currentScale));
+          valueEl.textContent = formatChartScale(currentScale);
+          if (commit && typeof persist === 'function') {
+            persist();
+          }
+        };
+
+        const setScale = (next, commit = false) => {
+          const applied = applyChartScale(frameWrap, iframe, next);
+          currentScale = applied;
+          g.scale = applied;
+          slider.value = String(Math.round(applied * 100));
+          persistScaleChange(commit);
+        };
+
+        slider.addEventListener('input', () => {
+          setScale(Number(slider.value) / 100, false);
+        });
+        slider.addEventListener('change', () => {
+          setScale(Number(slider.value) / 100, true);
+        });
+        minusBtn.addEventListener('click', (event) => {
+          event.preventDefault();
+          const next = Math.round((currentScale - CHART_SCALE_STEP) * 100) / 100;
+          setScale(next, true);
+          slider.focus();
+        });
+        plusBtn.addEventListener('click', (event) => {
+          event.preventDefault();
+          const next = Math.round((currentScale + CHART_SCALE_STEP) * 100) / 100;
+          setScale(next, true);
+          slider.focus();
+        });
+        resetBtn.addEventListener('click', (event) => {
+          event.preventDefault();
+          setScale(CHART_SCALE_DEFAULT, true);
+          slider.focus();
+        });
+
+        persistScaleChange(false);
+      }
+
+      content.appendChild(frameWrap);
+      fragment.appendChild(grp);
+      activeCardIds.add(g.id);
+      registerCard(g.id, grp);
+      rememberCardDimensions(grp, width, height);
+      setupMinSizeWatcher(grp, frameWrap);
+
       return;
     }
-    const grp = document.createElement('section');
-    grp.className = 'group';
-    grp.dataset.id = g.id;
-    grp.dataset.resizing = '0';
+    const { section: grp, header: h, content } =
+      createGroupStructure('links', g.id);
     const gWidth2 =
       g.width ?? SIZE_MAP[g.wSize ?? 'md'].width;
     const gHeight2 =
@@ -1299,15 +2148,10 @@ export function render(state, editing, T, I, handlers, saveFn) {
     const gWSize2 = g.wSize ?? sizeFromWidth(gWidth2);
     const gHSize2 = g.hSize ?? sizeFromHeight(gHeight2);
     applySize(grp, gWidth2, gHeight2, gWSize2, gHSize2);
+    initResizeHandles(grp);
     grp.style.resize = editing ? 'both' : 'none';
     grp.style.overflow = editing ? 'auto' : 'visible';
     if (editing) {
-      grp.addEventListener('mousedown', (e) => {
-        if (isWithinResizeHandle(grp, e)) {
-          e.preventDefault();
-          beginCardResize(grp, e);
-        }
-      });
       grp.draggable = true;
       grp.addEventListener('dragstart', (e) => {
         if (grp.dataset.resizing === '1') {
@@ -1340,34 +2184,47 @@ export function render(state, editing, T, I, handlers, saveFn) {
       }
     });
 
-    const h = document.createElement('div');
-    h.className = 'group-header';
     h.innerHTML = `
         <div class="group-title">
-          <button type="button" class="toggle" data-collapse title="${g.collapsed ? T.expand : T.collapse}" aria-label="${g.collapsed ? T.expand : T.collapse}">${g.collapsed ? I.arrowDown : I.arrowUp}</button>
-          <span class="dot" style="background:${g.color || '#6ee7b7'}"></span>
+          <span class="dot" aria-hidden="true"></span>
           <h2 title="Tempkite, kad perrikiuotumėte" class="handle">${escapeHtml(g.name)}</h2>
         </div>
-        ${
-          editing
-            ? `<div class="group-actions">
-          <button type="button" title="${T.moveUp}" aria-label="${T.moveUp}" data-act="up">${I.arrowUp}</button>
-          <button type="button" title="${T.moveDown}" aria-label="${T.moveDown}" data-act="down">${I.arrowDown}</button>
-          <button type="button" title="${T.openAll}" aria-label="${T.openAll}" data-act="openAll">${I.arrowUpRight}</button>
-          <button type="button" title="${T.addItem}" aria-label="${T.addItem}" data-act="add">${I.plus}</button>
-          <button type="button" title="${T.editGroup}" aria-label="${T.editGroup}" data-act="edit">${I.pencil}</button>
-          <button type="button" class="btn-danger" title="${T.deleteGroup}" aria-label="${T.deleteGroup}" data-act="del">${I.trash}</button>
-        </div>`
-            : ''
-        }`;
+        <div class="group-actions" role="group" aria-label="${T.actions}">
+          <div class="group-actions__always" role="group" aria-label="${T.groupQuickActions}">
+            <button type="button" title="${T.openAll}" aria-label="${T.openAll}" data-act="openAll">${I.arrowUpRight}</button>
+          </div>
+          ${
+            editing
+              ? `<div class="group-actions__edit" role="group" aria-label="${T.groupEditActions}">
+            <button type="button" title="${T.moveUp}" aria-label="${T.moveUp}" data-act="up">${I.arrowUp}</button>
+            <button type="button" title="${T.moveDown}" aria-label="${T.moveDown}" data-act="down">${I.arrowDown}</button>
+            <button type="button" title="${T.addItem}" aria-label="${T.addItem}" data-act="add">${I.plus}</button>
+            <button type="button" title="${T.editGroup}" aria-label="${T.editGroup}" data-act="edit">${I.pencil}</button>
+            <button type="button" class="btn-danger" title="${T.deleteGroup}" aria-label="${T.deleteGroup}" data-act="del">${I.trash}</button>
+          </div>`
+              : ''
+          }
+        </div>`;
+    h.style.setProperty('--dot-color', g.color || '#6ee7b7');
+
+    const openAllLinks = () => {
+      g.items
+        .filter((i) => i.type === 'link')
+        .forEach((i) => window.open(i.url, '_blank'));
+    };
+
+    const openAllBtn = h.querySelector('[data-act="openAll"]');
+    if (openAllBtn) {
+      openAllBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        openAllLinks();
+      });
+    }
 
     h.addEventListener('click', (e) => {
-      const btn = e.target.closest('button');
+      const btn = e.target.closest('button[data-act]');
       if (!btn) return;
-      if (btn.dataset.collapse !== undefined) {
-        handlers.toggleCollapse(g.id);
-        return;
-      }
       const act = btn.dataset.act;
       if (act === 'add') return handlers.addItem(g.id);
       if (act === 'edit') return handlers.editGroup(g.id);
@@ -1392,13 +2249,9 @@ export function render(state, editing, T, I, handlers, saveFn) {
         return;
       }
       if (act === 'openAll') {
-        g.items
-          .filter((i) => i.type === 'link')
-          .forEach((i) => window.open(i.url, '_blank'));
+        openAllLinks();
       }
     });
-
-    grp.appendChild(h);
 
     const itemsWrap = document.createElement('div');
     itemsWrap.className = 'items';
@@ -1427,9 +2280,29 @@ export function render(state, editing, T, I, handlers, saveFn) {
     });
 
     if (filteredItems.length === 0) {
-      const empty = document.createElement('div');
-      empty.className = 'empty';
-      empty.textContent = q ? T.noMatches : T.empty;
+      const emptyMessage = q ? T.noMatches : T.empty;
+      const emptyAction =
+        editing && typeof handlers?.addItem === 'function'
+          ? {
+              actionLabel: T.addItem,
+              onAction: () => {
+                // Allow adding items straight from the empty state while editing.
+                const result = handlers.addItem(g.id);
+                if (result && typeof result.then === 'function') {
+                  return result
+                    .then(() =>
+                      render(state, editing, T, I, handlers, saveFn),
+                    )
+                    .catch((err) => {
+                      console.error('Failed to add item from empty state', err);
+                    });
+                }
+                render(state, editing, T, I, handlers, saveFn);
+                return null;
+              },
+            }
+          : undefined;
+      const empty = createEmptyState(I.clipboard, emptyMessage, emptyAction);
       itemsScroll.appendChild(empty);
     } else {
       filteredItems.forEach((it) => {
@@ -1600,13 +2473,17 @@ export function render(state, editing, T, I, handlers, saveFn) {
     }
 
     itemsWrap.appendChild(itemsScroll);
-    grp.appendChild(itemsWrap);
-    if (g.collapsed) grp.classList.add('collapsed');
-    groupsEl.appendChild(grp);
+    content.appendChild(itemsWrap);
+    fragment.appendChild(grp);
+    activeCardIds.add(g.id);
+    registerCard(g.id, grp);
     const inner = grp.querySelector('.items');
     setupMinSizeWatcher(grp, inner);
 
   });
+
+  groupsEl.replaceChildren(fragment);
+  cleanupCardRegistry(activeCardIds);
 
   const applyLayoutAnimations = () => {
     if (!groupsEl) return;
@@ -1614,6 +2491,14 @@ export function render(state, editing, T, I, handlers, saveFn) {
     groupEls.forEach((el) => {
       const id = el.dataset?.id;
       if (!id) return;
+      if (id === 'reminders') {
+        // Reminder card turinys kinta dažnai (pvz., laikmačiams tiksint),
+        // todėl praleidžiame bendrą FLIP animaciją, kad kortelė nešokinėtų.
+        if (el.dataset.anim) {
+          el.removeAttribute('data-anim');
+        }
+        return;
+      }
       const previous = previousGroupRects.get(id);
       if (
         previous &&
@@ -1672,22 +2557,24 @@ export function render(state, editing, T, I, handlers, saveFn) {
   } else {
     applyLayoutAnimations();
   }
-
-  const totalGroups = state.groups.length;
-  const totalItems = countGroupItems(state.groups);
-  statsEl.textContent = `${totalGroups} grupės • ${totalItems} įrašai`;
 }
 
 export function updateEditingUI(editing, state, T, I, renderFn) {
   const editBtn = document.getElementById('editBtn');
-  document.body.classList.toggle('editing', editing);
-  editBtn.innerHTML = editing
-    ? `${I.check} <span>${T.done}</span>`
-    : `${I.pencil} <span>${T.editMode}</span>`;
-  ['addMenu', 'importBtn', 'exportBtn'].forEach((id) => {
-    const el = document.getElementById(id);
-    if (el) el.style.display = editing ? 'inline-flex' : 'none';
-  });
+  const hasRemindersCard = Boolean(state.remindersCard?.enabled);
+  if (!editing) {
+    hideResizeGuide();
+  }
+  if (document.body) {
+    document.body.classList.toggle('editing', editing);
+    document.body.classList.toggle('is-editing', editing);
+    document.body.classList.toggle('has-reminders-card', hasRemindersCard);
+  }
+  if (editBtn) {
+    editBtn.innerHTML = editing
+      ? `${I.check} <span>${T.done}</span>`
+      : `${I.pencil} <span>${T.editMode}</span>`;
+  }
   const addBtn = document.getElementById('addBtn');
   const addGroup = document.getElementById('addGroup');
   const addChart = document.getElementById('addChart');
@@ -1699,11 +2586,6 @@ export function updateEditingUI(editing, state, T, I, renderFn) {
   if (addNote) addNote.innerHTML = `${I.plus} ${T.addNote}`;
   if (addReminder) {
     addReminder.innerHTML = `${I.clock} ${T.addRemindersCard}`;
-    if (!editing) addReminder.style.display = 'none';
-    else
-      addReminder.style.display = state.remindersCard?.enabled
-        ? 'none'
-        : 'block';
   }
   renderFn();
 }

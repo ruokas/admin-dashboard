@@ -2,11 +2,13 @@ import { load, save, seed } from './storage.js';
 import { render, updateEditingUI, toSheetEmbed } from './render.js';
 import { SIZE_MAP, sizeFromWidth, sizeFromHeight } from './sizes.js';
 import {
+  remindersDialog,
   groupFormDialog,
   itemFormDialog,
   chartFormDialog,
   confirmDialog as confirmDlg,
   notesDialog,
+  helpDialog,
 } from './forms.js';
 import { I } from './icons.js';
 import { Tlt } from './i18n.js';
@@ -17,6 +19,14 @@ import {
   resetReminderFormState,
   updateReminderFormState,
 } from './reminder-form-state.js';
+import {
+  REMINDER_MODE_NONE,
+  REMINDER_MODE_DATETIME,
+  REMINDER_MODE_MINUTES,
+  parseReminderInput,
+  hasReminderPayload,
+} from './reminder-input.js';
+import { getActiveTheme, resolveChartThemeUrl } from './theme-utils.js';
 
 const T = Tlt;
 // Hook future English localisation: fill T.en when translations are ready.
@@ -24,14 +34,22 @@ T.en = T.en || {};
 
 const DEFAULT_TITLE = 'Admin skydelis';
 
-const REMINDER_MODE_NONE = 'none';
-const REMINDER_MODE_DATETIME = 'datetime';
-const REMINDER_MODE_MINUTES = 'minutes';
 const REMINDER_SNOOZE_MINUTES = 5;
 const REMINDER_QUICK_MINUTES = [5, 10, 15, 30];
 const NOTE_DEFAULT_COLOR = '#fef08a';
 const NOTE_DEFAULT_FONT = 20;
 const NOTE_DEFAULT_PADDING = 20;
+const MAX_ICON_IMAGE_BYTES = 200 * 1024; // 200 KB
+const MAX_ICON_IMAGE_LENGTH = Math.ceil((MAX_ICON_IMAGE_BYTES / 3) * 4) + 512;
+const ICON_IMAGE_ACCEPT_PREFIX = 'data:image/';
+
+function sanitizeIconImage(value) {
+  if (typeof value !== 'string') return '';
+  const trimmed = value.trim();
+  if (!trimmed || !trimmed.startsWith(ICON_IMAGE_ACCEPT_PREFIX)) return '';
+  if (trimmed.length > MAX_ICON_IMAGE_LENGTH) return '';
+  return trimmed;
+}
 
 function formatDateTimeLocal(ts) {
   if (!Number.isFinite(ts)) return '';
@@ -54,6 +72,36 @@ function normalizeNoteColor(value) {
   return NOTE_DEFAULT_COLOR;
 }
 
+function computeSizeMetadata(width, height) {
+  const widthMatch = Object.entries(SIZE_MAP).find(([, dims]) => {
+    const preset = Number.isFinite(dims?.width) ? Math.round(dims.width) : NaN;
+    return Number.isFinite(preset) && Number.isFinite(width) && Math.round(width) === preset;
+  });
+  const heightMatch = Object.entries(SIZE_MAP).find(([, dims]) => {
+    const preset = Number.isFinite(dims?.height) ? Math.round(dims.height) : NaN;
+    return Number.isFinite(preset) && Number.isFinite(height) && Math.round(height) === preset;
+  });
+  return {
+    sizePreset: {
+      width: widthMatch ? widthMatch[0] : null,
+      height: heightMatch ? heightMatch[0] : null,
+    },
+    customWidth: widthMatch ? null : Number.isFinite(width) ? Math.round(width) : null,
+    customHeight: heightMatch ? null : Number.isFinite(height) ? Math.round(height) : null,
+  };
+}
+
+function applySizeMetadata(target, width, height) {
+  if (!target) return;
+  const meta = computeSizeMetadata(width, height);
+  target.sizePreset = meta.sizePreset;
+  if (meta.customWidth != null) target.customWidth = meta.customWidth;
+  else delete target.customWidth;
+  if (meta.customHeight != null) target.customHeight = meta.customHeight;
+  else delete target.customHeight;
+  return meta;
+}
+
 const editBtn = document.getElementById('editBtn');
 // const syncStatus = document.getElementById('syncStatus'); // Sheets sync indikatorius (išjungta)
 const searchEl = document.getElementById('q');
@@ -67,6 +115,18 @@ const addMenu = document.getElementById('addMenu');
 const addMenuList = document.getElementById('addMenuList');
 const addBtn = document.getElementById('addBtn');
 const addMenuBackdrop = addMenu?.querySelector('[data-menu-backdrop]') ?? null;
+const helpBtn = document.getElementById('helpBtn');
+const searchClearBtn = document.getElementById('searchClear');
+const pageIconImageBtn = document.getElementById('pageIconImageBtn');
+const pageIconClearBtn = document.getElementById('pageIconClearBtn');
+const pageIconFileInput = document.getElementById('pageIconFile');
+const dataMenu = document.getElementById('dataMenu');
+const dataMenuBtn = document.getElementById('dataMenuBtn');
+const dataMenuList = document.getElementById('dataMenuList');
+let pageIconImageEl = null;
+
+applyPageIconActionLabels();
+applyDataMenuLabels();
 
 if (addMenu && !addMenu.dataset.open) {
   addMenu.dataset.open = '0';
@@ -80,32 +140,250 @@ if (addBtn) {
   }
   addBtn.setAttribute('aria-expanded', addMenu?.dataset.open === '1' ? 'true' : 'false');
 }
+if (dataMenu && !dataMenu.dataset.open) {
+  dataMenu.dataset.open = '0';
+}
+if (dataMenuBtn) {
+  if (!dataMenuBtn.hasAttribute('aria-controls')) {
+    dataMenuBtn.setAttribute('aria-controls', 'dataMenuList');
+  }
+  if (!dataMenuBtn.hasAttribute('aria-haspopup')) {
+    dataMenuBtn.setAttribute('aria-haspopup', 'true');
+  }
+  dataMenuBtn.setAttribute('aria-expanded', dataMenu?.dataset.open === '1' ? 'true' : 'false');
+}
 
 let state = load() || seed();
 if (!Array.isArray(state.groups)) state.groups = [];
 if (!state.title) state.title = DEFAULT_TITLE;
+if (typeof state.icon !== 'string') state.icon = '';
+if (typeof state.iconImage !== 'string') state.iconImage = '';
+state.iconImage = sanitizeIconImage(state.iconImage);
+if (state.iconImage) state.icon = '';
 let editing = false;
 let reminders;
+let debouncedSearchRender = null;
 
 normaliseReminderState();
 
 pageTitleEl.textContent = state.title;
-pageIconEl.textContent = state.icon || '';
-document.title = state.title;
+updatePageIconPresentation();
+document.title = state.title || DEFAULT_TITLE;
 
 pageTitleEl.addEventListener('input', () => {
   if (!editing) return;
-  state.title = pageTitleEl.textContent.trim();
-  document.title = state.title;
+  const rawTitle = pageTitleEl.textContent;
+  const trimmedTitle = rawTitle.trim();
+  state.title = trimmedTitle;
+  if (!trimmedTitle) {
+    pageTitleEl.textContent = '';
+    const selection = window.getSelection();
+    if (selection) {
+      const range = document.createRange();
+      range.selectNodeContents(pageTitleEl);
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+  }
+  document.title = state.title || DEFAULT_TITLE;
   persistState();
 });
 pageIconEl.addEventListener('input', () => {
   if (!editing) return;
-  state.icon = pageIconEl.textContent.trim();
+  state.iconImage = '';
+  state.icon = pageIconEl.textContent.replace(/\s+/g, ' ').trim();
+  updatePageIconPresentation({ preserveTextSelection: true });
   persistState();
 });
 
+if (pageIconImageBtn && pageIconFileInput) {
+  pageIconImageBtn.addEventListener('click', () => {
+    if (!editing) return;
+    pageIconFileInput.click();
+  });
+}
+
+if (pageIconClearBtn) {
+  pageIconClearBtn.addEventListener('click', () => {
+    if (!editing) return;
+    state.icon = '';
+    state.iconImage = '';
+    pageIconEl.textContent = '';
+    updatePageIconPresentation();
+    persistState();
+    pageIconEl.focus();
+  });
+}
+
+if (pageIconFileInput) {
+  pageIconFileInput.addEventListener('change', (event) => handlePageIconFileSelection(event));
+}
+
 const uid = () => crypto.randomUUID().slice(0, 8);
+
+const openHelp = () => helpDialog(T);
+
+const updateSearchClearVisibility = () => {
+  if (!searchClearBtn) return;
+  const hasValue = Boolean(searchEl?.value?.trim());
+  searchClearBtn.hidden = !hasValue;
+};
+
+function applyPageIconActionLabels() {
+  if (pageIconImageBtn) {
+    pageIconImageBtn.innerHTML = `${I.camera} <span class="page-icon-action-label" aria-hidden="true">${T.pageIconImage}</span>`;
+    pageIconImageBtn.querySelector('svg')?.setAttribute('aria-hidden', 'true');
+    pageIconImageBtn.setAttribute('aria-label', T.pageIconImage);
+  }
+  if (pageIconClearBtn) {
+    pageIconClearBtn.innerHTML = `${I.close} <span class="page-icon-action-label" aria-hidden="true">${T.pageIconClear}</span>`;
+    pageIconClearBtn.querySelector('svg')?.setAttribute('aria-hidden', 'true');
+    pageIconClearBtn.setAttribute('aria-label', T.pageIconClear);
+  }
+}
+
+function applyDataMenuLabels() {
+  if (!dataMenu) return;
+  const menuLabel = dataMenuBtn?.querySelector('[data-menu-label]');
+  if (menuLabel) {
+    menuLabel.textContent = T.dataMenu || 'Duomenys';
+  }
+  const importLabel = dataMenu.querySelector('[data-menu-import] span');
+  if (importLabel) {
+    importLabel.textContent = T.import || 'Importuoti';
+  }
+  const exportLabel = dataMenu.querySelector('[data-menu-export] span');
+  if (exportLabel) {
+    exportLabel.textContent = T.export || 'Eksportuoti';
+  }
+}
+
+function updatePageIconPresentation(options = {}) {
+  if (!pageIconEl) return;
+  const { preserveTextSelection = false } = options;
+  const placeholder = T.pageIconPlaceholder || '🖼';
+  pageIconEl.dataset.placeholder = placeholder;
+
+  const iconText = typeof state?.icon === 'string' ? state.icon.trim() : '';
+  const sanitizedImage = sanitizeIconImage(state?.iconImage || '');
+  if (state && state.iconImage !== sanitizedImage) {
+    state.iconImage = sanitizedImage;
+  }
+  const hasImage = Boolean(sanitizedImage);
+  const isEmpty = !hasImage && iconText === '';
+
+  pageIconEl.dataset.empty = isEmpty ? '1' : '0';
+  pageIconEl.classList.toggle('page-icon--image', hasImage);
+
+  if (hasImage) {
+    if (!pageIconImageEl) {
+      pageIconImageEl = document.createElement('img');
+      pageIconImageEl.decoding = 'async';
+      pageIconImageEl.loading = 'lazy';
+    }
+    const altText = T.pageIconImageAlt || T.pageIconImage || 'Puslapio piktograma';
+    if (pageIconImageEl.alt !== altText) pageIconImageEl.alt = altText;
+    if (pageIconImageEl.src !== sanitizedImage) {
+      pageIconImageEl.src = sanitizedImage;
+    }
+    if (pageIconEl.firstChild !== pageIconImageEl) {
+      pageIconEl.textContent = '';
+      pageIconEl.appendChild(pageIconImageEl);
+    }
+    pageIconEl.setAttribute('role', 'img');
+    pageIconEl.setAttribute('aria-hidden', 'false');
+    pageIconEl.setAttribute('aria-label', altText);
+  } else {
+    if (pageIconImageEl?.parentNode === pageIconEl) {
+      pageIconImageEl.remove();
+    }
+    if (!preserveTextSelection) {
+      pageIconEl.textContent = iconText;
+    }
+    pageIconEl.removeAttribute('role');
+    pageIconEl.removeAttribute('aria-label');
+    pageIconEl.setAttribute('aria-hidden', 'true');
+  }
+
+  const canEditText = Boolean(editing) && !hasImage;
+  pageIconEl.contentEditable = canEditText ? 'true' : 'false';
+
+  const imageHint = T.pageIconImageHint || '';
+  const editHint = T.pageIconEditHint || '';
+  if (editing) {
+    pageIconEl.title = hasImage ? imageHint : editHint;
+  } else if (hasImage && imageHint) {
+    pageIconEl.title = imageHint;
+  } else {
+    pageIconEl.removeAttribute('title');
+  }
+
+  if (pageIconImageBtn) {
+    const label = T.pageIconImageAria || T.pageIconImage || 'Paveikslėlis';
+    pageIconImageBtn.disabled = !editing;
+    pageIconImageBtn.setAttribute('aria-label', label);
+    pageIconImageBtn.title = T.pageIconImage || '';
+    pageIconImageBtn.setAttribute('aria-disabled', editing ? 'false' : 'true');
+  }
+
+  if (pageIconClearBtn) {
+    const clearLabel = T.pageIconClearAria || T.pageIconClear || 'Pašalinti';
+    pageIconClearBtn.hidden = isEmpty;
+    pageIconClearBtn.disabled = !editing;
+    pageIconClearBtn.setAttribute('aria-label', clearLabel);
+    pageIconClearBtn.title = T.pageIconClear || '';
+    pageIconClearBtn.setAttribute('aria-disabled', editing ? 'false' : 'true');
+  }
+}
+
+function handlePageIconFileSelection(event) {
+  const input = event?.target;
+  if (!editing) {
+    if (input) input.value = '';
+    return;
+  }
+  const file = input?.files?.[0];
+  if (!file) {
+    if (input) input.value = '';
+    return;
+  }
+  if (!file.type?.startsWith('image/')) {
+    alert(T.pageIconImageInvalid || 'Pasirinkite paveikslėlio failą.');
+    input.value = '';
+    return;
+  }
+  if (file.size > MAX_ICON_IMAGE_BYTES) {
+    alert(T.pageIconImageTooLarge || 'Paveikslėlis per didelis (maks. 200 KB).');
+    input.value = '';
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    const result = reader.result;
+    if (typeof result === 'string' && result.startsWith(ICON_IMAGE_ACCEPT_PREFIX)) {
+      const sanitized = sanitizeIconImage(result);
+      if (!sanitized) {
+        alert(T.pageIconImageTooLarge || 'Paveikslėlis per didelis (maks. 200 KB).');
+        return;
+      }
+      state.iconImage = sanitized;
+      state.icon = '';
+      updatePageIconPresentation();
+      persistState();
+    } else {
+      alert(T.pageIconImageInvalid || T.pageIconImageError || 'Nepavyko įkelti paveikslėlio.');
+    }
+  };
+  reader.onerror = () => {
+    alert(T.pageIconImageError || 'Nepavyko įkelti paveikslėlio.');
+  };
+  reader.onloadend = () => {
+    if (input) input.value = '';
+  };
+  reader.readAsDataURL(file);
+}
 
 function prefersReducedMotion() {
   return (
@@ -125,6 +403,88 @@ function findItemElement(gid, iid) {
   return Array.from(
     document.querySelectorAll('.item[data-gid][data-iid]'),
   ).find((el) => el.dataset?.gid === gid && el.dataset?.iid === iid);
+}
+
+function scheduleRender(callback, delay = 150) {
+  let controller = null;
+  let timeoutId = null;
+  let rafId = null;
+
+  const clearTimers = () => {
+    if (timeoutId != null) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+    if (rafId != null && typeof cancelAnimationFrame === 'function') {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
+  };
+
+  const schedule = (...args) => {
+    if (controller) {
+      controller.abort();
+    }
+    controller = new AbortController();
+    const { signal } = controller;
+
+    clearTimers();
+
+    const start = () => {
+      if (signal.aborted) return;
+      const run = () => {
+        if (signal.aborted) return;
+        controller = null;
+        callback(...args);
+      };
+      if (typeof requestAnimationFrame === 'function') {
+        rafId = requestAnimationFrame(run);
+      } else {
+        run();
+      }
+    };
+
+    if (
+      typeof window !== 'undefined' &&
+      typeof window.setTimeout === 'function' &&
+      delay > 0
+    ) {
+      timeoutId = window.setTimeout(start, delay);
+    } else {
+      start();
+    }
+
+    signal.addEventListener(
+      'abort',
+      () => {
+        clearTimers();
+      },
+      { once: true },
+    );
+
+    return controller;
+  };
+
+  schedule.cancel = () => {
+    if (controller) {
+      controller.abort();
+      controller = null;
+    } else {
+      clearTimers();
+    }
+  };
+
+  schedule.flush = (...args) => {
+    schedule.cancel();
+    const run = () => callback(...args);
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(run);
+    } else {
+      run();
+    }
+  };
+
+  return schedule;
 }
 
 function animateLeaveElement(el) {
@@ -185,75 +545,6 @@ function parseIframe(html) {
   return { src, height };
 }
 
-function parseReminderInput(data = {}) {
-  const rawMode =
-    typeof data.reminderMode === 'string' ? data.reminderMode : '';
-  let mode;
-  if (rawMode === REMINDER_MODE_MINUTES || rawMode === REMINDER_MODE_DATETIME) {
-    mode = rawMode;
-  } else if (rawMode === REMINDER_MODE_NONE) {
-    mode = REMINDER_MODE_NONE;
-  }
-  if (!mode) {
-    if (
-      (typeof data.reminderAt === 'string' && data.reminderAt) ||
-      Number.isFinite(data.reminderAt)
-    ) {
-      mode = REMINDER_MODE_DATETIME;
-    } else if (
-      Number.isFinite(data.reminderMinutes) &&
-      data.reminderMinutes > 0
-    ) {
-      mode = REMINDER_MODE_MINUTES;
-    } else {
-      mode = REMINDER_MODE_NONE;
-    }
-  }
-
-  let reminderMinutes = 0;
-  if (mode === REMINDER_MODE_MINUTES) {
-    const minutesVal = Number.parseInt(data.reminderMinutes, 10);
-    if (Number.isFinite(minutesVal) && minutesVal > 0) {
-      reminderMinutes = Math.max(0, Math.round(minutesVal));
-    } else if (
-      Number.isFinite(data.reminderMinutes) &&
-      data.reminderMinutes > 0
-    ) {
-      reminderMinutes = Math.max(0, Math.round(data.reminderMinutes));
-    }
-    if (reminderMinutes <= 0) {
-      reminderMinutes = 0;
-      mode = REMINDER_MODE_NONE;
-    }
-  }
-
-  let reminderAt = null;
-  if (mode === REMINDER_MODE_DATETIME) {
-    let parsed = NaN;
-    if (typeof data.reminderAt === 'string') {
-      const raw = data.reminderAt.trim();
-      if (raw) parsed = Date.parse(raw);
-    } else if (Number.isFinite(data.reminderAt)) {
-      parsed = data.reminderAt;
-    }
-    if (Number.isFinite(parsed)) {
-      reminderAt = Math.round(parsed);
-    } else {
-      mode = REMINDER_MODE_NONE;
-    }
-  }
-
-  return { mode, reminderMinutes, reminderAt };
-}
-
-function hasReminderPayload(data = {}) {
-  return (
-    Object.prototype.hasOwnProperty.call(data, 'reminderMode') ||
-    Object.prototype.hasOwnProperty.call(data, 'reminderMinutes') ||
-    Object.prototype.hasOwnProperty.call(data, 'reminderAt')
-  );
-}
-
 function normaliseReminderState() {
   if (!Array.isArray(state.customReminders)) state.customReminders = [];
   else
@@ -280,24 +571,31 @@ function normaliseReminderState() {
       showQuick: false,
     };
     const dims = SIZE_MAP.md || {};
-    state.remindersCard.width = Number.isFinite(dims.width) ? dims.width : 360;
-    state.remindersCard.height = Number.isFinite(dims.height) ? dims.height : 360;
+    const width = Number.isFinite(dims.width) ? dims.width : 360;
+    const height = Number.isFinite(dims.height) ? dims.height : 360;
+    state.remindersCard.width = width;
+    state.remindersCard.height = height;
+    applySizeMetadata(state.remindersCard, width, height);
   } else {
     const fallbackWidth = SIZE_MAP[state.remindersCard.wSize || 'md']?.width || 360;
-    const fallbackHeight =
-      SIZE_MAP[state.remindersCard.hSize || 'md']?.height || 360;
-    if (!Number.isFinite(state.remindersCard.width))
-      state.remindersCard.width = fallbackWidth;
-    if (!Number.isFinite(state.remindersCard.height))
-      state.remindersCard.height = fallbackHeight;
-    state.remindersCard.wSize =
-      state.remindersCard.wSize || sizeFromWidth(state.remindersCard.width);
-    state.remindersCard.hSize =
-      state.remindersCard.hSize || sizeFromHeight(state.remindersCard.height);
-    state.remindersCard.width =
-      SIZE_MAP[state.remindersCard.wSize]?.width ?? fallbackWidth;
-    state.remindersCard.height =
-      SIZE_MAP[state.remindersCard.hSize]?.height ?? fallbackHeight;
+    const fallbackHeight = SIZE_MAP[state.remindersCard.hSize || 'md']?.height || 360;
+    let width = Number.isFinite(state.remindersCard.customWidth)
+      ? state.remindersCard.customWidth
+      : Number.isFinite(state.remindersCard.width)
+        ? state.remindersCard.width
+        : fallbackWidth;
+    let height = Number.isFinite(state.remindersCard.customHeight)
+      ? state.remindersCard.customHeight
+      : Number.isFinite(state.remindersCard.height)
+        ? state.remindersCard.height
+        : fallbackHeight;
+    width = Number.isFinite(width) ? Math.max(0, Math.round(width)) : fallbackWidth;
+    height = Number.isFinite(height) ? Math.max(0, Math.round(height)) : fallbackHeight;
+    state.remindersCard.wSize = sizeFromWidth(width);
+    state.remindersCard.hSize = sizeFromHeight(height);
+    state.remindersCard.width = width;
+    state.remindersCard.height = height;
+    applySizeMetadata(state.remindersCard, width, height);
     state.remindersCard.title =
       typeof state.remindersCard.title === 'string'
         ? state.remindersCard.title
@@ -618,8 +916,11 @@ function addRemindersCard() {
       showQuick: false,
     };
     const dims = SIZE_MAP.md || {};
-    state.remindersCard.width = Number.isFinite(dims.width) ? dims.width : 360;
-    state.remindersCard.height = Number.isFinite(dims.height) ? dims.height : 360;
+    const width = Number.isFinite(dims.width) ? dims.width : 360;
+    const height = Number.isFinite(dims.height) ? dims.height : 360;
+    state.remindersCard.width = width;
+    state.remindersCard.height = height;
+    applySizeMetadata(state.remindersCard, width, height);
   } else {
     state.remindersCard.enabled = true;
   }
@@ -649,10 +950,47 @@ function setRemindersCardTitle(title) {
 }
 
 function openReminders() {
-  if (state.remindersCard?.enabled && focusReminderCard()) {
+  const entries = buildReminderEntries().sort((a, b) => a.at - b.at);
+  if (!state.remindersCard?.enabled && entries.length === 0) {
+    alert(T.reminderCardMissing);
     return;
   }
-  alert(T.reminderCardMissing);
+  return remindersDialog(T, entries, async (action, key, meta = {}) => {
+    if (!action) return null;
+    if (action === 'remove') {
+      clearReminder(key);
+      const idx = entries.findIndex((entry) => entry.key === key);
+      if (idx >= 0) entries.splice(idx, 1);
+      return { removed: true };
+    }
+    if (action === 'snooze') {
+      const minutes = Number.isFinite(Number(meta?.minutes))
+        ? Number(meta.minutes)
+        : REMINDER_SNOOZE_MINUTES;
+      const newAt = snoozeReminder(key, minutes);
+      if (Number.isFinite(newAt)) {
+        const target = entries.find((entry) => entry.key === key);
+        if (target) target.at = newAt;
+        persistState();
+        renderAll();
+        return { at: newAt };
+      }
+      return { error: true };
+    }
+    if (action === 'edit') {
+      const entry = entries.find((item) => item.key === key);
+      if (!entry) return { error: true };
+      await editReminder(entry);
+      return { edited: true };
+    }
+    if (action === 'quick') {
+      const minutes = Number.isFinite(Number(meta?.minutes))
+        ? Number(meta.minutes)
+        : REMINDER_SNOOZE_MINUTES;
+      return createQuickReminder(minutes);
+    }
+    return null;
+  });
 }
 
 /**
@@ -697,12 +1035,17 @@ function persistState() {
 }
 
 function renderAll() {
+  if (typeof debouncedSearchRender?.cancel === 'function') {
+    debouncedSearchRender.cancel();
+  }
   render(
     state,
     editing,
     T,
     I,
     {
+      addGroup: () => addGroup(),
+      beginAddGroup: () => beginAddGroupFlow(),
       addItem,
       editGroup,
       editItem,
@@ -713,7 +1056,6 @@ function renderAll() {
         edit: (id) => editNoteCard(id),
         remove: (id) => removeNoteCard(id),
       },
-      toggleCollapse,
       confirmDialog: (msg) => confirmDlg(T, msg),
       reminders: {
         entries: () => buildReminderEntries().sort((a, b) => a.at - b.at),
@@ -749,12 +1091,24 @@ function updateUI() {
   }
   updateEditingUI(editing, state, T, I, renderAll);
   pageTitleEl.contentEditable = editing;
-  pageIconEl.contentEditable = editing;
   if (!editing) {
-    state.title = pageTitleEl.textContent.trim();
-    state.icon = pageIconEl.textContent.trim();
-    document.title = state.title;
+    const trimmedTitle = pageTitleEl.textContent.trim();
+    state.title = trimmedTitle;
+    if (!trimmedTitle) {
+      pageTitleEl.textContent = '';
+    }
+    if (!state.iconImage) {
+      state.icon = pageIconEl.textContent.trim();
+    }
+    document.title = state.title || DEFAULT_TITLE;
+    updatePageIconPresentation({ preserveTextSelection: false });
     persistState();
+  } else {
+    if (!pageTitleEl.textContent.trim()) {
+      pageTitleEl.textContent = '';
+    }
+    const preserveSelection = document.activeElement === pageIconEl;
+    updatePageIconPresentation({ preserveTextSelection: preserveSelection });
   }
 }
 
@@ -765,18 +1119,33 @@ function findNoteById(id) {
 async function addGroup() {
   const res = await groupFormDialog(T);
   if (!res) return;
-  const dims = SIZE_MAP[res.size] ?? SIZE_MAP.md;
-  state.groups.push({
+  const dims = SIZE_MAP.md;
+  const width = Number.isFinite(dims.width) ? dims.width : SIZE_MAP.md.width;
+  const height = Number.isFinite(dims.height) ? dims.height : SIZE_MAP.md.height;
+  const group = {
     id: uid(),
     name: res.name,
     color: res.color,
-    ...dims,
-    wSize: sizeFromWidth(dims.width),
-    hSize: sizeFromHeight(dims.height),
+    width,
+    height,
+    wSize: sizeFromWidth(width),
+    hSize: sizeFromHeight(height),
     items: [],
-  });
+  };
+  applySizeMetadata(group, width, height);
+  state.groups.push(group);
   persistState();
   renderAll();
+}
+
+function beginAddGroupFlow() {
+  if (editing) {
+    addGroup();
+    return;
+  }
+  editing = true;
+  updateUI();
+  setTimeout(() => addGroup(), 0);
 }
 
 async function editGroup(gid) {
@@ -785,15 +1154,17 @@ async function editGroup(gid) {
   const res = await groupFormDialog(T, {
     name: g.name,
     color: g.color,
-    size: sizeFromWidth(g.width ?? 360),
   });
   if (!res) return;
   g.name = res.name;
   g.color = res.color;
-  const dims2 = SIZE_MAP[res.size] ?? SIZE_MAP.md;
-  Object.assign(g, dims2);
-  g.wSize = sizeFromWidth(dims2.width);
-  g.hSize = sizeFromHeight(dims2.height);
+  const width = Number.isFinite(g.width) ? g.width : SIZE_MAP.md.width;
+  const height = Number.isFinite(g.height) ? g.height : SIZE_MAP.md.height;
+  g.width = width;
+  g.height = height;
+  g.wSize = sizeFromWidth(width);
+  g.hSize = sizeFromHeight(height);
+  applySizeMetadata(g, width, height);
   persistState();
   renderAll();
 }
@@ -801,18 +1172,19 @@ async function editGroup(gid) {
 async function addChart() {
   const res = await chartFormDialog(T);
   if (!res) return;
-  const parsed = parseIframe(res.url);
-  const cDims = SIZE_MAP.md;
-  state.groups.push({
+  const chart = {
     id: uid(),
     type: 'chart',
     name: res.title,
-    url: parsed.src,
-    h: parsed.height ? parsed.height + 56 : undefined,
-    ...cDims,
-    wSize: sizeFromWidth(cDims.width),
-    hSize: sizeFromHeight(cDims.height),
-  });
+    url: res.url,
+    width: Number.isFinite(SIZE_MAP.md.width) ? SIZE_MAP.md.width : 640,
+    height: Number.isFinite(SIZE_MAP.md.height) ? SIZE_MAP.md.height : 480,
+    scale: 1,
+  };
+  chart.wSize = sizeFromWidth(chart.width);
+  chart.hSize = sizeFromHeight(chart.height);
+  applySizeMetadata(chart, chart.width, chart.height);
+  state.groups.push(chart);
   persistState();
   renderAll();
 }
@@ -827,6 +1199,8 @@ async function addNoteCard() {
   });
   if (res === null) return;
   const dims = SIZE_MAP.md;
+  const width = Number.isFinite(dims.width) ? dims.width : SIZE_MAP.md.width;
+  const height = Number.isFinite(dims.height) ? dims.height : SIZE_MAP.md.height;
   const note = {
     id: uid(),
     type: 'note',
@@ -834,13 +1208,14 @@ async function addNoteCard() {
     name: res.title.trim() || T.notes,
     text: res.text,
     color: normalizeNoteColor(res.color),
-    width: dims.width,
-    height: dims.height,
-    wSize: sizeFromWidth(dims.width),
-    hSize: sizeFromHeight(dims.height),
+    width,
+    height,
+    wSize: sizeFromWidth(width),
+    hSize: sizeFromHeight(height),
     fontSize: Number.isFinite(res.size) ? res.size : NOTE_DEFAULT_FONT,
     padding: Number.isFinite(res.padding) ? res.padding : NOTE_DEFAULT_PADDING,
   };
+  applySizeMetadata(note, width, height);
   state.groups.push(note);
   persistState();
   renderAll();
@@ -884,22 +1259,24 @@ async function removeNoteCard(noteId) {
 async function editChart(gid) {
   const g = state.groups.find((x) => x.id === gid && x.type === 'chart');
   if (!g) return;
-  const res = await chartFormDialog(T, { title: g.name, url: g.url });
+  const res = await chartFormDialog(T, {
+    title: g.name,
+    url: g.url,
+  });
   if (!res) return;
-  const parsed = parseIframe(res.url);
   g.name = res.title;
-  g.url = parsed.src;
-  if (parsed.height) {
-    g.h = parsed.height + 56;
-  }
-  persistState();
-  renderAll();
-}
-
-function toggleCollapse(gid) {
-  const g = state.groups.find((x) => x.id === gid);
-  if (!g) return;
-  g.collapsed = !g.collapsed;
+  g.url = res.url;
+  delete g.frameHeight;
+  delete g.frameWidth;
+  delete g.h;
+  delete g.w;
+  const width = Number.isFinite(g.width) ? g.width : SIZE_MAP.md.width;
+  const height = Number.isFinite(g.height) ? g.height : SIZE_MAP.md.height;
+  g.width = width;
+  g.height = height;
+  g.wSize = sizeFromWidth(width);
+  g.hSize = sizeFromHeight(height);
+  applySizeMetadata(g, width, height);
   persistState();
   renderAll();
 }
@@ -1029,9 +1406,11 @@ function importJson(file) {
       state.title = importedTitle || DEFAULT_TITLE;
       const importedIcon =
         typeof state.icon === 'string' ? state.icon.trim() : '';
-      state.icon = importedIcon;
+      const importedIconImage = sanitizeIconImage(state.iconImage || '');
+      state.iconImage = importedIconImage;
+      state.icon = importedIconImage ? '' : importedIcon;
       pageTitleEl.textContent = state.title || DEFAULT_TITLE;
-      pageIconEl.textContent = state.icon || '';
+      updatePageIconPresentation();
       document.title = state.title || DEFAULT_TITLE;
       persistState();
       renderAll();
@@ -1043,15 +1422,7 @@ function importJson(file) {
 }
 
 function applyTheme() {
-  let theme = localStorage.getItem('ed_dash_theme');
-  if (!theme) {
-    const prefersLight =
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia('(prefers-color-scheme: light)').matches;
-    // Pakeiskite numatytą temą, jei skyriui reikia kitokio starto varianto.
-    theme = prefersLight ? 'light' : 'dark';
-    localStorage.setItem('ed_dash_theme', theme);
-  }
+  const theme = getActiveTheme();
   const light = theme === 'light';
   document.documentElement.classList.toggle('theme-light', light);
   const label = light ? T.toDark : T.toLight;
@@ -1059,12 +1430,36 @@ function applyTheme() {
   themeBtn.innerHTML = `${icon}`;
   themeBtn.setAttribute('aria-label', label);
   themeBtn.title = label;
+  syncChartFrameThemes(theme);
 }
 
 function toggleTheme() {
   const curr = localStorage.getItem('ed_dash_theme') === 'light';
   localStorage.setItem('ed_dash_theme', curr ? 'dark' : 'light');
   applyTheme();
+}
+
+function syncChartFrameThemes(theme) {
+  const frames = document.querySelectorAll('.group--chart iframe');
+  frames.forEach((frame) => {
+    if (!(frame instanceof HTMLIFrameElement)) return;
+    const storedBase = typeof frame.dataset.baseUrl === 'string'
+      ? frame.dataset.baseUrl.trim()
+      : '';
+    const baseUrl = storedBase || frame.getAttribute('data-base-url') || frame.src;
+    const resolvedBase = typeof baseUrl === 'string' ? baseUrl.trim() : '';
+    const nextSrc = resolveChartThemeUrl(resolvedBase, theme);
+    if (!storedBase && resolvedBase) {
+      frame.dataset.baseUrl = resolvedBase;
+    }
+    if (frame.dataset.themeApplied === theme && frame.src === nextSrc) {
+      return;
+    }
+    frame.dataset.themeApplied = theme;
+    if (nextSrc && frame.src !== nextSrc) {
+      frame.src = nextSrc;
+    }
+  });
 }
 
 // Galimos spalvų schemos; pridėkite savo jei reikia
@@ -1155,6 +1550,198 @@ document.addEventListener('click', (event) => {
   }
 });
 
+let isDataMenuOpen = false;
+let lastFocusedBeforeDataMenu = null;
+
+function focusFirstDataMenuItem() {
+  if (!dataMenuList) return;
+  const focusTarget = dataMenuList.querySelector('button:not([disabled])');
+  if (!(focusTarget instanceof HTMLElement)) return;
+  const focusFn = () => focusTarget.focus();
+  if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+    window.requestAnimationFrame(focusFn);
+  } else {
+    focusFn();
+  }
+}
+
+function setDataMenuOpenState(open, options = {}) {
+  if (!dataMenu || !dataMenuBtn) return;
+  const { restoreFocus = false } = options;
+  isDataMenuOpen = Boolean(open);
+  dataMenu.dataset.open = open ? '1' : '0';
+  dataMenuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (!open && restoreFocus) {
+    const focusTarget =
+      lastFocusedBeforeDataMenu instanceof HTMLElement ? lastFocusedBeforeDataMenu : dataMenuBtn;
+    if (focusTarget && typeof focusTarget.focus === 'function') {
+      focusTarget.focus();
+    }
+  }
+  if (!open) {
+    lastFocusedBeforeDataMenu = null;
+  }
+}
+
+function openDataMenu(options = {}) {
+  if (!dataMenu || !dataMenuBtn) return;
+  if (isDataMenuOpen) {
+    if (options.focusFirst) {
+      focusFirstDataMenuItem();
+    }
+    return;
+  }
+  lastFocusedBeforeDataMenu =
+    document.activeElement instanceof HTMLElement ? document.activeElement : dataMenuBtn;
+  setDataMenuOpenState(true);
+  if (options.focusFirst) {
+    focusFirstDataMenuItem();
+  }
+  document.addEventListener('pointerdown', handleDataMenuPointerDown, true);
+  document.addEventListener('focusin', handleDataMenuFocusIn, true);
+  document.addEventListener('keydown', handleDataMenuKeydown, true);
+}
+
+function closeDataMenu(options = {}) {
+  if (!isDataMenuOpen) return;
+  const { restoreFocus = false } = options;
+  setDataMenuOpenState(false, { restoreFocus });
+  document.removeEventListener('pointerdown', handleDataMenuPointerDown, true);
+  document.removeEventListener('focusin', handleDataMenuFocusIn, true);
+  document.removeEventListener('keydown', handleDataMenuKeydown, true);
+}
+
+function toggleDataMenu(options = {}) {
+  if (isDataMenuOpen) {
+    closeDataMenu();
+  } else {
+    openDataMenu(options);
+  }
+}
+
+function handleDataMenuPointerDown(event) {
+  if (!isDataMenuOpen || !dataMenu) return;
+  if (!dataMenu.contains(event.target)) {
+    closeDataMenu();
+  }
+}
+
+function handleDataMenuFocusIn(event) {
+  if (!isDataMenuOpen || !dataMenu) return;
+  if (!dataMenu.contains(event.target)) {
+    closeDataMenu();
+  }
+}
+
+function handleDataMenuKeydown(event) {
+  if (!isDataMenuOpen) return;
+  if (event.key === 'Escape' || event.key === 'Esc') {
+    event.preventDefault();
+    closeDataMenu({ restoreFocus: true });
+  }
+}
+
+if (dataMenu && dataMenuBtn && dataMenuList) {
+  dataMenuBtn.addEventListener('click', () => {
+    toggleDataMenu();
+  });
+  dataMenuBtn.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      openDataMenu({ focusFirst: true });
+    } else if (event.key === 'Escape' || event.key === 'Esc') {
+      event.preventDefault();
+      closeDataMenu({ restoreFocus: true });
+    }
+  });
+}
+
+// Išplėtimui: jei reikia kitų laukų ignoravimo, papildykite žemiau esantį sąrašą.
+function isEditableTarget(target) {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName?.toLowerCase();
+  if (target.isContentEditable) return true;
+  if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
+  if (target.getAttribute('role') === 'textbox') return true;
+  return false;
+}
+
+// Jei keičiate paieškos identifikatorių – atnaujinkite fokusavimo logiką.
+function focusSearchField() {
+  if (!(searchEl instanceof HTMLElement)) return;
+  const focusOptions = { preventScroll: true };
+  try {
+    searchEl.focus(focusOptions);
+  } catch (err) {
+    searchEl.focus();
+  }
+  if (typeof searchEl.select === 'function') {
+    searchEl.select();
+  }
+}
+
+// Pagrindinis kelias naujiems trumpiniams – praplėskite šią funkciją arba pridėkite naują.
+function openAddMenuViaShortcut() {
+  if (!addMenu || !addBtn) return;
+  if (!editing) {
+    editing = true;
+    updateUI();
+  }
+  if (!editing) return;
+  if (!isMenuOpen()) {
+    setMenuOpen(true, { restoreFocus: false });
+  }
+  if (addMenuList && addMenuList.contains(document.activeElement)) {
+    return;
+  }
+  if (addMenuList) {
+    const firstItem = addMenuList.querySelector('button:not([disabled])');
+    if (firstItem instanceof HTMLElement) {
+      firstItem.focus();
+    }
+  }
+}
+
+document.addEventListener('keydown', (event) => {
+  if (event.defaultPrevented) return;
+  const target = event.target instanceof HTMLElement ? event.target : null;
+  if (isEditableTarget(target)) {
+    return;
+  }
+
+  const key = event.key?.toLowerCase();
+  if (
+    event.key === '/' &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.altKey
+  ) {
+    event.preventDefault();
+    focusSearchField();
+    return;
+  }
+
+  if (
+    (event.key === '?' || (event.shiftKey && key === '/')) &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.altKey
+  ) {
+    event.preventDefault();
+    openHelp();
+    return;
+  }
+
+  if (
+    (event.ctrlKey || event.metaKey) &&
+    !event.altKey &&
+    key === 'k'
+  ) {
+    event.preventDefault();
+    openAddMenuViaShortcut();
+  }
+});
+
 [
   ['addGroup', () => addGroup()],
   ['addChart', () => addChart()],
@@ -1175,17 +1762,33 @@ if (addRemindersBtn) {
     addRemindersCard();
   });
 }
-document.getElementById('exportBtn').addEventListener('click', () => {
-  exportJson(state);
-});
-document.getElementById('importBtn').addEventListener('click', () => {
-  document.getElementById('fileInput').click();
-});
+const exportBtnEl = document.getElementById('exportBtn');
+if (exportBtnEl) {
+  exportBtnEl.addEventListener('click', () => {
+    closeDataMenu();
+    exportJson(state);
+  });
+}
+const importBtnEl = document.getElementById('importBtn');
+if (importBtnEl) {
+  importBtnEl.addEventListener('click', () => {
+    closeDataMenu();
+    document.getElementById('fileInput')?.click();
+  });
+}
 document.getElementById('fileInput').addEventListener('change', (e) => {
   const f = e.target.files[0];
   if (f) importJson(f);
   e.target.value = '';
 });
+
+if (helpBtn) {
+  helpBtn.innerHTML = `${I.help}<span class="sr-only">${T.help}</span>`;
+  helpBtn.setAttribute('aria-label', `${T.help}`);
+  helpBtn.setAttribute('data-tooltip', `${T.help}`);
+  helpBtn.title = `${T.help}`;
+  helpBtn.addEventListener('click', () => openHelp());
+}
 
 reminders = createReminderManager();
 if (remindersBtn) {
@@ -1200,9 +1803,33 @@ editBtn.addEventListener('click', () => {
   updateUI();
 });
 if (searchLabelEl) searchLabelEl.textContent = T.searchLabel;
+debouncedSearchRender = scheduleRender(() => renderAll());
 searchEl.setAttribute('aria-label', T.searchLabel);
 searchEl.placeholder = T.searchPH;
-searchEl.addEventListener('input', renderAll);
+searchEl.addEventListener('focus', () => updateSearchClearVisibility());
+searchEl.addEventListener('input', () => {
+  updateSearchClearVisibility();
+  debouncedSearchRender();
+});
+searchEl.addEventListener('change', () => {
+  updateSearchClearVisibility();
+  debouncedSearchRender.flush();
+});
+if (searchClearBtn) {
+  searchClearBtn.innerHTML = `${I.close}<span class="sr-only">${T.searchClear}</span>`;
+  searchClearBtn.setAttribute('aria-label', T.searchClear);
+  searchClearBtn.title = T.searchClear;
+  searchClearBtn.addEventListener('click', () => {
+    searchEl.value = '';
+    updateSearchClearVisibility();
+    if (typeof debouncedSearchRender?.cancel === 'function') {
+      debouncedSearchRender.cancel();
+    }
+    renderAll();
+    searchEl.focus();
+  });
+  updateSearchClearVisibility();
+}
 
 applyTheme();
 applyColor();

@@ -4,16 +4,43 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Admin skydelis</title>
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles/base.css" />
+    <link rel="stylesheet" href="styles/components/header.css" />
+    <link rel="stylesheet" href="styles/components/buttons.css" />
+    <link rel="stylesheet" href="styles/components/card.css" />
+    <link rel="stylesheet" href="styles/components/layout.css" />
+    <link rel="stylesheet" href="styles/components/reminders.css" />
   </head>
   <body>
-    <header>
-      <div class="title">
-        <span id="pageIcon" class="page-icon" aria-hidden="true"></span>
+    <header class="page-header">
+      <div class="title" data-zone="title">
+        <div class="page-icon-wrapper">
+          <span id="pageIcon" class="page-icon" aria-hidden="true"></span>
+          <div class="page-icon-actions" data-editing-visible>
+            <button
+              id="pageIconImageBtn"
+              class="page-icon-action"
+              type="button"
+              aria-label="Paveikslėlis"
+            >
+              <span aria-hidden="true">🖼</span>
+              <span class="page-icon-action-label" aria-hidden="true">Paveikslėlis</span>
+            </button>
+            <button
+              id="pageIconClearBtn"
+              class="page-icon-action page-icon-action--remove"
+              type="button"
+              hidden
+              aria-label="Pašalinti"
+            >
+              <span aria-hidden="true">✕</span>
+              <span class="page-icon-action-label" aria-hidden="true">Pašalinti</span>
+            </button>
+          </div>
+        </div>
         <h1 id="pageTitle"></h1>
-        <span class="badge" id="stats"></span>
       </div>
-      <div class="controls">
+      <div class="primary-actions" data-zone="primary-actions">
         <div class="search">
           <svg
             width="20"
@@ -37,19 +64,24 @@
             />
           </svg>
           <label for="q" id="searchLabel" class="sr-only">Paieška</label>
-          <input id="q" placeholder="Paieška nuorodose…" />
+          <input
+            id="q"
+            class="search-input"
+            placeholder="Paieška nuorodose…"
+            aria-keyshortcuts="/"
+          />
+          <button id="searchClear" class="search-clear" type="button" hidden>
+            <span class="sr-only">Išvalyti</span>
+          </button>
         </div>
-        <!-- Fallback labels so buttons are visible before JS initializes -->
-        <button id="editBtn" class="btn-outline" type="button">
-          Redaguoti
-        </button>
-        <div id="addMenu" data-open="0" style="display: none">
+        <div id="addMenu" data-open="0" data-editing-visible>
           <button
             id="addBtn"
             type="button"
             aria-haspopup="true"
             aria-expanded="false"
             aria-controls="addMenuList"
+            aria-keyshortcuts="Control+K"
           >
             ＋ Pridėti
           </button>
@@ -69,35 +101,81 @@
             <button id="addNote" type="button" role="menuitem">
               ＋ Pridėti pastabas
             </button>
-            <button id="addRemindersCard" type="button" role="menuitem">
+            <button
+              id="addRemindersCard"
+              type="button"
+              role="menuitem"
+              data-editing-visible
+              data-hide-when-reminders
+            >
               ⏰ Pridėti priminimų kortelę
             </button>
           </div>
         </div>
-        <button
-          id="importBtn"
-          class="btn-outline"
-          type="button"
-          style="display: none"
-        >
-          <svg class="icon" viewBox="0 0 24 24">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" /></svg
-          ><span>Importuoti</span>
+      </div>
+      <div class="secondary-actions" data-zone="secondary-actions">
+        <!-- Fallback labels so buttons are visible before JS initializes -->
+        <button id="editBtn" class="btn-outline" type="button">
+          Redaguoti
         </button>
-        <button
-          id="exportBtn"
-          class="btn-outline"
-          type="button"
-          style="display: none"
+        <div
+          id="dataMenu"
+          class="data-menu"
+          data-open="0"
+          data-editing-visible
         >
-          <svg class="icon" viewBox="0 0 24 24">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="17 8 12 3 7 8" />
-            <line x1="12" y1="3" x2="12" y2="15" /></svg
-          ><span>Eksportuoti</span>
-        </button>
+          <button
+            id="dataMenuBtn"
+            class="btn-outline data-menu-toggle"
+            type="button"
+            aria-haspopup="true"
+            aria-expanded="false"
+            aria-controls="dataMenuList"
+          >
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2h-7.59a2 2 0 0 1-1.41-.59L9.59 1.41A2 2 0 0 0 8.17 1H4a2 2 0 0 0-2 2v17a2 2 0 0 0 2 2z"
+              />
+            </svg>
+            <span data-menu-label>Duomenys</span>
+            <svg class="chevron" viewBox="0 0 24 24" aria-hidden="true">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div
+            id="dataMenuList"
+            class="menu-panel"
+            role="menu"
+            aria-labelledby="dataMenuBtn"
+          >
+            <button
+              id="importBtn"
+              type="button"
+              role="menuitem"
+              data-menu-import
+            >
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              <span>Importuoti</span>
+            </button>
+            <button
+              id="exportBtn"
+              type="button"
+              role="menuitem"
+              data-menu-export
+            >
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+              <span>Eksportuoti</span>
+            </button>
+          </div>
+        </div>
         <button
           id="themeBtn"
           class="btn"
@@ -108,6 +186,18 @@
             <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
           </svg>
         </button>
+        <button
+          id="helpBtn"
+          class="btn-outline help-btn"
+          type="button"
+          aria-label="Pagalba"
+          aria-keyshortcuts="?"
+          title="Pagalba"
+          data-tooltip="Pagalba"
+        >
+          <span aria-hidden="true">?</span>
+          <span class="sr-only">Pagalba</span>
+        </button>
         <span id="syncStatus" role="status" aria-live="polite"></span>
       </div>
     </header>
@@ -117,6 +207,12 @@
     </main>
 
     <input type="file" id="fileInput" accept="application/json" hidden />
+    <input
+      type="file"
+      id="pageIconFile"
+      accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
+      hidden
+    />
 
     <script src="app.js" type="module"></script>
   </body>
