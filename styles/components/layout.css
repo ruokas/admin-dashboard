@@ -284,11 +284,25 @@ a.item {
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   border-radius: var(--space-3);
-  background: var(--surface);
+  background-color: var(--surface);
+  background-color: color-mix(in srgb, var(--surface) 55%, transparent);
   border: 1px solid var(--border-strong);
-  box-shadow: var(--shadow);
+  border-color: color-mix(in srgb, var(--border-strong) 60%, transparent);
+  box-shadow: none;
   color: var(--text);
+  backdrop-filter: blur(6px);
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
   z-index: 2;
+}
+
+.chart-scale-controls:hover,
+.chart-scale-controls:focus-within {
+  background-color: color-mix(in srgb, var(--surface) 85%, transparent);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow);
 }
 
 .chart-scale-controls__label {
