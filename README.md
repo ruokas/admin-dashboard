@@ -60,8 +60,9 @@ Statinis HTML + ES moduliais paremtas prietaisų skydas, skirtas greitam informa
 
 ## Duomenų saugojimas ir atsarginės kopijos
 - Būsena saugoma `localStorage` po raktu `ed_dashboard_lt_v1` (grupės, įrašai, priminimai, pavadinimas, ikonos, temos nustatymai).
-- **Eksportas**: mygtukas „Eksportuoti“ išsaugo JSON failą (`<pavadinimas>-<timestamp>.json`).
-- **Importas**: mygtukas „Importuoti“ leidžia pasirinkti anksčiau eksportuotą JSON; importuojant atnaujinamas pavadinimas, ikona, kortelės, priminimai.
+- **Duomenų meniu**: mygtukas „Duomenys“ redagavimo režime išskleidžia importo ir eksporto parinktis.
+- **Eksportas**: parinktis „Eksportuoti“ išsaugo JSON failą (`<pavadinimas>-<timestamp>.json`).
+- **Importas**: parinktis „Importuoti“ leidžia pasirinkti anksčiau eksportuotą JSON; importuojant atnaujinamas pavadinimas, ikona, kortelės, priminimai.
 - **Google Sheets** (pasirenkama):
   1. `storage.js` faile atnaujinkite `SCRIPT_URL` į savo Apps Script „web app“ adresą.
   2. `app.js` faile atkomentuokite `const sheets = sheetsSync(...)` ir prijunkite `sheets.export()`/`sheets.import()` prie reikiamų mygtukų.

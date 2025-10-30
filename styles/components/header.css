@@ -175,6 +175,53 @@ body.is-editing .page-icon-action:focus-visible .page-icon-action-label {
   width: 100%;
 }
 
+.data-menu {
+  position: relative;
+  display: inline-flex;
+}
+
+.data-menu-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1-5);
+}
+
+.data-menu-toggle .chevron {
+  width: 16px;
+  height: 16px;
+}
+
+.data-menu .menu-panel {
+  left: auto;
+  right: 0;
+  top: calc(100% + var(--space-1));
+  min-width: 200px;
+  padding: var(--space-1);
+  gap: var(--space-1);
+  transform-origin: top right;
+  z-index: 6;
+}
+
+.data-menu .menu-panel button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.data-menu .menu-panel .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.data-menu[data-open='1'] .menu-panel {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+  visibility: visible;
+  animation: menu-pop 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 .help-btn {
   position: relative;
   display: inline-flex;

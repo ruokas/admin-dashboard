@@ -120,9 +120,13 @@ const searchClearBtn = document.getElementById('searchClear');
 const pageIconImageBtn = document.getElementById('pageIconImageBtn');
 const pageIconClearBtn = document.getElementById('pageIconClearBtn');
 const pageIconFileInput = document.getElementById('pageIconFile');
+const dataMenu = document.getElementById('dataMenu');
+const dataMenuBtn = document.getElementById('dataMenuBtn');
+const dataMenuList = document.getElementById('dataMenuList');
 let pageIconImageEl = null;
 
 applyPageIconActionLabels();
+applyDataMenuLabels();
 
 if (addMenu && !addMenu.dataset.open) {
   addMenu.dataset.open = '0';
@@ -135,6 +139,18 @@ if (addBtn) {
     addBtn.setAttribute('aria-haspopup', 'true');
   }
   addBtn.setAttribute('aria-expanded', addMenu?.dataset.open === '1' ? 'true' : 'false');
+}
+if (dataMenu && !dataMenu.dataset.open) {
+  dataMenu.dataset.open = '0';
+}
+if (dataMenuBtn) {
+  if (!dataMenuBtn.hasAttribute('aria-controls')) {
+    dataMenuBtn.setAttribute('aria-controls', 'dataMenuList');
+  }
+  if (!dataMenuBtn.hasAttribute('aria-haspopup')) {
+    dataMenuBtn.setAttribute('aria-haspopup', 'true');
+  }
+  dataMenuBtn.setAttribute('aria-expanded', dataMenu?.dataset.open === '1' ? 'true' : 'false');
 }
 
 let state = load() || seed();
@@ -224,6 +240,22 @@ function applyPageIconActionLabels() {
     pageIconClearBtn.innerHTML = `${I.close} <span class="page-icon-action-label" aria-hidden="true">${T.pageIconClear}</span>`;
     pageIconClearBtn.querySelector('svg')?.setAttribute('aria-hidden', 'true');
     pageIconClearBtn.setAttribute('aria-label', T.pageIconClear);
+  }
+}
+
+function applyDataMenuLabels() {
+  if (!dataMenu) return;
+  const menuLabel = dataMenuBtn?.querySelector('[data-menu-label]');
+  if (menuLabel) {
+    menuLabel.textContent = T.dataMenu || 'Duomenys';
+  }
+  const importLabel = dataMenu.querySelector('[data-menu-import] span');
+  if (importLabel) {
+    importLabel.textContent = T.import || 'Importuoti';
+  }
+  const exportLabel = dataMenu.querySelector('[data-menu-export] span');
+  if (exportLabel) {
+    exportLabel.textContent = T.export || 'Eksportuoti';
   }
 }
 
@@ -1518,6 +1550,112 @@ document.addEventListener('click', (event) => {
   }
 });
 
+let isDataMenuOpen = false;
+let lastFocusedBeforeDataMenu = null;
+
+function focusFirstDataMenuItem() {
+  if (!dataMenuList) return;
+  const focusTarget = dataMenuList.querySelector('button:not([disabled])');
+  if (!(focusTarget instanceof HTMLElement)) return;
+  const focusFn = () => focusTarget.focus();
+  if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+    window.requestAnimationFrame(focusFn);
+  } else {
+    focusFn();
+  }
+}
+
+function setDataMenuOpenState(open, options = {}) {
+  if (!dataMenu || !dataMenuBtn) return;
+  const { restoreFocus = false } = options;
+  isDataMenuOpen = Boolean(open);
+  dataMenu.dataset.open = open ? '1' : '0';
+  dataMenuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (!open && restoreFocus) {
+    const focusTarget =
+      lastFocusedBeforeDataMenu instanceof HTMLElement ? lastFocusedBeforeDataMenu : dataMenuBtn;
+    if (focusTarget && typeof focusTarget.focus === 'function') {
+      focusTarget.focus();
+    }
+  }
+  if (!open) {
+    lastFocusedBeforeDataMenu = null;
+  }
+}
+
+function openDataMenu(options = {}) {
+  if (!dataMenu || !dataMenuBtn) return;
+  if (isDataMenuOpen) {
+    if (options.focusFirst) {
+      focusFirstDataMenuItem();
+    }
+    return;
+  }
+  lastFocusedBeforeDataMenu =
+    document.activeElement instanceof HTMLElement ? document.activeElement : dataMenuBtn;
+  setDataMenuOpenState(true);
+  if (options.focusFirst) {
+    focusFirstDataMenuItem();
+  }
+  document.addEventListener('pointerdown', handleDataMenuPointerDown, true);
+  document.addEventListener('focusin', handleDataMenuFocusIn, true);
+  document.addEventListener('keydown', handleDataMenuKeydown, true);
+}
+
+function closeDataMenu(options = {}) {
+  if (!isDataMenuOpen) return;
+  const { restoreFocus = false } = options;
+  setDataMenuOpenState(false, { restoreFocus });
+  document.removeEventListener('pointerdown', handleDataMenuPointerDown, true);
+  document.removeEventListener('focusin', handleDataMenuFocusIn, true);
+  document.removeEventListener('keydown', handleDataMenuKeydown, true);
+}
+
+function toggleDataMenu(options = {}) {
+  if (isDataMenuOpen) {
+    closeDataMenu();
+  } else {
+    openDataMenu(options);
+  }
+}
+
+function handleDataMenuPointerDown(event) {
+  if (!isDataMenuOpen || !dataMenu) return;
+  if (!dataMenu.contains(event.target)) {
+    closeDataMenu();
+  }
+}
+
+function handleDataMenuFocusIn(event) {
+  if (!isDataMenuOpen || !dataMenu) return;
+  if (!dataMenu.contains(event.target)) {
+    closeDataMenu();
+  }
+}
+
+function handleDataMenuKeydown(event) {
+  if (!isDataMenuOpen) return;
+  if (event.key === 'Escape' || event.key === 'Esc') {
+    event.preventDefault();
+    closeDataMenu({ restoreFocus: true });
+  }
+}
+
+if (dataMenu && dataMenuBtn && dataMenuList) {
+  dataMenuBtn.addEventListener('click', () => {
+    toggleDataMenu();
+  });
+  dataMenuBtn.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      openDataMenu({ focusFirst: true });
+    } else if (event.key === 'Escape' || event.key === 'Esc') {
+      event.preventDefault();
+      closeDataMenu({ restoreFocus: true });
+    }
+  });
+}
+
 // Išplėtimui: jei reikia kitų laukų ignoravimo, papildykite žemiau esantį sąrašą.
 function isEditableTarget(target) {
   if (!(target instanceof HTMLElement)) return false;
@@ -1624,12 +1762,20 @@ if (addRemindersBtn) {
     addRemindersCard();
   });
 }
-document.getElementById('exportBtn').addEventListener('click', () => {
-  exportJson(state);
-});
-document.getElementById('importBtn').addEventListener('click', () => {
-  document.getElementById('fileInput').click();
-});
+const exportBtnEl = document.getElementById('exportBtn');
+if (exportBtnEl) {
+  exportBtnEl.addEventListener('click', () => {
+    closeDataMenu();
+    exportJson(state);
+  });
+}
+const importBtnEl = document.getElementById('importBtn');
+if (importBtnEl) {
+  importBtnEl.addEventListener('click', () => {
+    closeDataMenu();
+    document.getElementById('fileInput')?.click();
+  });
+}
 document.getElementById('fileInput').addEventListener('change', (e) => {
   const f = e.target.files[0];
   if (f) importJson(f);
