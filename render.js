@@ -232,11 +232,13 @@ function updateChartSizingForCard(
   displayHeight,
   options = {},
 ) {
-  if (!cardEl || !cardEl.classList?.contains('group--chart')) return;
+  if (!cardEl || !cardEl.classList?.contains('group--chart')) return false;
   const embed = cardEl.querySelector('.embed');
   const frameWrap = cardEl.querySelector('.chart-frame');
   const iframe = frameWrap?.querySelector('iframe');
-  if (!embed || !frameWrap || !iframe) return;
+  if (!embed || !frameWrap || !iframe) return false;
+
+  let stateChanged = false;
 
   const metrics = measureChartHostMetrics(cardEl, displayWidth, displayHeight);
   const hostWidthExtra = Math.max(0, metrics.widthExtra || 0);
@@ -394,6 +396,40 @@ function updateChartSizingForCard(
     cardEl.dataset.chartHostWidthExtra = String(hostWidthExtra);
     cardEl.dataset.chartHostHeightExtra = String(hostHeightExtra);
   }
+
+  if (options?.commitState && currentState && cardEl?.dataset?.id) {
+    const chartState = currentState.groups?.find(
+      (g) => g && g.id === cardEl.dataset.id && g.type === 'chart',
+    );
+    if (chartState) {
+      const nextBaseWidth = clampChartWidth(resolvedBaseWidth);
+      const nextBaseHeight = clampChartHeight(resolvedBaseHeight);
+      if (Number.isFinite(nextBaseWidth)) {
+        const rounded = Math.round(nextBaseWidth);
+        if (chartState.frameWidth !== rounded) stateChanged = true;
+        chartState.frameWidth = rounded;
+        chartState.w = rounded;
+      } else {
+        if ('frameWidth' in chartState) stateChanged = true;
+        if ('w' in chartState) stateChanged = true;
+        delete chartState.frameWidth;
+        delete chartState.w;
+      }
+      if (Number.isFinite(nextBaseHeight)) {
+        const rounded = Math.round(nextBaseHeight);
+        if (chartState.frameHeight !== rounded) stateChanged = true;
+        chartState.frameHeight = rounded;
+        chartState.h = rounded;
+      } else {
+        if ('frameHeight' in chartState) stateChanged = true;
+        if ('h' in chartState) stateChanged = true;
+        delete chartState.frameHeight;
+        delete chartState.h;
+      }
+    }
+  }
+
+  return stateChanged;
 }
 
 function getCardDimensions(el) {
@@ -1249,11 +1285,17 @@ function applyResizeForElement(el, width, height, wSize, hSize) {
   const metadata = resolveSizeMetadata(finalWidth, finalHeight);
 
   applySize(el, finalWidth, finalHeight, wSize, hSize);
-  updateChartSizingForCard(el, finalWidth, finalHeight, { commitState: true });
+  const chartStateChanged = updateChartSizingForCard(el, finalWidth, finalHeight, {
+    commitState: true,
+  });
   if (el.dataset.id === 'reminders') {
     const prev = currentState.remindersCard || {};
     const changed =
-      prev.width !== finalWidth || prev.height !== finalHeight || prev.wSize !== wSize || prev.hSize !== hSize;
+      !!chartStateChanged ||
+      prev.width !== finalWidth ||
+      prev.height !== finalHeight ||
+      prev.wSize !== wSize ||
+      prev.hSize !== hSize;
     currentState.remindersCard = {
       ...prev,
       width: finalWidth,
@@ -1269,7 +1311,11 @@ function applyResizeForElement(el, width, height, wSize, hSize) {
   const sg = currentState.groups.find((x) => x.id === el.dataset.id);
   if (!sg) return false;
   const changed =
-    sg.width !== finalWidth || sg.height !== finalHeight || sg.wSize !== wSize || sg.hSize !== hSize;
+    !!chartStateChanged ||
+    sg.width !== finalWidth ||
+    sg.height !== finalHeight ||
+    sg.wSize !== wSize ||
+    sg.hSize !== hSize;
   sg.width = finalWidth;
   sg.height = finalHeight;
   sg.wSize = wSize;
