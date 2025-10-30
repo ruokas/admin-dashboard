@@ -190,6 +190,11 @@ body.is-editing .page-icon-action:focus-visible .page-icon-action-label {
 .data-menu-toggle .chevron {
   width: 16px;
   height: 16px;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .data-menu .menu-panel {
