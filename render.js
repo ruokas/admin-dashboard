@@ -16,6 +16,11 @@ const MIN_SIZE_ADJUSTER = Symbol('minSizeAdjuster');
 const RESIZE_HANDLE_SIZE = 20;
 const RESIZE_HANDLER_KEY = Symbol('resizeHandler');
 
+const CHART_MIN_WIDTH = 200;
+const CHART_MAX_WIDTH = 2400;
+const CHART_MIN_HEIGHT = 120;
+const CHART_MAX_HEIGHT = 2000;
+
 let resizeGuideEl = null;
 let measureHostEl = null;
 
@@ -112,6 +117,398 @@ function rememberCardDimensions(el, width, height) {
   });
 }
 
+function clampChartWidth(value) {
+  const numeric = Number.parseFloat(value);
+  if (!Number.isFinite(numeric)) return null;
+  return Math.min(CHART_MAX_WIDTH, Math.max(CHART_MIN_WIDTH, Math.round(numeric)));
+}
+
+function clampChartHeight(value) {
+  const numeric = Number.parseFloat(value);
+  if (!Number.isFinite(numeric)) return null;
+  return Math.min(CHART_MAX_HEIGHT, Math.max(CHART_MIN_HEIGHT, Math.round(numeric)));
+}
+
+function parseChartNumber(value) {
+  const numeric = Number.parseFloat(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function measureChartHostMetrics(cardEl, fallbackWidth = null, fallbackHeight = null) {
+  const fallback = {
+    viewportWidth: null,
+    viewportHeight: null,
+    widthExtra: 0,
+    heightExtra: 0,
+    cardWidth: null,
+    cardHeight: null,
+  };
+  if (!cardEl || !(cardEl instanceof HTMLElement) || !cardEl.isConnected) {
+    return fallback;
+  }
+  const embed = cardEl.querySelector('.embed');
+  const content = cardEl.querySelector('.group-content');
+  const header = cardEl.querySelector('.group-header');
+
+  let cardRect = null;
+  try {
+    cardRect = cardEl.getBoundingClientRect();
+  } catch {}
+
+  const parseSize = (value) => {
+    const numeric = Number.parseFloat(value);
+    return Number.isFinite(numeric) ? numeric : 0;
+  };
+
+  const cardStyles = typeof window !== 'undefined' ? window.getComputedStyle(cardEl) : null;
+  const contentStyles = content && typeof window !== 'undefined' ? window.getComputedStyle(content) : null;
+  const embedStyles = embed && typeof window !== 'undefined' ? window.getComputedStyle(embed) : null;
+
+  let cardWidth = Number.isFinite(cardRect?.width) ? Math.round(cardRect.width) : null;
+  let cardHeight = Number.isFinite(cardRect?.height) ? Math.round(cardRect.height) : null;
+
+  if (!Number.isFinite(cardWidth) && Number.isFinite(fallbackWidth)) {
+    cardWidth = Math.round(fallbackWidth);
+  }
+  if (!Number.isFinite(cardHeight) && Number.isFinite(fallbackHeight)) {
+    cardHeight = Math.round(fallbackHeight);
+  }
+
+  const headerHeight = header
+    ? Math.max(0, Math.round(header.getBoundingClientRect?.().height || header.offsetHeight || 0))
+    : 0;
+
+  const cardBorderX = cardStyles
+    ? parseSize(cardStyles.borderLeftWidth) + parseSize(cardStyles.borderRightWidth)
+    : 0;
+  const cardBorderY = cardStyles
+    ? parseSize(cardStyles.borderTopWidth) + parseSize(cardStyles.borderBottomWidth)
+    : 0;
+  const contentPaddingX = contentStyles
+    ? parseSize(contentStyles.paddingLeft) + parseSize(contentStyles.paddingRight)
+    : 0;
+  const contentPaddingY = contentStyles
+    ? parseSize(contentStyles.paddingTop) + parseSize(contentStyles.paddingBottom)
+    : 0;
+  const embedPaddingX = embedStyles
+    ? parseSize(embedStyles.paddingLeft) + parseSize(embedStyles.paddingRight)
+    : 0;
+  const embedPaddingY = embedStyles
+    ? parseSize(embedStyles.paddingTop) + parseSize(embedStyles.paddingBottom)
+    : 0;
+  const embedBorderX = embedStyles
+    ? parseSize(embedStyles.borderLeftWidth) + parseSize(embedStyles.borderRightWidth)
+    : 0;
+  const embedBorderY = embedStyles
+    ? parseSize(embedStyles.borderTopWidth) + parseSize(embedStyles.borderBottomWidth)
+    : 0;
+
+  const widthExtra = Math.max(0, Math.round(cardBorderX + contentPaddingX + embedPaddingX + embedBorderX));
+  const heightExtra = Math.max(
+    0,
+    Math.round(cardBorderY + headerHeight + contentPaddingY + embedPaddingY + embedBorderY),
+  );
+
+  const viewportWidth = Number.isFinite(cardWidth) && cardWidth > widthExtra
+    ? Math.round(cardWidth - widthExtra)
+    : null;
+  const viewportHeight = Number.isFinite(cardHeight) && cardHeight > heightExtra
+    ? Math.round(cardHeight - heightExtra)
+    : null;
+
+  return {
+    viewportWidth: Number.isFinite(viewportWidth) ? viewportWidth : null,
+    viewportHeight: Number.isFinite(viewportHeight) ? viewportHeight : null,
+    widthExtra,
+    heightExtra,
+    cardWidth: Number.isFinite(cardWidth) ? cardWidth : null,
+    cardHeight: Number.isFinite(cardHeight) ? cardHeight : null,
+  };
+}
+
+function resolveChartLayout(cardEl, desiredWidth, desiredHeight, options = {}) {
+  if (!cardEl || !cardEl.classList?.contains('group--chart')) return null;
+  const frameWrap = cardEl.querySelector('.chart-frame');
+  const iframe = frameWrap?.querySelector('iframe');
+  if (!frameWrap || !iframe) return null;
+
+  const metrics = measureChartHostMetrics(cardEl, desiredWidth, desiredHeight);
+  const hostWidthExtra = Math.max(0, metrics.widthExtra || 0);
+  const hostHeightExtra = Math.max(0, metrics.heightExtra || 0);
+  const minHostWidth = Math.max(CHART_MIN_WIDTH + hostWidthExtra, CHART_MIN_WIDTH);
+  const minHostHeight = Math.max(CHART_MIN_HEIGHT + hostHeightExtra, CHART_MIN_HEIGHT);
+
+  const overrideBaseWidth = clampChartWidth(options.baseWidth);
+  const overrideBaseHeight = clampChartHeight(options.baseHeight);
+
+  let baseWidth =
+    clampChartWidth(overrideBaseWidth) ??
+    clampChartWidth(parseChartNumber(frameWrap.dataset?.width)) ??
+    clampChartWidth(parseChartNumber(iframe.dataset?.baseWidth)) ??
+    clampChartWidth(parseChartNumber(cardEl.dataset?.chartBaseWidth)) ??
+    clampChartWidth(parseChartNumber(cardEl.dataset?.chartDisplayWidth)) ??
+    clampChartWidth(parseChartNumber(metrics.viewportWidth)) ??
+    CHART_MIN_WIDTH;
+
+  let baseHeight =
+    clampChartHeight(overrideBaseHeight) ??
+    clampChartHeight(parseChartNumber(frameWrap.dataset?.height)) ??
+    clampChartHeight(parseChartNumber(iframe.dataset?.baseHeight)) ??
+    clampChartHeight(parseChartNumber(cardEl.dataset?.chartBaseHeight)) ??
+    clampChartHeight(parseChartNumber(cardEl.dataset?.chartDisplayHeight)) ??
+    clampChartHeight(parseChartNumber(metrics.viewportHeight)) ??
+    CHART_MIN_HEIGHT;
+
+  let hostWidth = Number.isFinite(desiredWidth)
+    ? Math.round(desiredWidth)
+    : Number.isFinite(metrics.cardWidth)
+      ? metrics.cardWidth
+      : clampChartWidth(parseChartNumber(cardEl.dataset?.chartHostWidth));
+  let hostHeight = Number.isFinite(desiredHeight)
+    ? Math.round(desiredHeight)
+    : Number.isFinite(metrics.cardHeight)
+      ? metrics.cardHeight
+      : clampChartHeight(parseChartNumber(cardEl.dataset?.chartHostHeight));
+
+  if (!Number.isFinite(hostWidth)) {
+    const fallback = Number.isFinite(baseWidth) ? baseWidth + hostWidthExtra : null;
+    hostWidth = Number.isFinite(fallback) ? fallback : minHostWidth;
+  }
+  if (!Number.isFinite(hostHeight)) {
+    const fallback = Number.isFinite(baseHeight) ? baseHeight + hostHeightExtra : null;
+    hostHeight = Number.isFinite(fallback) ? fallback : minHostHeight;
+  }
+
+  hostWidth = Math.max(minHostWidth, hostWidth || minHostWidth);
+  hostHeight = Math.max(minHostHeight, hostHeight || minHostHeight);
+
+  let viewportWidth = Math.max(CHART_MIN_WIDTH, Math.round(hostWidth - hostWidthExtra));
+  let viewportHeight = Math.max(CHART_MIN_HEIGHT, Math.round(hostHeight - hostHeightExtra));
+
+  if (!Number.isFinite(baseWidth) || baseWidth <= 0) {
+    baseWidth = Math.max(CHART_MIN_WIDTH, viewportWidth);
+  }
+  if (!Number.isFinite(baseHeight) || baseHeight <= 0) {
+    baseHeight = Math.max(CHART_MIN_HEIGHT, viewportHeight);
+  }
+
+  const clampScale = (value) => Math.max(0.05, Math.min(32, value));
+  const widthRatio = Number.isFinite(baseWidth) && baseWidth > 0 ? viewportWidth / baseWidth : 1;
+  const heightRatio = Number.isFinite(baseHeight) && baseHeight > 0 ? viewportHeight / baseHeight : 1;
+  let limitedByWidth = widthRatio <= heightRatio;
+  let limitedByHeight = heightRatio < widthRatio;
+  if (!Number.isFinite(widthRatio)) limitedByWidth = false;
+  if (!Number.isFinite(heightRatio)) limitedByHeight = false;
+
+  let scaleCandidate = limitedByWidth ? widthRatio : heightRatio;
+  if (!Number.isFinite(scaleCandidate) || scaleCandidate <= 0) {
+    scaleCandidate = 1;
+  }
+  let scale = clampScale(scaleCandidate);
+
+  let displayWidth = Math.round(baseWidth * scale);
+  let displayHeight = Math.round(baseHeight * scale);
+
+  if (limitedByWidth) {
+    displayWidth = Math.min(viewportWidth, Math.max(CHART_MIN_WIDTH, displayWidth));
+    displayHeight = Math.min(
+      viewportHeight,
+      Math.max(CHART_MIN_HEIGHT, Math.round(baseHeight * scale)),
+    );
+    hostHeight = Math.max(minHostHeight, displayHeight + hostHeightExtra);
+  } else if (limitedByHeight) {
+    displayHeight = Math.min(viewportHeight, Math.max(CHART_MIN_HEIGHT, displayHeight));
+    displayWidth = Math.min(
+      viewportWidth,
+      Math.max(CHART_MIN_WIDTH, Math.round(baseWidth * scale)),
+    );
+    hostWidth = Math.max(minHostWidth, displayWidth + hostWidthExtra);
+  } else {
+    displayWidth = Math.min(viewportWidth, Math.max(CHART_MIN_WIDTH, displayWidth));
+    displayHeight = Math.min(viewportHeight, Math.max(CHART_MIN_HEIGHT, displayHeight));
+    hostWidth = Math.max(minHostWidth, displayWidth + hostWidthExtra);
+    hostHeight = Math.max(minHostHeight, displayHeight + hostHeightExtra);
+  }
+
+  viewportWidth = Math.max(CHART_MIN_WIDTH, Math.round(hostWidth - hostWidthExtra));
+  viewportHeight = Math.max(CHART_MIN_HEIGHT, Math.round(hostHeight - hostHeightExtra));
+
+  displayWidth = Math.min(viewportWidth, Math.max(CHART_MIN_WIDTH, displayWidth));
+  displayHeight = Math.min(viewportHeight, Math.max(CHART_MIN_HEIGHT, displayHeight));
+
+  if (scale >= 1) {
+    if (displayWidth > baseWidth) {
+      baseWidth = displayWidth;
+    }
+    if (displayHeight > baseHeight) {
+      baseHeight = displayHeight;
+    }
+  }
+
+  const shouldScaleDown = scale < 1;
+  const appliedScale = shouldScaleDown ? scale : 1;
+  const offsetX = Math.max(0, Math.round((viewportWidth - displayWidth) / 2));
+  const offsetY = Math.max(0, Math.round((viewportHeight - displayHeight) / 2));
+
+  const safeBaseWidth = clampChartWidth(baseWidth) ?? CHART_MIN_WIDTH;
+  const safeBaseHeight = clampChartHeight(baseHeight) ?? CHART_MIN_HEIGHT;
+  const safeDisplayWidth = clampChartWidth(displayWidth) ?? CHART_MIN_WIDTH;
+  const safeDisplayHeight = clampChartHeight(displayHeight) ?? CHART_MIN_HEIGHT;
+  const safeHostWidth = clampChartWidth(hostWidth) ?? minHostWidth;
+  const safeHostHeight = clampChartHeight(hostHeight) ?? minHostHeight;
+  const safeViewportWidth = clampChartWidth(viewportWidth) ?? CHART_MIN_WIDTH;
+  const safeViewportHeight = clampChartHeight(viewportHeight) ?? CHART_MIN_HEIGHT;
+
+  return {
+    baseWidth: Math.max(CHART_MIN_WIDTH, safeBaseWidth),
+    baseHeight: Math.max(CHART_MIN_HEIGHT, safeBaseHeight),
+    displayWidth: Math.max(CHART_MIN_WIDTH, safeDisplayWidth),
+    displayHeight: Math.max(CHART_MIN_HEIGHT, safeDisplayHeight),
+    scale: appliedScale,
+    shouldScaleDown,
+    hostWidth: Math.max(minHostWidth, safeHostWidth),
+    hostHeight: Math.max(minHostHeight, safeHostHeight),
+    minHostWidth,
+    minHostHeight,
+    viewportWidth: Math.max(CHART_MIN_WIDTH, safeViewportWidth),
+    viewportHeight: Math.max(CHART_MIN_HEIGHT, safeViewportHeight),
+    hostWidthExtra,
+    hostHeightExtra,
+    offsetX,
+    offsetY,
+  };
+}
+
+function updateChartSizingForCard(
+  cardEl,
+  displayWidth,
+  displayHeight,
+  options = {},
+) {
+  if (!cardEl || !cardEl.classList?.contains('group--chart')) return false;
+  const embed = cardEl.querySelector('.embed');
+  const frameWrap = cardEl.querySelector('.chart-frame');
+  const iframe = frameWrap?.querySelector('iframe');
+  if (!embed || !frameWrap || !iframe) return false;
+
+  let stateChanged = false;
+
+  const layout = resolveChartLayout(cardEl, displayWidth, displayHeight, options);
+  if (!layout) return false;
+
+  const {
+    baseWidth,
+    baseHeight,
+    displayWidth: displayWidthPx,
+    displayHeight: displayHeightPx,
+    scale,
+    shouldScaleDown,
+    hostWidth,
+    hostHeight,
+    minHostWidth,
+    minHostHeight,
+    viewportWidth,
+    viewportHeight,
+    hostWidthExtra,
+    hostHeightExtra,
+    offsetX,
+    offsetY,
+  } = layout;
+
+  if (cardEl instanceof HTMLElement) {
+    if (Number.isFinite(hostWidth)) {
+      cardEl.style.width = `${hostWidth}px`;
+    }
+    if (Number.isFinite(hostHeight)) {
+      cardEl.style.height = `${hostHeight}px`;
+    }
+    cardEl.style.minWidth = `${Math.max(minHostWidth, CHART_MIN_WIDTH)}px`;
+    cardEl.style.minHeight = `${Math.max(minHostHeight, CHART_MIN_HEIGHT)}px`;
+    rememberCardDimensions(cardEl, hostWidth, hostHeight);
+    cardEl.dataset.chartBaseWidth = String(baseWidth);
+    cardEl.dataset.chartBaseHeight = String(baseHeight);
+    cardEl.dataset.chartDisplayWidth = String(displayWidthPx);
+    cardEl.dataset.chartDisplayHeight = String(displayHeightPx);
+    cardEl.dataset.chartHostWidth = String(hostWidth);
+    cardEl.dataset.chartHostHeight = String(hostHeight);
+    cardEl.dataset.chartHostWidthExtra = String(hostWidthExtra);
+    cardEl.dataset.chartHostHeightExtra = String(hostHeightExtra);
+  }
+
+  if (embed instanceof HTMLElement) {
+    embed.style.width = '100%';
+    embed.style.height = '100%';
+    embed.style.minWidth = `${Math.max(CHART_MIN_WIDTH, viewportWidth)}px`;
+    embed.style.minHeight = `${Math.max(CHART_MIN_HEIGHT, viewportHeight)}px`;
+    embed.style.flex = '1 1 auto';
+  }
+
+  if (frameWrap instanceof HTMLElement) {
+    frameWrap.style.width = '100%';
+    frameWrap.style.height = '100%';
+    frameWrap.style.minWidth = `${Math.max(CHART_MIN_WIDTH, viewportWidth)}px`;
+    frameWrap.style.minHeight = `${Math.max(CHART_MIN_HEIGHT, viewportHeight)}px`;
+    frameWrap.dataset.width = String(baseWidth);
+    frameWrap.dataset.height = String(baseHeight);
+    frameWrap.dataset.displayWidth = String(displayWidthPx);
+    frameWrap.dataset.displayHeight = String(displayHeightPx);
+    frameWrap.dataset.scaleX = String(scale);
+    frameWrap.dataset.scaleY = String(scale);
+    frameWrap.dataset.scale = String(scale);
+  }
+
+  if (iframe instanceof HTMLElement) {
+    const iframeWidth = shouldScaleDown ? baseWidth : displayWidthPx;
+    const iframeHeight = shouldScaleDown ? baseHeight : displayHeightPx;
+    iframe.style.width = `${iframeWidth}px`;
+    iframe.style.height = `${iframeHeight}px`;
+    iframe.style.transform = shouldScaleDown ? `scale(${scale})` : 'none';
+    iframe.style.transformOrigin = 'top left';
+    iframe.style.left = `${offsetX}px`;
+    iframe.style.top = `${offsetY}px`;
+    iframe.style.aspectRatio = 'auto';
+    iframe.dataset.baseWidth = String(baseWidth);
+    iframe.dataset.baseHeight = String(baseHeight);
+    iframe.dataset.scaleX = String(scale);
+    iframe.dataset.scaleY = String(scale);
+    iframe.dataset.scale = String(scale);
+  }
+
+  if (options?.commitState && currentState && cardEl?.dataset?.id) {
+    const chartState = currentState.groups?.find(
+      (g) => g && g.id === cardEl.dataset.id && g.type === 'chart',
+    );
+    if (chartState) {
+      const nextBaseWidth = clampChartWidth(baseWidth);
+      const nextBaseHeight = clampChartHeight(baseHeight);
+      if (Number.isFinite(nextBaseWidth)) {
+        const rounded = Math.round(nextBaseWidth);
+        if (chartState.frameWidth !== rounded) stateChanged = true;
+        chartState.frameWidth = rounded;
+        chartState.w = rounded;
+      } else {
+        if ('frameWidth' in chartState) stateChanged = true;
+        if ('w' in chartState) stateChanged = true;
+        delete chartState.frameWidth;
+        delete chartState.w;
+      }
+      if (Number.isFinite(nextBaseHeight)) {
+        const rounded = Math.round(nextBaseHeight);
+        if (chartState.frameHeight !== rounded) stateChanged = true;
+        chartState.frameHeight = rounded;
+        chartState.h = rounded;
+      } else {
+        if ('frameHeight' in chartState) stateChanged = true;
+        if ('h' in chartState) stateChanged = true;
+        delete chartState.frameHeight;
+        delete chartState.h;
+      }
+    }
+  }
+
+  return stateChanged;
+}
+
 function getCardDimensions(el) {
   if (!el) {
     return { width: 0, height: 0 };
@@ -153,6 +550,47 @@ function measureIntrinsicContentSize(cardEl, innerEl = findCardInnerElement(card
   }
 
   const host = ensureMeasureHost();
+  const adjustChartMeasurement = (currentWidth, currentHeight, widthExtra = 0, heightExtra = 0) => {
+    if (!cardEl?.classList?.contains('group--chart')) {
+      return { width: currentWidth, height: currentHeight };
+    }
+    const frame = cardEl.querySelector('.chart-frame');
+    if (!frame) {
+      return { width: currentWidth, height: currentHeight };
+    }
+    const parseNumeric = (value) => {
+      const numeric = Number.parseFloat(value);
+      return Number.isFinite(numeric) ? numeric : null;
+    };
+    const storedDisplayWidth = parseNumeric(frame.dataset?.displayWidth);
+    const storedDisplayHeight = parseNumeric(frame.dataset?.displayHeight);
+    const baseWidth = parseNumeric(frame.dataset?.width);
+    const baseHeight = parseNumeric(frame.dataset?.height);
+    const scaleX =
+      parseNumeric(frame.dataset?.scaleX) ?? parseNumeric(frame.dataset?.scale);
+    const scaleY =
+      parseNumeric(frame.dataset?.scaleY) ?? parseNumeric(frame.dataset?.scale);
+    const computedWidth = Number.isFinite(storedDisplayWidth)
+      ? storedDisplayWidth
+      : Number.isFinite(baseWidth) && Number.isFinite(scaleX)
+        ? baseWidth * scaleX
+        : null;
+    const computedHeight = Number.isFinite(storedDisplayHeight)
+      ? storedDisplayHeight
+      : Number.isFinite(baseHeight) && Number.isFinite(scaleY)
+        ? baseHeight * scaleY
+        : null;
+    const extraWidth = Number.isFinite(widthExtra) ? widthExtra : 0;
+    const extraHeight = Number.isFinite(heightExtra) ? heightExtra : 0;
+    const nextWidth = Number.isFinite(computedWidth)
+      ? Math.max(currentWidth, Math.round(computedWidth + extraWidth))
+      : currentWidth;
+    const nextHeight = Number.isFinite(computedHeight)
+      ? Math.max(currentHeight, Math.round(computedHeight + extraHeight))
+      : currentHeight;
+    return { width: nextWidth, height: nextHeight };
+  };
+
   if (host) {
     const clone = cardEl.cloneNode(true);
     clone.removeAttribute('id');
@@ -184,14 +622,15 @@ function measureIntrinsicContentSize(cardEl, innerEl = findCardInnerElement(card
     host.appendChild(clone);
     const rect = clone.getBoundingClientRect();
     const innerRect = cloneInner ? cloneInner.getBoundingClientRect() : null;
-    const width = Number.isFinite(rect.width) ? Math.ceil(rect.width) : 0;
-    const height = Number.isFinite(rect.height) ? Math.ceil(rect.height) : 0;
+    let width = Number.isFinite(rect.width) ? Math.ceil(rect.width) : 0;
+    let height = Number.isFinite(rect.height) ? Math.ceil(rect.height) : 0;
     const widthExtra = innerRect
       ? Math.max(0, Math.ceil(rect.width - innerRect.width))
       : 0;
     const heightExtra = innerRect
       ? Math.max(0, Math.ceil(rect.height - innerRect.height))
       : 0;
+    ({ width, height } = adjustChartMeasurement(width, height, widthExtra, heightExtra));
     host.removeChild(clone);
     return { width, height, widthExtra, heightExtra };
   }
@@ -250,8 +689,10 @@ function measureIntrinsicContentSize(cardEl, innerEl = findCardInnerElement(card
   const widthCandidate = Math.max(cardScrollWidth + borderX, innerScrollWidth + widthExtra);
   const heightCandidate = Math.max(cardScrollHeight + borderY, innerScrollHeight + heightExtra);
 
-  const width = Number.isFinite(widthCandidate) ? Math.ceil(widthCandidate) : 0;
-  const height = Number.isFinite(heightCandidate) ? Math.ceil(heightCandidate) : 0;
+  let width = Number.isFinite(widthCandidate) ? Math.ceil(widthCandidate) : 0;
+  let height = Number.isFinite(heightCandidate) ? Math.ceil(heightCandidate) : 0;
+
+  ({ width, height } = adjustChartMeasurement(width, height, widthExtra, heightExtra));
 
   cardEl.style.width = prevCard.width;
   cardEl.style.minWidth = prevCard.minWidth;
@@ -271,6 +712,11 @@ function measureIntrinsicContentSize(cardEl, innerEl = findCardInnerElement(card
 
 function applyMinSizeStyles(cardEl, width, height) {
   if (!cardEl) return;
+  if (cardEl.classList?.contains('group--chart')) {
+    cardEl.style.minWidth = `${CHART_MIN_WIDTH}px`;
+    cardEl.style.minHeight = `${CHART_MIN_HEIGHT}px`;
+    return;
+  }
   const widthPx = width > 0 ? `${width}px` : '';
   const heightPx = height > 0 ? `${height}px` : '';
   if (cardEl.style.minWidth !== widthPx) {
@@ -291,6 +737,9 @@ function computeIntrinsicSizeFromState(state) {
   }
   if (Number.isFinite(measured.heightExtra)) {
     state.hostPaddingHeight = Math.max(0, measured.heightExtra);
+  }
+  if (state.cardEl.classList?.contains('group--chart')) {
+    return { width: CHART_MIN_WIDTH, height: CHART_MIN_HEIGHT };
   }
   return { width: measured.width, height: measured.height };
 }
@@ -427,14 +876,20 @@ function applyIntrinsicMinSize(
   }
   if (!state.last || (!state.last.width && !state.last.height)) {
     const measured = measureIntrinsicContentSize(cardEl, innerEl);
-    state.last = { width: measured.width, height: measured.height };
+    let resolvedWidth = measured.width;
+    let resolvedHeight = measured.height;
+    if (cardEl.classList?.contains('group--chart')) {
+      resolvedWidth = CHART_MIN_WIDTH;
+      resolvedHeight = CHART_MIN_HEIGHT;
+    }
+    state.last = { width: resolvedWidth, height: resolvedHeight };
     if (Number.isFinite(measured.widthExtra)) {
       state.hostPaddingWidth = Math.max(0, measured.widthExtra);
     }
     if (Number.isFinite(measured.heightExtra)) {
       state.hostPaddingHeight = Math.max(0, measured.heightExtra);
     }
-    applyMinSizeStyles(cardEl, measured.width, measured.height);
+    applyMinSizeStyles(cardEl, resolvedWidth, resolvedHeight);
   }
   scheduleIntrinsicUpdate(cardEl);
   return state.last;
@@ -664,13 +1119,34 @@ function initResizeHandles(cardEl) {
     targets
       .filter((target, index) => target && target.isConnected && targets.indexOf(target) === index)
       .forEach((target) => {
-        if (Number.isFinite(nextWidth)) {
-          target.style.width = `${Math.max(0, nextWidth)}px`;
+        const widthValue = Number.isFinite(nextWidth) ? Math.max(0, nextWidth) : null;
+        const heightValue = Number.isFinite(nextHeight) ? Math.max(0, nextHeight) : null;
+        if (Number.isFinite(widthValue)) {
+          target.style.width = `${widthValue}px`;
         }
-        if (Number.isFinite(nextHeight)) {
-          target.style.height = `${Math.max(0, nextHeight)}px`;
+        if (Number.isFinite(heightValue)) {
+          target.style.height = `${heightValue}px`;
         }
-        rememberCardDimensions(target, nextWidth, nextHeight);
+        let rememberedWidth = widthValue;
+        let rememberedHeight = heightValue;
+        if (Number.isFinite(widthValue) || Number.isFinite(heightValue)) {
+          updateChartSizingForCard(
+            target,
+            Number.isFinite(widthValue) ? widthValue : undefined,
+            Number.isFinite(heightValue) ? heightValue : undefined,
+          );
+          if (target.classList?.contains('group--chart')) {
+            const datasetWidth = parseChartNumber(target.dataset?.chartHostWidth);
+            const datasetHeight = parseChartNumber(target.dataset?.chartHostHeight);
+            if (Number.isFinite(datasetWidth)) {
+              rememberedWidth = datasetWidth;
+            }
+            if (Number.isFinite(datasetHeight)) {
+              rememberedHeight = datasetHeight;
+            }
+          }
+        }
+        rememberCardDimensions(target, rememberedWidth, rememberedHeight);
       });
 
     activeResize.snapWidth = widthSnap?.value ?? null;
@@ -898,34 +1374,54 @@ function applyResizeForElement(el, width, height, wSize, hSize) {
   const metadata = resolveSizeMetadata(finalWidth, finalHeight);
 
   applySize(el, finalWidth, finalHeight, wSize, hSize);
+  const chartStateChanged = updateChartSizingForCard(el, finalWidth, finalHeight, {
+    commitState: true,
+  });
+  const effectiveWidth = el.classList?.contains('group--chart')
+    ? clampChartWidth(parseChartNumber(el.dataset?.chartHostWidth)) ?? finalWidth
+    : finalWidth;
+  const effectiveHeight = el.classList?.contains('group--chart')
+    ? clampChartHeight(parseChartNumber(el.dataset?.chartHostHeight)) ?? finalHeight
+    : finalHeight;
+  const appliedMetadata = el.classList?.contains('group--chart')
+    ? resolveSizeMetadata(effectiveWidth, effectiveHeight)
+    : metadata;
   if (el.dataset.id === 'reminders') {
     const prev = currentState.remindersCard || {};
     const changed =
-      prev.width !== finalWidth || prev.height !== finalHeight || prev.wSize !== wSize || prev.hSize !== hSize;
+      !!chartStateChanged ||
+      prev.width !== effectiveWidth ||
+      prev.height !== effectiveHeight ||
+      prev.wSize !== wSize ||
+      prev.hSize !== hSize;
     currentState.remindersCard = {
       ...prev,
-      width: finalWidth,
-      height: finalHeight,
+      width: effectiveWidth,
+      height: effectiveHeight,
       wSize,
       hSize,
-      sizePreset: metadata.sizePreset,
-      customWidth: metadata.customWidth,
-      customHeight: metadata.customHeight,
+      sizePreset: appliedMetadata.sizePreset,
+      customWidth: appliedMetadata.customWidth,
+      customHeight: appliedMetadata.customHeight,
     };
     return changed;
   }
   const sg = currentState.groups.find((x) => x.id === el.dataset.id);
   if (!sg) return false;
   const changed =
-    sg.width !== finalWidth || sg.height !== finalHeight || sg.wSize !== wSize || sg.hSize !== hSize;
-  sg.width = finalWidth;
-  sg.height = finalHeight;
+    !!chartStateChanged ||
+    sg.width !== effectiveWidth ||
+    sg.height !== effectiveHeight ||
+    sg.wSize !== wSize ||
+    sg.hSize !== hSize;
+  sg.width = effectiveWidth;
+  sg.height = effectiveHeight;
   sg.wSize = wSize;
   sg.hSize = hSize;
-  sg.sizePreset = metadata.sizePreset;
-  if (metadata.customWidth != null) sg.customWidth = metadata.customWidth;
+  sg.sizePreset = appliedMetadata.sizePreset;
+  if (appliedMetadata.customWidth != null) sg.customWidth = appliedMetadata.customWidth;
   else delete sg.customWidth;
-  if (metadata.customHeight != null) sg.customHeight = metadata.customHeight;
+  if (appliedMetadata.customHeight != null) sg.customHeight = appliedMetadata.customHeight;
   else delete sg.customHeight;
   delete sg.size;
   return changed;
@@ -1816,7 +2312,7 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
       applySize(grp, gWidth, gHeight, gWSize, gHSize);
       initResizeHandles(grp);
       grp.style.resize = editing ? 'both' : 'none';
-      grp.style.overflow = editing ? 'auto' : 'visible';
+      grp.style.overflow = 'hidden';
       if (editing) {
         grp.draggable = true;
         grp.addEventListener('dragstart', (e) => {
@@ -1896,16 +2392,194 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
       const emb = document.createElement('div');
       emb.className = 'embed';
       emb.dataset.custom = '1';
-      emb.style.flex = '1';
+      emb.style.flex = '1 1 auto';
       emb.style.resize = 'none';
-      emb.innerHTML = `<iframe src="${g.url}" loading="lazy" referrerpolicy="no-referrer"></iframe>`;
+
+      const frameWrap = document.createElement('div');
+      frameWrap.className = 'chart-frame';
+      const iframe = document.createElement('iframe');
+      iframe.src = g.url;
+      iframe.loading = 'lazy';
+      iframe.referrerPolicy = 'no-referrer';
+      iframe.allowFullscreen = true;
+      iframe.title = g.name ? `${g.name}` : T.chartFrameTitle || 'Grafikas';
+
+      const fallbackCardHeight = Number.isFinite(g.height)
+        ? g.height
+        : SIZE_MAP[g.hSize ?? 'md']?.height ?? SIZE_MAP.md.height;
+      const fallbackCardWidth = Number.isFinite(g.width)
+        ? g.width
+        : SIZE_MAP[g.wSize ?? 'md']?.width ?? SIZE_MAP.md.width;
+      const baseHeightRaw = Number.isFinite(g.frameHeight)
+        ? g.frameHeight
+        : Number.isFinite(g.h)
+          ? g.h
+          : null;
+      const baseWidthRaw = Number.isFinite(g.frameWidth)
+        ? g.frameWidth
+        : Number.isFinite(g.w)
+          ? g.w
+          : null;
+      let baseHeight =
+        clampChartHeight(baseHeightRaw) ??
+        clampChartHeight(fallbackCardHeight) ??
+        clampChartHeight(480);
+      let baseWidth =
+        clampChartWidth(baseWidthRaw) ??
+        clampChartWidth(fallbackCardWidth) ??
+        clampChartWidth(640);
+
+      const resolveDisplayHeight = () => {
+        if (Number.isFinite(g.height)) {
+          const clamped = clampChartHeight(g.height);
+          if (clamped) return clamped;
+        }
+        const fallback = clampChartHeight(fallbackCardHeight);
+        return fallback ?? clampChartHeight(baseHeight) ?? clampChartHeight(480);
+      };
+
+      const resolveDisplayWidth = () => {
+        if (Number.isFinite(g.width)) {
+          const clamped = clampChartWidth(g.width);
+          if (clamped) return clamped;
+        }
+        const fallback = clampChartWidth(fallbackCardWidth);
+        return fallback ?? clampChartWidth(baseWidth) ?? clampChartWidth(640);
+      };
+
+      const applySizing = () => {
+        const safeBaseHeight =
+          clampChartHeight(baseHeight) ??
+          clampChartHeight(fallbackCardHeight) ??
+          clampChartHeight(480);
+        const safeBaseWidth =
+          clampChartWidth(baseWidth) ??
+          clampChartWidth(fallbackCardWidth) ??
+          clampChartWidth(640);
+        const displayHeight = resolveDisplayHeight();
+        const displayWidth = resolveDisplayWidth();
+        const finalHeight = Number.isFinite(displayHeight)
+          ? clampChartHeight(displayHeight)
+          : safeBaseHeight;
+        const finalWidth = Number.isFinite(displayWidth)
+          ? clampChartWidth(displayWidth)
+          : safeBaseWidth;
+        g.width = finalWidth;
+        g.height = finalHeight;
+        g.wSize = sizeFromWidth(finalWidth);
+        g.hSize = sizeFromHeight(finalHeight);
+        delete g.scale;
+        applySize(grp, finalWidth, finalHeight, g.wSize, g.hSize);
+        updateChartSizingForCard(grp, finalWidth, finalHeight, {
+          baseWidth: safeBaseWidth,
+          baseHeight: safeBaseHeight,
+        });
+      };
+
+      const measureSize = () => {
+        try {
+          const doc = iframe.contentDocument;
+          if (!doc) return null;
+          const body = doc.body;
+          const root = doc.documentElement;
+          const bodyHeight = body ? Math.max(body.scrollHeight, body.offsetHeight) : 0;
+          const rootHeight = root ? Math.max(root.scrollHeight, root.offsetHeight) : 0;
+          const bodyWidth = body ? Math.max(body.scrollWidth, body.offsetWidth) : 0;
+          const rootWidth = root ? Math.max(root.scrollWidth, root.offsetWidth) : 0;
+          const measuredHeight = Math.max(bodyHeight, rootHeight);
+          const measuredWidth = Math.max(bodyWidth, rootWidth);
+          const safeHeight =
+            Number.isFinite(measuredHeight) && measuredHeight > 0
+              ? clampChartHeight(measuredHeight)
+              : null;
+          const safeWidth =
+            Number.isFinite(measuredWidth) && measuredWidth > 0
+              ? clampChartWidth(measuredWidth)
+              : null;
+          if (!safeHeight && !safeWidth) return null;
+          return { height: safeHeight, width: safeWidth };
+        } catch {
+          return null;
+        }
+      };
+
+      const nearlyEqual = (a, b, tolerance = 2) =>
+        Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= tolerance;
+
+      const getHostExtras = () => {
+        const metrics = measureChartHostMetrics(grp);
+        return {
+          width: Math.max(0, metrics.widthExtra || 0),
+          height: Math.max(0, metrics.heightExtra || 0),
+        };
+      };
+
+      const syncMeasuredSize = () => {
+        const measured = measureSize();
+        if (!measured) return;
+        let changed = false;
+        const prevBaseHeight = baseHeight;
+        const prevBaseWidth = baseWidth;
+        const extras = getHostExtras();
+        const prevHostHeight = Number.isFinite(g.height) ? g.height : null;
+        const prevHostWidth = Number.isFinite(g.width) ? g.width : null;
+        if (
+          Number.isFinite(measured.height) &&
+          (!baseHeight || Math.abs(measured.height - baseHeight) > 2)
+        ) {
+          baseHeight = measured.height;
+          g.frameHeight = measured.height;
+          g.h = measured.height;
+          if (
+            !Number.isFinite(prevHostHeight) ||
+            nearlyEqual(prevHostHeight, prevBaseHeight + extras.height)
+          ) {
+            g.height = measured.height + extras.height;
+          }
+          changed = true;
+        }
+        if (
+          Number.isFinite(measured.width) &&
+          (!baseWidth || Math.abs(measured.width - baseWidth) > 2)
+        ) {
+          baseWidth = measured.width;
+          g.frameWidth = measured.width;
+          g.w = measured.width;
+          if (
+            !Number.isFinite(prevHostWidth) ||
+            nearlyEqual(prevHostWidth, prevBaseWidth + extras.width)
+          ) {
+            g.width = measured.width + extras.width;
+          }
+          changed = true;
+        }
+        if (changed) {
+          g.wSize = sizeFromWidth(g.width);
+          g.hSize = sizeFromHeight(g.height);
+          applySizing();
+          if (typeof persist === 'function') {
+            persist();
+          }
+        }
+      };
+
+      iframe.addEventListener('load', () => {
+        applySizing();
+        syncMeasuredSize();
+        window.setTimeout(syncMeasuredSize, 400);
+        window.setTimeout(syncMeasuredSize, 1200);
+      });
+
+      frameWrap.appendChild(iframe);
+      emb.appendChild(frameWrap);
       content.appendChild(emb);
       fragment.appendChild(grp);
       activeCardIds.add(g.id);
       registerCard(g.id, grp);
       const inner = grp.querySelector('.embed');
+      applySizing();
       setupMinSizeWatcher(grp, inner);
-      
+
       return;
     }
     const { section: grp, header: h, content } =
