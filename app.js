@@ -1147,6 +1147,7 @@ async function addChart() {
     url: res.url,
     width: Number.isFinite(SIZE_MAP.md.width) ? SIZE_MAP.md.width : 640,
     height: Number.isFinite(SIZE_MAP.md.height) ? SIZE_MAP.md.height : 480,
+    scale: 1,
   };
   chart.wSize = sizeFromWidth(chart.width);
   chart.hSize = sizeFromHeight(chart.height);
@@ -1237,7 +1238,6 @@ async function editChart(gid) {
   delete g.frameWidth;
   delete g.h;
   delete g.w;
-  delete g.scale;
   const width = Number.isFinite(g.width) ? g.width : SIZE_MAP.md.width;
   const height = Number.isFinite(g.height) ? g.height : SIZE_MAP.md.height;
   g.width = width;

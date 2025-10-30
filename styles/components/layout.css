@@ -253,6 +253,7 @@ a.item {
 }
 
 .chart-frame {
+  position: relative;
   width: 100%;
   height: 100%;
   overflow: hidden;
@@ -268,6 +269,84 @@ a.item {
   height: 100%;
   border: 0;
   background: white;
+  transform-origin: top left;
+  transition: transform 120ms ease;
+}
+
+.chart-scale-controls {
+  position: absolute;
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: var(--space-3);
+  display: grid;
+  grid-template-columns: auto auto 1fr auto auto auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow);
+  color: var(--text);
+  z-index: 2;
+}
+
+.chart-scale-controls__label {
+  font-size: var(--font-sm);
+  font-weight: 600;
+}
+
+.chart-scale-controls__btn {
+  appearance: none;
+  border: 1px solid var(--border-strong);
+  background: var(--muted);
+  color: var(--text);
+  border-radius: var(--space-2);
+  padding: 0 var(--space-2);
+  height: 30px;
+  min-width: 32px;
+  font-size: var(--font-md);
+  line-height: 1;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.theme-light .chart-scale-controls__btn {
+  background: var(--surface-raised);
+}
+
+.chart-scale-controls__btn:hover,
+.chart-scale-controls__btn:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.chart-scale-controls__slider {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.chart-scale-controls__value {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--font-sm);
+  min-width: 3.5ch;
+  text-align: right;
+}
+
+.chart-scale-controls__reset {
+  appearance: none;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.chart-scale-controls__reset:hover,
+.chart-scale-controls__reset:focus-visible {
+  text-decoration: underline;
+  outline: none;
 }
 
 .empty {

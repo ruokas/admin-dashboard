@@ -17,6 +17,32 @@ const MIN_SIZE_ADJUSTER = Symbol('minSizeAdjuster');
 const RESIZE_HANDLE_SIZE = 20;
 const RESIZE_HANDLER_KEY = Symbol('resizeHandler');
 
+const CHART_SCALE_DEFAULT = 1;
+const CHART_SCALE_MIN = 0.5;
+const CHART_SCALE_MAX = 2;
+const CHART_SCALE_STEP = 0.05;
+
+function clampChartScale(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return CHART_SCALE_DEFAULT;
+  return Math.min(CHART_SCALE_MAX, Math.max(CHART_SCALE_MIN, num));
+}
+
+function formatChartScale(scale) {
+  return `${Math.round(scale * 100)}%`;
+}
+
+function applyChartScale(frame, iframe, scale) {
+  if (!frame || !iframe) return CHART_SCALE_DEFAULT;
+  const clamped = clampChartScale(scale);
+  frame.dataset.chartScale = clamped.toFixed(2);
+  iframe.style.transform = `scale(${clamped})`;
+  iframe.style.width = `${(100 / clamped).toFixed(4)}%`;
+  iframe.style.height = `${(100 / clamped).toFixed(4)}%`;
+  iframe.style.transformOrigin = 'top left';
+  return clamped;
+}
+
 
 
 let resizeGuideEl = null;
@@ -1918,13 +1944,128 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
       iframe.referrerPolicy = 'no-referrer';
       iframe.allowFullscreen = true;
       iframe.title = g.name ? `${g.name}` : T.chartFrameTitle || 'Grafikas';
-      iframe.style.width = '100%';
-      iframe.style.height = '100%';
-      iframe.style.border = '0';
       iframe.dataset.baseUrl = g.url || '';
       iframe.dataset.themeApplied = activeTheme;
 
       frameWrap.appendChild(iframe);
+
+      const initialScaleValue = Number.isFinite(g.scale)
+        ? g.scale
+        : CHART_SCALE_DEFAULT;
+      const initialScale = clampChartScale(initialScaleValue);
+      if (!Number.isFinite(g.scale) || g.scale !== initialScale) {
+        g.scale = initialScale;
+      }
+      applyChartScale(frameWrap, iframe, initialScale);
+
+      if (editing) {
+        const controls = document.createElement('div');
+        controls.className = 'chart-scale-controls';
+
+        const labelEl = document.createElement('span');
+        labelEl.className = 'chart-scale-controls__label';
+        labelEl.textContent = T.chartScaleLabel || 'Grafiko mastelis';
+
+        const minusBtn = document.createElement('button');
+        minusBtn.type = 'button';
+        minusBtn.className = 'chart-scale-controls__btn';
+        minusBtn.textContent = '−';
+        minusBtn.setAttribute(
+          'aria-label',
+          T.chartScaleDecrease || 'Sumažinti mastelį',
+        );
+
+        const slider = document.createElement('input');
+        slider.type = 'range';
+        slider.className = 'chart-scale-controls__slider';
+        slider.min = String(Math.round(CHART_SCALE_MIN * 100));
+        slider.max = String(Math.round(CHART_SCALE_MAX * 100));
+        slider.step = String(Math.round(CHART_SCALE_STEP * 100));
+        slider.value = String(Math.round(initialScale * 100));
+        slider.setAttribute('aria-label', T.chartScaleLabel || 'Grafiko mastelis');
+        slider.setAttribute('aria-valuemin', slider.min);
+        slider.setAttribute('aria-valuemax', slider.max);
+        slider.setAttribute('aria-valuenow', slider.value);
+        slider.setAttribute('aria-valuetext', formatChartScale(initialScale));
+
+        const plusBtn = document.createElement('button');
+        plusBtn.type = 'button';
+        plusBtn.className = 'chart-scale-controls__btn';
+        plusBtn.textContent = '+';
+        plusBtn.setAttribute(
+          'aria-label',
+          T.chartScaleIncrease || 'Padidinti mastelį',
+        );
+
+        const valueEl = document.createElement('output');
+        valueEl.className = 'chart-scale-controls__value';
+        valueEl.textContent = formatChartScale(initialScale);
+
+        const resetBtn = document.createElement('button');
+        resetBtn.type = 'button';
+        resetBtn.className = 'chart-scale-controls__reset';
+        resetBtn.textContent =
+          T.chartScaleReset || T.reset || 'Atstatyti mastelį';
+
+        controls.append(
+          labelEl,
+          minusBtn,
+          slider,
+          plusBtn,
+          valueEl,
+          resetBtn,
+        );
+        frameWrap.appendChild(controls);
+
+        let currentScale = initialScale;
+
+        const persistScaleChange = (commit = false) => {
+          slider.setAttribute(
+            'aria-valuenow',
+            String(Math.round(currentScale * 100)),
+          );
+          slider.setAttribute('aria-valuetext', formatChartScale(currentScale));
+          valueEl.textContent = formatChartScale(currentScale);
+          if (commit && typeof persist === 'function') {
+            persist();
+          }
+        };
+
+        const setScale = (next, commit = false) => {
+          const applied = applyChartScale(frameWrap, iframe, next);
+          currentScale = applied;
+          g.scale = applied;
+          slider.value = String(Math.round(applied * 100));
+          persistScaleChange(commit);
+        };
+
+        slider.addEventListener('input', () => {
+          setScale(Number(slider.value) / 100, false);
+        });
+        slider.addEventListener('change', () => {
+          setScale(Number(slider.value) / 100, true);
+        });
+        minusBtn.addEventListener('click', (event) => {
+          event.preventDefault();
+          const next = Math.round((currentScale - CHART_SCALE_STEP) * 100) / 100;
+          setScale(next, true);
+          slider.focus();
+        });
+        plusBtn.addEventListener('click', (event) => {
+          event.preventDefault();
+          const next = Math.round((currentScale + CHART_SCALE_STEP) * 100) / 100;
+          setScale(next, true);
+          slider.focus();
+        });
+        resetBtn.addEventListener('click', (event) => {
+          event.preventDefault();
+          setScale(CHART_SCALE_DEFAULT, true);
+          slider.focus();
+        });
+
+        persistScaleChange(false);
+      }
+
       content.appendChild(frameWrap);
       fragment.appendChild(grp);
       activeCardIds.add(g.id);
