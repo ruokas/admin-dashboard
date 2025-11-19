@@ -75,7 +75,7 @@ const supabaseConfigPromise = import('./supabase-config.js')
 supabaseConfigPromise.then(async (config) => {
   if (config) {
     try {
-      initSupabase({ url: config.url, anonKey: config.anonKey });
+      await initSupabase({ url: config.url, anonKey: config.anonKey });
       supabaseReady = true;
       updateAuthButtonState();
       await refreshAuthSession();
