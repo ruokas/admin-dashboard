@@ -214,6 +214,26 @@
       hidden
     />
 
+    <script>
+      window.addEventListener(
+        'error',
+        (event) => {
+          const target = event.target;
+          if (
+            target &&
+            target.tagName === 'SCRIPT' &&
+            typeof target.src === 'string' &&
+            target.src.includes('supabase-config.js')
+          ) {
+            console.warn(
+              'Supabase konfigūracija nerasta. Nukopijuokite supabase-config.example.js į supabase-config.js ir užpildykite reikšmes.'
+            );
+          }
+        },
+        true
+      );
+    </script>
+    <script type="module" src="./supabase-config.js" defer></script>
     <script src="app.js" type="module"></script>
   </body>
 </html>
