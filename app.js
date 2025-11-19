@@ -234,10 +234,12 @@ let authSubmitting = false;
 let lastFocusedBeforeAuthModal = null;
 let autoAuthModalRequested = true;
 let bootstrapCompleted = false;
+let loginGateActive = true;
 
 applyPageIconActionLabels();
 applyAuthLabels();
 updateAuthButtonState();
+setLoginGateActive(true);
 
 if (addMenu && !addMenu.dataset.open) {
   addMenu.dataset.open = '0';
@@ -507,6 +509,18 @@ function setAuthMessage(message, variant = 'neutral') {
   }
 }
 
+function setLoginGateActive(active) {
+  loginGateActive = Boolean(active);
+  if (loginGateActive) {
+    document.body.dataset.loginGate = '1';
+    if (!authModalOpen) {
+      openAuthModal({ force: true });
+    }
+  } else {
+    delete document.body.dataset.loginGate;
+  }
+}
+
 function scheduleAuthModalAutoOpen() {
   autoAuthModalRequested = true;
   maybeAutoOpenAuthModal();
@@ -589,9 +603,10 @@ function updateAuthButtonState() {
   authToggleBtn.setAttribute('aria-label', nextLabel);
 }
 
-function openAuthModal() {
+function openAuthModal(options = {}) {
   if (!authModalEl) return;
-  if (!supabaseReady) {
+  const { force = false } = options;
+  if (!force && !supabaseReady) {
     alert(T.authNoConfig || 'Supabase konfigūracija nerasta.');
     return;
   }
@@ -600,7 +615,11 @@ function openAuthModal() {
   lastFocusedBeforeAuthModal =
     document.activeElement instanceof HTMLElement ? document.activeElement : null;
   authModalEl.hidden = false;
+  authModalEl.classList.toggle('auth-modal--gate', loginGateActive);
   document.body.dataset.modalOpen = '1';
+  if (loginGateActive) {
+    document.body.dataset.loginGate = '1';
+  }
   setAuthMessage('', 'neutral');
   if (authPasswordInput) {
     authPasswordInput.value = '';
@@ -613,6 +632,9 @@ function openAuthModal() {
 
 function closeAuthModal(options = {}) {
   if (!authModalEl) return;
+  if (loginGateActive && !authSession) {
+    return;
+  }
   const { restoreFocus = true } = options;
   authModalOpen = false;
   authModalEl.hidden = true;
@@ -722,6 +744,7 @@ async function refreshAuthSession() {
 function updateAuthSession(session) {
   const wasAuthenticated = Boolean(authSession);
   authSession = session && session.user ? session : null;
+  setLoginGateActive(!authSession);
   updateIdleSyncStatus();
   if (authSession?.user?.email) {
     autoAuthModalRequested = false;

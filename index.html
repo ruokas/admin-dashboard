@@ -170,7 +170,13 @@
     >
       <div class="auth-modal__panel" data-modal-dialog>
         <div class="auth-modal__header">
-          <h2 id="authModalTitle">Prisijungimas</h2>
+          <div class="auth-modal__brand">
+            <div class="auth-modal__logo" aria-hidden="true">🛡️</div>
+            <div>
+              <p class="auth-modal__eyebrow">Admin skydelis</p>
+              <h2 id="authModalTitle">Prisijungimas</h2>
+            </div>
+          </div>
           <button
             id="authClose"
             class="auth-modal__close"
@@ -180,9 +186,15 @@
             ✕
           </button>
         </div>
-          <p id="authModalDescription" class="auth-modal__description">
-            Įveskite savo el. paštą ir slaptažodį.
-          </p>
+        <p class="auth-modal__subheading">Greita, saugi prieiga iš bet kurio įrenginio.</p>
+        <p id="authModalDescription" class="auth-modal__description">
+          Įveskite savo el. paštą ir slaptažodį.
+        </p>
+        <div class="auth-modal__badges" aria-hidden="true">
+          <span class="auth-modal__badge">SMP / ED</span>
+          <span class="auth-modal__badge">LT sąsaja</span>
+          <span class="auth-modal__badge">Saugi prieiga</span>
+        </div>
         <form id="authForm" class="auth-modal__form">
           <label for="authEmail">El. pašto adresas</label>
           <input
@@ -214,6 +226,11 @@
             </button>
             <button id="authClear" class="btn-outline" type="button">Išvalyti</button>
           </div>
+          <ul class="auth-modal__list" aria-hidden="true">
+            <li>Aiški LT sąsaja be perteklinių mygtukų.</li>
+            <li>Prieiga tik autorizuotiems naudotojams.</li>
+            <li>Duomenų sinchronizacija su Supabase.</li>
+          </ul>
           <p id="authMessage" class="auth-modal__message" role="status" aria-live="polite"></p>
         </form>
       </div>
