@@ -111,5 +111,9 @@ Statinis HTML + ES moduliais paremtas prietaisų skydas, skirtas greitam informa
 3. Sustabdykite įrašymą ir išanalizuokite kadrų laiką, skriptų vykdymą bei atmintį.
 4. Palyginimui išsisaugokite profilį prieš ir po kodo pakeitimų.
 
+## Supabase integracija
+- [docs/supabase-integration-plan.md](docs/supabase-integration-plan.md) – nuoseklus 8 žingsnių planas, kaip pridėti Supabase autentifikaciją ir nustatymų sinchronizaciją (lentelės SQL, failų pakeitimai, smoke testai).
+- Rekomenduojama kiekvieną etapą diegti atskirai ir po sėkmės žymėti releasus (`v0.2.0-alpha1`, `v0.2.0-alpha2`, …), kad būtų paprasta grįžti į stabilų lokalų režimą, jei nuotolinis saugojimas sukeltų trikdžių.
+
 ## Licencija
 Projektas platinamas pagal [MIT licenciją](LICENSE).
