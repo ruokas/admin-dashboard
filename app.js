@@ -1710,6 +1710,7 @@ async function remoteFetchLatest() {
       updateIdleSyncStatus();
       return;
     }
+    clearPendingRemoteSave();
     const remoteId = typeof remote.id === 'string' && remote.id ? remote.id : null;
     const applied = applyRemoteState(remoteState, {
       remoteId,
@@ -1816,6 +1817,11 @@ function clearRemoteSaveTimer() {
   }
 }
 
+function clearPendingRemoteSave() {
+  clearRemoteSaveTimer();
+  remoteSavePendingSnapshot = null;
+}
+
 function cloneStateSnapshot(input) {
   if (!input || typeof input !== 'object') return null;
   if (typeof structuredClone === 'function') {
@@ -1916,8 +1922,7 @@ export const __testHooks = {
     supabaseReady = Boolean(nextReady);
   },
   resetRemoteSaveForTest() {
-    clearRemoteSaveTimer();
-    remoteSavePendingSnapshot = null;
+    clearPendingRemoteSave();
     remoteSaveInFlight = false;
   },
   getRemoteSaveTimerForTest() {
