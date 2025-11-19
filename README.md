@@ -116,5 +116,11 @@ Statinis HTML + ES moduliais paremtas prietaisų skydas, skirtas greitam informa
 - `supabase/schema.sql` ir `supabase/README.md` – pirmojo etapo (projekto paruošimas) failai: lentelės `ed_dash_settings` SQL, RLS politika, Email autentifikacijos ir smoke test instrukcijos.
 - Rekomenduojama kiekvieną etapą diegti atskirai ir po sėkmės žymėti releasus (`v0.2.0-alpha1`, `v0.2.0-alpha2`, …), kad būtų paprasta grįžti į stabilų lokalų režimą, jei nuotolinis saugojimas sukeltų trikdžių.
 
+### Kaip įjungti Supabase
+1. Nukopijuokite konfigūraciją: `cp supabase-config.example.js supabase-config.js` ir užpildykite `SUPABASE_URL`, `SUPABASE_ANON_KEY`. Failas neįtraukiamas į git, todėl raktažodžiai lieka lokaliai.
+2. Patikrinkite [docs/supabase-integration-plan.md](docs/supabase-integration-plan.md) – žingsniai nuo projekto SQL iki UI prisijungimo ir sinchronizavimo.
+3. Paleiskite kokybės patikras: `npm test`, `npm run lint`, `npm run format` arba tik Supabase scenarijų `npm run test:supabase`.
+4. Jei reikia atsukti pakeitimus („How to rollback“): naudokite paskutinę žymą, pvz., `git checkout v0.1.0` (lokalus režimas) arba `git checkout v0.2.0-alpha<N>` (Supabase etapai).
+
 ## Licencija
 Projektas platinamas pagal [MIT licenciją](LICENSE).
