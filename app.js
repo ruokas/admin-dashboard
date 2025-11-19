@@ -4,6 +4,7 @@ import {
   signOut as supabaseSignOut,
   getSession,
   onAuthStateChange,
+  fetchSettings,
 } from './supabase-client.js';
 import { load, save, seed } from './storage.js';
 import { render, updateEditingUI, toSheetEmbed } from './render.js';
@@ -71,16 +72,18 @@ const supabaseConfigPromise = import('./supabase-config.js')
     );
     return null;
   });
-
-supabaseConfigPromise.then(async (config) => {
-  if (config) {
+const supabaseInitPromise = supabaseConfigPromise
+  .then(async (config) => {
+    if (!config) {
+      updateAuthButtonState();
+      return false;
+    }
     try {
       await initSupabase({ url: config.url, anonKey: config.anonKey });
       supabaseReady = true;
       updateAuthButtonState();
-      await refreshAuthSession();
-      maybeAutoOpenAuthModal();
       subscribeToAuthChanges();
+      return true;
     } catch (error) {
       supabaseReady = false;
       updateAuthButtonState();
@@ -88,11 +91,13 @@ supabaseConfigPromise.then(async (config) => {
       setSyncStatus(T.authStatusError || 'Nepavyko prisijungti. Bandykite dar kartą.', {
         variant: 'error',
       });
+      return false;
     }
-  } else {
-    updateAuthButtonState();
-  }
-});
+  })
+  .catch((error) => {
+    console.error('Supabase inicijavimo klaida:', error);
+    return false;
+  });
 
 function sanitizeIconImage(value) {
   if (typeof value !== 'string') return '';
@@ -100,6 +105,15 @@ function sanitizeIconImage(value) {
   if (!trimmed || !trimmed.startsWith(ICON_IMAGE_ACCEPT_PREFIX)) return '';
   if (trimmed.length > MAX_ICON_IMAGE_LENGTH) return '';
   return trimmed;
+}
+
+function ensureStateMeta(targetState) {
+  const source = targetState && typeof targetState === 'object' ? targetState : state;
+  if (!source || typeof source !== 'object') return {};
+  if (!source.meta || typeof source.meta !== 'object') {
+    source.meta = {};
+  }
+  return source.meta;
 }
 
 function formatDateTimeLocal(ts) {
@@ -195,6 +209,13 @@ const dataMenuBtn = document.getElementById('dataMenuBtn');
 const dataMenuList = document.getElementById('dataMenuList');
 let pageIconImageEl = null;
 
+let authSession = null;
+let authSubscription = null;
+let authModalOpen = false;
+let authSubmitting = false;
+let lastFocusedBeforeAuthModal = null;
+let autoAuthModalRequested = true;
+
 applyPageIconActionLabels();
 applyDataMenuLabels();
 applyAuthLabels();
@@ -226,6 +247,18 @@ if (dataMenuBtn) {
 }
 
 let state = load() || seed();
+bootstrapSession()
+  .then((result) => {
+    if (result?.appliedRemote) {
+      normaliseReminderState();
+      refreshPageHeaderFromState();
+      renderAll();
+      syncReminders();
+    }
+  })
+  .catch((error) => {
+    console.error('Nepavyko užbaigti Supabase paleidimo:', error);
+  });
 if (!Array.isArray(state.groups)) state.groups = [];
 if (!state.title) state.title = DEFAULT_TITLE;
 if (typeof state.icon !== 'string') state.icon = '';
@@ -235,12 +268,6 @@ if (state.iconImage) state.icon = '';
 let editing = false;
 let reminders;
 let debouncedSearchRender = null;
-let authSession = null;
-let authSubscription = null;
-let authModalOpen = false;
-let authSubmitting = false;
-let lastFocusedBeforeAuthModal = null;
-let autoAuthModalRequested = true;
 
 normaliseReminderState();
 
@@ -252,9 +279,7 @@ if (authPasswordInput) {
   authPasswordInput.value = '';
 }
 
-pageTitleEl.textContent = state.title;
-updatePageIconPresentation();
-document.title = state.title || DEFAULT_TITLE;
+refreshPageHeaderFromState();
 
 pageTitleEl.addEventListener('input', () => {
   if (!editing) return;
@@ -475,6 +500,62 @@ function maybeAutoOpenAuthModal() {
   autoAuthModalRequested = false;
 }
 
+async function bootstrapSession() {
+  const initReady = await supabaseInitPromise.catch(() => false);
+  if (!initReady || !supabaseReady) return { appliedRemote: false };
+  const session = await refreshAuthSession();
+  if (!session) {
+    maybeAutoOpenAuthModal();
+    return { appliedRemote: false };
+  }
+  let shouldPersist = false;
+  let remoteApplied = false;
+  try {
+    const remote = await fetchSettings();
+    const meta = ensureStateMeta();
+    if (!remote) {
+      if (meta.remoteUpdatedAt) {
+        meta.remoteUpdatedAt = null;
+        shouldPersist = true;
+      }
+      return { appliedRemote: false };
+    }
+    const remoteState =
+      remote.state_json && typeof remote.state_json === 'object' ? remote.state_json : null;
+    const remoteUpdatedAtIso =
+      typeof remote.updated_at === 'string' && remote.updated_at ? remote.updated_at : null;
+    const remoteUpdatedAtValue = remoteUpdatedAtIso ? Date.parse(remoteUpdatedAtIso) : null;
+    const localUpdatedAt = Number.isFinite(state.updatedAt) ? state.updatedAt : 0;
+    if (meta.remoteUpdatedAt !== remoteUpdatedAtIso) {
+      meta.remoteUpdatedAt = remoteUpdatedAtIso;
+      shouldPersist = true;
+    }
+    if (
+      remoteState &&
+      Number.isFinite(remoteUpdatedAtValue) &&
+      remoteUpdatedAtValue > localUpdatedAt
+    ) {
+      Object.assign(state, remoteState);
+      if (!Number.isFinite(state.updatedAt) || state.updatedAt < remoteUpdatedAtValue) {
+        state.updatedAt = remoteUpdatedAtValue;
+      }
+      ensureStateMeta().remoteUpdatedAt =
+        remoteUpdatedAtIso ||
+        (remoteUpdatedAtValue ? new Date(remoteUpdatedAtValue).toISOString() : null);
+      shouldPersist = true;
+      remoteApplied = true;
+    }
+  } catch (error) {
+    console.error('Nepavyko įkelti nuotolinės būsenos iš Supabase:', error);
+  } finally {
+    if (shouldPersist) {
+      save(state);
+    }
+    maybeAutoOpenAuthModal();
+  }
+  return { appliedRemote: remoteApplied };
+}
+
 function resolveAuthErrorMessage(error) {
   const defaultMessage = T.authStatusError || 'Nepavyko prisijungti. Bandykite dar kartą.';
   if (!error) return defaultMessage;
@@ -639,16 +720,18 @@ function handleAuthClear() {
 }
 
 async function refreshAuthSession() {
-  if (!supabaseReady) return;
+  if (!supabaseReady) return null;
   try {
     setSyncStatus(T.authStatusSyncing || 'Sinchronizuojama…');
     const { data } = await getSession();
     const session = data?.session ?? null;
     updateAuthSession(session);
+    return session;
   } catch (error) {
     console.error('Nepavyko gauti Supabase sesijos:', error);
     updateAuthSession(null);
     setSyncStatus(T.authStatusSignedOut || 'Neprisijungęs', { variant: 'error' });
+    return null;
   }
 }
 
@@ -778,6 +861,15 @@ function updatePageIconPresentation(options = {}) {
     pageIconClearBtn.title = T.pageIconClear || '';
     pageIconClearBtn.setAttribute('aria-disabled', editing ? 'false' : 'true');
   }
+}
+
+function refreshPageHeaderFromState(options = {}) {
+  const { preserveIconSelection = false } = options;
+  if (pageTitleEl) {
+    pageTitleEl.textContent = state?.title || '';
+  }
+  document.title = (state?.title && state.title.trim()) || DEFAULT_TITLE;
+  updatePageIconPresentation({ preserveTextSelection: preserveIconSelection });
 }
 
 function handlePageIconFileSelection(event) {
@@ -1473,6 +1565,8 @@ function syncReminders() {
 
 function persistState() {
   normaliseReminderState();
+  state.updatedAt = Date.now();
+  ensureStateMeta();
   save(state);
   syncReminders();
 }

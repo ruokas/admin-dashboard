@@ -355,6 +355,20 @@ export function load() {
         data.remindersCard.showQuick = data.remindersCard.showQuick === true;
       }
       if (typeof data.remindersPos !== 'number') data.remindersPos = 0;
+      const normalizedUpdatedAt = sanitizeTimestamp(data.updatedAt);
+      data.updatedAt = Number.isFinite(normalizedUpdatedAt)
+        ? normalizedUpdatedAt
+        : Date.now();
+      if (!data.meta || typeof data.meta !== 'object') {
+        data.meta = {};
+      } else {
+        data.meta = { ...data.meta };
+      }
+      const remoteUpdatedAt =
+        typeof data.meta.remoteUpdatedAt === 'string' && data.meta.remoteUpdatedAt
+          ? data.meta.remoteUpdatedAt
+          : null;
+      data.meta.remoteUpdatedAt = remoteUpdatedAt;
     }
     return data;
   } catch (e) {
@@ -381,6 +395,7 @@ export function seed() {
   const defaultHeight = Number.isFinite(defaultDims.height)
     ? defaultDims.height
     : Math.round(DEFAULT_CARD_HEIGHT);
+  const now = Date.now();
   const defaultMeta = resolveSizeMetadata(defaultWidth, defaultHeight);
   const data = {
     groups: [],
@@ -401,6 +416,10 @@ export function seed() {
     title: '',
     icon: '',
     iconImage: '',
+    updatedAt: now,
+    meta: {
+      remoteUpdatedAt: null,
+    },
   };
   save(data);
   return data;
