@@ -533,6 +533,8 @@ async function bootstrapSession() {
   try {
     const remote = await fetchSettings();
     const meta = ensureStateMeta();
+    const hadRemoteId = typeof meta.remoteId === 'string' && meta.remoteId;
+    const localHasContent = Array.isArray(state.groups) && state.groups.length > 0;
     if (!remote) {
       if (meta.remoteUpdatedAt) {
         meta.remoteUpdatedAt = null;
@@ -545,6 +547,7 @@ async function bootstrapSession() {
       return { appliedRemote: false };
     }
     const remoteId = typeof remote.id === 'string' && remote.id ? remote.id : null;
+    const remoteIdChanged = Boolean(hadRemoteId && remoteId && hadRemoteId !== remoteId);
     if (meta.remoteId !== remoteId) {
       meta.remoteId = remoteId;
       shouldPersist = true;
@@ -555,15 +558,17 @@ async function bootstrapSession() {
       typeof remote.updated_at === 'string' && remote.updated_at ? remote.updated_at : null;
     const remoteUpdatedAtValue = remoteUpdatedAtIso ? Date.parse(remoteUpdatedAtIso) : null;
     const localUpdatedAt = Number.isFinite(state.updatedAt) ? state.updatedAt : 0;
+    const isFreshLocalState = !hadRemoteId && !localHasContent;
+    const shouldApplyRemote =
+      remoteState &&
+      (remoteIdChanged ||
+        isFreshLocalState ||
+        (Number.isFinite(remoteUpdatedAtValue) && remoteUpdatedAtValue > localUpdatedAt));
     if (meta.remoteUpdatedAt !== remoteUpdatedAtIso) {
       meta.remoteUpdatedAt = remoteUpdatedAtIso;
       shouldPersist = true;
     }
-    if (
-      remoteState &&
-      Number.isFinite(remoteUpdatedAtValue) &&
-      remoteUpdatedAtValue > localUpdatedAt
-    ) {
+    if (shouldApplyRemote) {
       Object.assign(state, remoteState);
       if (!Number.isFinite(state.updatedAt) || state.updatedAt < remoteUpdatedAtValue) {
         state.updatedAt = remoteUpdatedAtValue;
