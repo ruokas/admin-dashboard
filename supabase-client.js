@@ -1,6 +1,17 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
 let supabase = null;
+let supabaseModulePromise = null;
+
+async function loadSupabaseModule() {
+  if (!supabaseModulePromise) {
+    supabaseModulePromise = import('https://esm.sh/@supabase/supabase-js@2').catch(
+      (error) => {
+        supabaseModulePromise = null;
+        throw error;
+      }
+    );
+  }
+  return supabaseModulePromise;
+}
 
 function resolveConfig(input = {}) {
   if (!input || typeof input !== 'object') {
@@ -28,7 +39,7 @@ function ensureClient() {
   return supabase;
 }
 
-export function initSupabase(config = {}) {
+export async function initSupabase(config = {}) {
   const { url, anonKey } = resolveConfig(config);
   if (!url || !anonKey) {
     console.warn(
@@ -37,7 +48,8 @@ export function initSupabase(config = {}) {
     supabase = null;
     return null;
   }
-  supabase = createClient(url, anonKey);
+  const module = await loadSupabaseModule();
+  supabase = module.createClient(url, anonKey);
   return supabase;
 }
 
