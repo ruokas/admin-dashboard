@@ -209,6 +209,13 @@ const dataMenuBtn = document.getElementById('dataMenuBtn');
 const dataMenuList = document.getElementById('dataMenuList');
 let pageIconImageEl = null;
 
+let authSession = null;
+let authSubscription = null;
+let authModalOpen = false;
+let authSubmitting = false;
+let lastFocusedBeforeAuthModal = null;
+let autoAuthModalRequested = true;
+
 applyPageIconActionLabels();
 applyDataMenuLabels();
 applyAuthLabels();
@@ -250,12 +257,6 @@ if (state.iconImage) state.icon = '';
 let editing = false;
 let reminders;
 let debouncedSearchRender = null;
-let authSession = null;
-let authSubscription = null;
-let authModalOpen = false;
-let authSubmitting = false;
-let lastFocusedBeforeAuthModal = null;
-let autoAuthModalRequested = true;
 
 normaliseReminderState();
 
