@@ -116,7 +116,21 @@ function ensureStateMeta(targetState) {
   if (!source.meta || typeof source.meta !== 'object') {
     source.meta = {};
   }
+  if (!('remoteUpdatedAt' in source.meta)) {
+    source.meta.remoteUpdatedAt = null;
+  }
+  if (!('remoteId' in source.meta)) {
+    source.meta.remoteId = null;
+  }
   return source.meta;
+}
+
+function resolveAuthUserId() {
+  const userId = authSession?.user?.id;
+  if (typeof userId === 'string' && userId) {
+    return userId;
+  }
+  return null;
 }
 
 function formatDateTimeLocal(ts) {
@@ -522,7 +536,16 @@ async function bootstrapSession() {
         meta.remoteUpdatedAt = null;
         shouldPersist = true;
       }
+      if (meta.remoteId) {
+        meta.remoteId = null;
+        shouldPersist = true;
+      }
       return { appliedRemote: false };
+    }
+    const remoteId = typeof remote.id === 'string' && remote.id ? remote.id : null;
+    if (meta.remoteId !== remoteId) {
+      meta.remoteId = remoteId;
+      shouldPersist = true;
     }
     const remoteState =
       remote.state_json && typeof remote.state_json === 'object' ? remote.state_json : null;
@@ -1574,6 +1597,33 @@ function canSyncRemoteState() {
   return supabaseReady && Boolean(authSession?.user);
 }
 
+async function ensureRemoteRowId() {
+  const userId = resolveAuthUserId();
+  if (!userId) {
+    return { userId: null, rowId: null };
+  }
+  const meta = ensureStateMeta();
+  if (typeof meta.remoteId === 'string' && meta.remoteId) {
+    return { userId, rowId: meta.remoteId };
+  }
+  try {
+    const remote = await fetchSettings();
+    const remoteId = typeof remote?.id === 'string' && remote.id ? remote.id : null;
+    if (remoteId) {
+      meta.remoteId = remoteId;
+      const remoteUpdatedAt =
+        typeof remote?.updated_at === 'string' && remote.updated_at ? remote.updated_at : null;
+      if (remoteUpdatedAt) {
+        meta.remoteUpdatedAt = remoteUpdatedAt;
+      }
+      return { userId, rowId: remoteId };
+    }
+  } catch (error) {
+    console.warn('Nepavyko nustatyti Supabase įrašo ID:', error);
+  }
+  return { userId, rowId: userId };
+}
+
 function clearRemoteSaveTimer() {
   if (remoteSaveTimer) {
     clearTimeout(remoteSaveTimer);
@@ -1613,15 +1663,25 @@ async function remoteSave(snapshot) {
   if (!canSyncRemoteState()) return;
   const targetState = snapshot || cloneStateSnapshot(state);
   if (!targetState) return;
+  const { userId, rowId } = await ensureRemoteRowId();
+  if (!userId) {
+    console.warn('Nuotolinio išsaugojimo vartotojo ID nerastas – sinchronizacija nutraukta.');
+    return;
+  }
   const issuedAtIso = new Date().toISOString();
   try {
     setSyncStatus(T.authStatusSyncing || 'Sinchronizuojama…');
     const result = await upsertSettings({
+      id: rowId,
+      user_id: userId,
       state_json: targetState,
       updated_at: issuedAtIso,
     });
     const remoteUpdatedAt = result?.updated_at || issuedAtIso;
-    ensureStateMeta().remoteUpdatedAt = remoteUpdatedAt;
+    const meta = ensureStateMeta();
+    meta.remoteUpdatedAt = remoteUpdatedAt;
+    const savedRemoteId = typeof result?.id === 'string' && result.id ? result.id : rowId;
+    meta.remoteId = savedRemoteId;
     save(state);
     const email = authSession?.user?.email || '';
     if (email) {

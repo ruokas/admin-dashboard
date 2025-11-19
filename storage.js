@@ -369,6 +369,9 @@ export function load() {
           ? data.meta.remoteUpdatedAt
           : null;
       data.meta.remoteUpdatedAt = remoteUpdatedAt;
+      const remoteId =
+        typeof data.meta.remoteId === 'string' && data.meta.remoteId ? data.meta.remoteId : null;
+      data.meta.remoteId = remoteId;
     }
     return data;
   } catch (e) {
@@ -430,6 +433,7 @@ export function seed() {
     updatedAt: now,
     meta: {
       remoteUpdatedAt: null,
+      remoteId: null,
     },
   };
   save(data);
