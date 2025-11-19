@@ -50,6 +50,8 @@ const MAX_ICON_IMAGE_LENGTH = Math.ceil((MAX_ICON_IMAGE_BYTES / 3) * 4) + 512;
 const ICON_IMAGE_ACCEPT_PREFIX = 'data:image/';
 const AUTH_EMAIL_STORAGE_KEY = 'ed_dash_last_email';
 
+let supabaseReady = false;
+
 const supabaseConfigPromise = import('./supabase-config.js')
   .then((module) => {
     const url = module?.SUPABASE_URL;
@@ -229,7 +231,6 @@ if (state.iconImage) state.icon = '';
 let editing = false;
 let reminders;
 let debouncedSearchRender = null;
-let supabaseReady = false;
 let authSession = null;
 let authSubscription = null;
 let authModalOpen = false;
