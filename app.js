@@ -8,7 +8,12 @@ import {
   upsertSettings,
 } from './supabase-client.js';
 import { load, save, seed, touchState } from './storage.js';
-import { render, updateEditingUI, toSheetEmbed } from './render.js';
+import {
+  render,
+  updateEditingUI,
+  toSheetEmbed,
+  formatRemoteSyncStatus,
+} from './render.js';
 import { SIZE_MAP, sizeFromWidth, sizeFromHeight } from './sizes.js';
 import {
   remindersDialog,
@@ -18,6 +23,7 @@ import {
   confirmDialog as confirmDlg,
   notesDialog,
   helpDialog,
+  remoteSyncDialog,
 } from './forms.js';
 import { I } from './icons.js';
 import { Tlt } from './i18n.js';
@@ -224,6 +230,8 @@ const pageIconFileInput = document.getElementById('pageIconFile');
 const dataMenu = document.getElementById('dataMenu');
 const dataMenuBtn = document.getElementById('dataMenuBtn');
 const dataMenuList = document.getElementById('dataMenuList');
+const remoteFetchBtn = document.getElementById('remoteFetchBtn');
+const remotePushBtn = document.getElementById('remotePushBtn');
 let pageIconImageEl = null;
 
 let authSession = null;
@@ -237,6 +245,7 @@ applyPageIconActionLabels();
 applyDataMenuLabels();
 applyAuthLabels();
 updateAuthButtonState();
+updateRemoteSyncButtons();
 
 if (addMenu && !addMenu.dataset.open) {
   addMenu.dataset.open = '0';
@@ -405,6 +414,14 @@ function applyDataMenuLabels() {
   if (exportLabel) {
     exportLabel.textContent = T.export || 'Eksportuoti';
   }
+  const remoteFetchLabel = dataMenu.querySelector('[data-menu-remote-fetch] span');
+  if (remoteFetchLabel) {
+    remoteFetchLabel.textContent = T.remoteFetch || 'Atsiųsti iš Supabase';
+  }
+  const remotePushLabel = dataMenu.querySelector('[data-menu-remote-push] span');
+  if (remotePushLabel) {
+    remotePushLabel.textContent = T.remotePush || 'Išsiųsti į Supabase';
+  }
 }
 
 function applyAuthLabels() {
@@ -454,13 +471,62 @@ function applyAuthLabels() {
 
 function setSyncStatus(message, options = {}) {
   if (!syncStatusEl) return;
-  const { variant = 'neutral' } = options;
-  syncStatusEl.textContent = message || '';
+  const { variant = 'neutral', includeRemoteMeta = false } = options;
+  const segments = [];
+  if (message) {
+    segments.push(message);
+  }
+  if (includeRemoteMeta) {
+    const remoteLabel = formatRemoteSyncStatus(ensureStateMeta(), T);
+    if (remoteLabel) {
+      segments.push(remoteLabel);
+    }
+  }
+  syncStatusEl.textContent = segments.join(' • ');
   if (variant && variant !== 'neutral') {
     syncStatusEl.dataset.variant = variant;
   } else {
     delete syncStatusEl.dataset.variant;
   }
+}
+
+function updateRemoteSyncButtons() {
+  const canSync = canSyncRemoteState();
+  const disabledTitle = !supabaseReady
+    ? T.authNoConfig || ''
+    : T.remoteSyncAuthRequired || T.authToggleSignIn || '';
+  [remoteFetchBtn, remotePushBtn].forEach((btn) => {
+    if (!btn) return;
+    btn.disabled = !canSync;
+    if (btn.hasAttribute('aria-disabled')) {
+      btn.setAttribute('aria-disabled', canSync ? 'false' : 'true');
+    } else if (!canSync) {
+      btn.setAttribute('aria-disabled', 'true');
+    }
+    btn.title = canSync ? '' : disabledTitle;
+  });
+}
+
+function updateIdleSyncStatus() {
+  if (!supabaseReady) {
+    setSyncStatus(T.authStatusSignedOut || 'Neprisijungęs');
+    return;
+  }
+  if (authSession?.user?.email) {
+    setSyncStatus(formatSignedInStatus(authSession.user.email), {
+      variant: 'success',
+      includeRemoteMeta: true,
+    });
+    return;
+  }
+  if (authSession) {
+    setSyncStatus(T.authStatusSignedIn || 'Prisijungęs', {
+      variant: 'success',
+      includeRemoteMeta: true,
+    });
+    return;
+  }
+  setSyncStatus(T.authStatusSignedOut || 'Neprisijungęs');
 }
 
 function formatSignedInStatus(email) {
@@ -772,22 +838,20 @@ async function refreshAuthSession() {
 function updateAuthSession(session) {
   const wasAuthenticated = Boolean(authSession);
   authSession = session && session.user ? session : null;
+  updateIdleSyncStatus();
   if (authSession?.user?.email) {
-    setSyncStatus(formatSignedInStatus(authSession.user.email), { variant: 'success' });
     autoAuthModalRequested = false;
     if (authModalOpen) {
       closeAuthModal({ restoreFocus: false });
     }
-  } else if (supabaseReady) {
-    setSyncStatus(T.authStatusSignedOut || 'Neprisijungęs');
-    if (wasAuthenticated) {
-      scheduleAuthModalAutoOpen();
-    }
+  } else if (supabaseReady && wasAuthenticated) {
+    scheduleAuthModalAutoOpen();
   }
   if (!authSession) {
     clearRemoteSaveTimer();
   }
   updateAuthButtonState();
+  updateRemoteSyncButtons();
 }
 
 async function onAuthSignOut() {
@@ -1604,6 +1668,120 @@ function canSyncRemoteState() {
   return supabaseReady && Boolean(authSession?.user);
 }
 
+function ensureRemoteSyncAvailable() {
+  if (!supabaseReady) {
+    alert(T.authNoConfig || 'Supabase konfigūracija nerasta.');
+    return false;
+  }
+  if (!canSyncRemoteState()) {
+    alert(T.remoteSyncAuthRequired || 'Prisijunkite, kad naudotumėte Supabase sinchronizavimą.');
+    return false;
+  }
+  return true;
+}
+
+async function remoteFetchLatest() {
+  if (!ensureRemoteSyncAvailable()) return;
+  try {
+    setSyncStatus(T.authStatusSyncing || 'Sinchronizuojama…');
+    const remote = await fetchSettings();
+    const remoteState =
+      remote && remote.state_json && typeof remote.state_json === 'object'
+        ? remote.state_json
+        : null;
+    if (!remoteState) {
+      setSyncStatus(T.remoteSyncNoData || 'Supabase duomenų nerasta.', {
+        variant: 'warning',
+      });
+      return;
+    }
+    const remoteUpdatedAtIso =
+      typeof remote.updated_at === 'string' && remote.updated_at ? remote.updated_at : null;
+    const remoteUpdatedAtValue = remoteUpdatedAtIso ? Date.parse(remoteUpdatedAtIso) : null;
+    const localUpdatedAt = Number.isFinite(state.updatedAt) ? state.updatedAt : null;
+    const confirmOverwrite = await remoteSyncDialog(T, {
+      remoteUpdatedAt: remoteUpdatedAtValue,
+      localUpdatedAt,
+      isRemoteNewer:
+        Number.isFinite(remoteUpdatedAtValue) &&
+        (!Number.isFinite(localUpdatedAt) || remoteUpdatedAtValue >= localUpdatedAt),
+    });
+    if (!confirmOverwrite) {
+      updateIdleSyncStatus();
+      return;
+    }
+    const remoteId = typeof remote.id === 'string' && remote.id ? remote.id : null;
+    const applied = applyRemoteState(remoteState, {
+      remoteId,
+      remoteUpdatedAtIso,
+      remoteUpdatedAtValue,
+    });
+    if (!applied) {
+      setSyncStatus(T.remoteSyncNoData || 'Supabase duomenų nerasta.', {
+        variant: 'warning',
+      });
+      return;
+    }
+    setSyncStatus(T.remoteSyncSuccess || 'Duomenys atnaujinti iš Supabase.', {
+      variant: 'success',
+      includeRemoteMeta: true,
+    });
+  } catch (error) {
+    console.error('Nuotolinio atsisiuntimo klaida iš Supabase:', error);
+    setSyncStatus(T.remoteSyncError || 'Nepavyko atsiųsti duomenų iš Supabase.', {
+      variant: 'error',
+    });
+  }
+}
+
+async function remotePushLatest() {
+  if (!ensureRemoteSyncAvailable()) return;
+  const snapshot = cloneStateSnapshot(state);
+  if (!snapshot) return;
+  await remoteSave(snapshot);
+}
+
+function applyRemoteState(remoteState, options = {}) {
+  if (!remoteState || typeof remoteState !== 'object') return false;
+  Object.keys(state).forEach((key) => {
+    if (!(key in remoteState)) {
+      delete state[key];
+    }
+  });
+  Object.assign(state, remoteState);
+  const sanitizedIconImage = sanitizeIconImage(state.iconImage || '');
+  state.iconImage = sanitizedIconImage;
+  if (sanitizedIconImage) {
+    state.icon = '';
+  } else if (typeof state.icon !== 'string') {
+    state.icon = '';
+  }
+  if (typeof state.title !== 'string' || !state.title.trim()) {
+    state.title = DEFAULT_TITLE;
+  }
+  normaliseReminderState();
+  refreshPageHeaderFromState();
+  renderAll();
+  syncReminders();
+  const meta = ensureStateMeta();
+  if (typeof options.remoteId === 'string' && options.remoteId) {
+    meta.remoteId = options.remoteId;
+  }
+  if (typeof options.remoteUpdatedAtIso === 'string' && options.remoteUpdatedAtIso) {
+    meta.remoteUpdatedAt = options.remoteUpdatedAtIso;
+  } else if (Number.isFinite(options.remoteUpdatedAtValue)) {
+    meta.remoteUpdatedAt = new Date(options.remoteUpdatedAtValue).toISOString();
+  }
+  if (
+    Number.isFinite(options.remoteUpdatedAtValue) &&
+    (!Number.isFinite(state.updatedAt) || state.updatedAt < options.remoteUpdatedAtValue)
+  ) {
+    state.updatedAt = options.remoteUpdatedAtValue;
+  }
+  save(state);
+  return true;
+}
+
 async function ensureRemoteRowId() {
   const userId = resolveAuthUserId();
   if (!userId) {
@@ -1711,12 +1889,7 @@ async function performRemoteSaveRequest(snapshot) {
     const savedRemoteId = typeof result?.id === 'string' && result.id ? result.id : rowId;
     meta.remoteId = savedRemoteId;
     save(state);
-    const email = authSession?.user?.email || '';
-    if (email) {
-      setSyncStatus(formatSignedInStatus(email), { variant: 'success' });
-    } else {
-      setSyncStatus(T.authStatusSignedIn || 'Prisijungęs', { variant: 'success' });
-    }
+    updateIdleSyncStatus();
   } catch (error) {
     console.error('Nuotolinio išsaugojimo klaida:', error);
     setSyncStatus(REMOTE_SAVE_ERROR_MESSAGE, { variant: 'error' });
@@ -2472,6 +2645,18 @@ if (importBtnEl) {
   importBtnEl.addEventListener('click', () => {
     closeDataMenu();
     document.getElementById('fileInput')?.click();
+  });
+}
+if (remoteFetchBtn) {
+  remoteFetchBtn.addEventListener('click', () => {
+    closeDataMenu();
+    remoteFetchLatest();
+  });
+}
+if (remotePushBtn) {
+  remotePushBtn.addEventListener('click', () => {
+    closeDataMenu();
+    remotePushLatest();
   });
 }
 document.getElementById('fileInput').addEventListener('change', (e) => {

@@ -1265,3 +1265,82 @@ export function confirmDialog(T, msg) {
     first?.focus();
   });
 }
+
+export function remoteSyncDialog(T, options = {}) {
+  return new Promise((resolve) => {
+    const prevFocus = document.activeElement;
+    const dlg = document.createElement('dialog');
+    const remoteTime = Number.isFinite(options.remoteUpdatedAt)
+      ? formatDateTime(options.remoteUpdatedAt)
+      : T.remoteSyncUnknownTime || 'Nežinoma';
+    const localTime = Number.isFinite(options.localUpdatedAt)
+      ? formatDateTime(options.localUpdatedAt)
+      : T.remoteSyncUnknownTime || 'Nežinoma';
+    const title = T.remoteSyncDialogTitle || 'Atsiųsti iš Supabase';
+    const description =
+      options.description ||
+      T.remoteSyncDialogDescription ||
+      'Nuotoliniai duomenys gali perrašyti vietinius įrašus.';
+    const warning = options.isRemoteNewer
+      ? `<p class="remote-sync-dialog__warning">${escapeHtml(
+          T.remoteSyncNewerWarning || 'Supabase duomenys naujesni nei vietiniai.',
+        )}</p>`
+      : '';
+    const remoteLabel = T.remoteSyncRemoteLabel || 'Nuotolinė versija';
+    const localLabel = T.remoteSyncLocalLabel || 'Vietinė versija';
+    const cancelLabel = T.remoteSyncCancel || T.cancel || 'Atšaukti';
+    const confirmLabel =
+      T.remoteSyncOverwrite || 'Perrašyti vietinius duomenis';
+    dlg.innerHTML = `<form method="dialog" class="remote-sync-dialog"><div class="remote-sync-dialog__body"><h2 id="remoteSyncDialogLabel">${escapeHtml(
+      title,
+    )}</h2><p>${escapeHtml(description)}</p>${warning}<dl class="remote-sync-dialog__times"><div><dt>${escapeHtml(
+      remoteLabel,
+    )}</dt><dd>${escapeHtml(remoteTime)}</dd></div><div><dt>${escapeHtml(
+      localLabel,
+    )}</dt><dd>${escapeHtml(localTime)}</dd></div></dl></div><menu><button type="button" data-act="cancel">${escapeHtml(
+      cancelLabel,
+    )}</button><button type="submit" class="btn-danger" data-act="confirm">${escapeHtml(
+      confirmLabel,
+    )}</button></menu></form>`;
+    dlg.setAttribute('aria-modal', 'true');
+    dlg.setAttribute('aria-labelledby', 'remoteSyncDialogLabel');
+    document.body.appendChild(dlg);
+    const form = dlg.querySelector('form');
+    const cancelBtn = form.querySelector('[data-act="cancel"]');
+    const confirmBtn = form.querySelector('[data-act="confirm"]');
+
+    function cleanup(result) {
+      form.removeEventListener('submit', handleSubmit);
+      cancelBtn?.removeEventListener('click', handleCancel);
+      dlg.removeEventListener('cancel', handleDialogCancel);
+      dlg.remove();
+      if (prevFocus instanceof HTMLElement) {
+        prevFocus.focus();
+      }
+      resolve(result);
+    }
+
+    function handleSubmit(event) {
+      event.preventDefault();
+      cleanup(true);
+    }
+
+    function handleCancel(event) {
+      event.preventDefault();
+      dlg.close();
+      cleanup(false);
+    }
+
+    function handleDialogCancel() {
+      cleanup(false);
+    }
+
+    form.addEventListener('submit', handleSubmit);
+    cancelBtn?.addEventListener('click', handleCancel);
+    dlg.addEventListener('cancel', handleDialogCancel);
+    dlg.showModal();
+    if (confirmBtn instanceof HTMLElement) {
+      confirmBtn.focus();
+    }
+  });
+}
