@@ -44,14 +44,37 @@ function sanitizeIconImage(value) {
   return trimmed;
 }
 
+const SIZE_SNAP_TOLERANCE = 1;
+
+function shouldSnapToPreset(value, preset) {
+  if (!Number.isFinite(preset)) return false;
+  if (!Number.isFinite(value)) return true;
+  return Math.abs(Math.round(value) - Math.round(preset)) <= SIZE_SNAP_TOLERANCE;
+}
+
 function normalizeDimensionPair(width, height, wSize, hSize) {
   const widthPreset = SIZE_MAP[wSize]?.width;
   const heightPreset = SIZE_MAP[hSize]?.height;
-  const finalWidth = Number.isFinite(widthPreset) ? widthPreset : width;
-  const finalHeight = Number.isFinite(heightPreset) ? heightPreset : height;
+
+  let finalWidth;
+  if (shouldSnapToPreset(width, widthPreset)) {
+    finalWidth = Number.isFinite(widthPreset) ? Math.round(widthPreset) : undefined;
+  } else if (Number.isFinite(width)) {
+    finalWidth = Math.round(width);
+  }
+
+  let finalHeight;
+  if (shouldSnapToPreset(height, heightPreset)) {
+    finalHeight = Number.isFinite(heightPreset)
+      ? Math.round(heightPreset)
+      : undefined;
+  } else if (Number.isFinite(height)) {
+    finalHeight = Math.round(height);
+  }
+
   return {
-    width: Number.isFinite(finalWidth) ? Math.round(finalWidth) : undefined,
-    height: Number.isFinite(finalHeight) ? Math.round(finalHeight) : undefined,
+    width: finalWidth,
+    height: finalHeight,
   };
 }
 
@@ -138,9 +161,15 @@ export function load() {
       const normalisedGroups = groups
         .map((g) => {
           if (!g || typeof g !== 'object') return null;
-          let width = Number.isFinite(g.width) ? g.width : DEFAULT_CARD_WIDTH;
-          let height = Number.isFinite(g.height) ? g.height : DEFAULT_CARD_HEIGHT;
-          if (!Number.isFinite(g.width) || !Number.isFinite(g.height)) {
+          const hasWidth = Number.isFinite(g.width);
+          const hasHeight = Number.isFinite(g.height);
+          let width = hasWidth
+            ? g.width
+            : SIZE_MAP[g.wSize ?? g.size]?.width ?? DEFAULT_CARD_WIDTH;
+          let height = hasHeight
+            ? g.height
+            : SIZE_MAP[g.hSize ?? g.size]?.height ?? DEFAULT_CARD_HEIGHT;
+          if (!hasWidth || !hasHeight) {
             if (g.size === 'sm') {
               width = 240;
               height = 240;
