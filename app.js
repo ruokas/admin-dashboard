@@ -83,17 +83,20 @@ const supabaseInitPromise = supabaseConfigPromise
   .then(async (config) => {
     if (!config) {
       updateAuthButtonState();
+      setLoginGateActive(false);
       return false;
     }
     try {
       await initSupabase({ url: config.url, anonKey: config.anonKey });
       supabaseReady = true;
+      setLoginGateActive(true);
       updateAuthButtonState();
       subscribeToAuthChanges();
       return true;
     } catch (error) {
       supabaseReady = false;
       updateAuthButtonState();
+      setLoginGateActive(false);
       console.error('Nepavyko inicijuoti Supabase kliento:', error);
       setSyncStatus(T.authStatusError || 'Nepavyko prisijungti. Bandykite dar kartą.', {
         variant: 'error',
@@ -103,6 +106,7 @@ const supabaseInitPromise = supabaseConfigPromise
   })
   .catch((error) => {
     console.error('Supabase inicijavimo klaida:', error);
+    setLoginGateActive(false);
     return false;
   });
 
@@ -234,12 +238,11 @@ let authSubmitting = false;
 let lastFocusedBeforeAuthModal = null;
 let autoAuthModalRequested = true;
 let bootstrapCompleted = false;
-let loginGateActive = true;
+let loginGateActive = false;
 
 applyPageIconActionLabels();
 applyAuthLabels();
 updateAuthButtonState();
-setLoginGateActive(true);
 
 if (addMenu && !addMenu.dataset.open) {
   addMenu.dataset.open = '0';
@@ -518,6 +521,9 @@ function setLoginGateActive(active) {
     }
   } else {
     delete document.body.dataset.loginGate;
+    if (authModalOpen) {
+      closeAuthModal({ restoreFocus: false });
+    }
   }
 }
 
