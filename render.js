@@ -2208,9 +2208,33 @@ export function renderGroups(state, editing, T, I, handlers, saveFn) {
     h.style.setProperty('--dot-color', g.color || '#6ee7b7');
 
     const openAllLinks = () => {
-      g.items
-        .filter((i) => i.type === 'link')
-        .forEach((i) => window.open(i.url, '_blank'));
+      const linkItems = g.items.filter((i) => i.type === 'link' && i.url);
+      if (linkItems.length === 0) return;
+
+      const tempContainer = document.createElement('div');
+      tempContainer.style.position = 'absolute';
+      tempContainer.style.left = '-9999px';
+      tempContainer.style.top = '0';
+      tempContainer.setAttribute('aria-hidden', 'true');
+      tempContainer.dataset.tempLinks = '1';
+
+      linkItems.forEach((item) => {
+        const anchor = document.createElement('a');
+        anchor.href = item.url;
+        anchor.target = '_blank';
+        anchor.rel = 'noopener';
+        anchor.dataset.tempLink = '1';
+        tempContainer.appendChild(anchor);
+      });
+
+      const targetParent = document.body || document.documentElement;
+      targetParent.appendChild(tempContainer);
+
+      tempContainer
+        .querySelectorAll('a[data-temp-link="1"]')
+        .forEach((anchor) => anchor.click());
+
+      tempContainer.remove();
     };
 
     const openAllBtn = h.querySelector('[data-act="openAll"]');
