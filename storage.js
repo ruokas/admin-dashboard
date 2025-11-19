@@ -369,6 +369,9 @@ export function load() {
           ? data.meta.remoteUpdatedAt
           : null;
       data.meta.remoteUpdatedAt = remoteUpdatedAt;
+      const remoteId =
+        typeof data.meta.remoteId === 'string' && data.meta.remoteId ? data.meta.remoteId : null;
+      data.meta.remoteId = remoteId;
     }
     return data;
   } catch (e) {
@@ -376,7 +379,18 @@ export function load() {
   }
 }
 
+export function touchState(target, timestamp = Date.now()) {
+  if (!target || typeof target !== 'object') return null;
+  const nextTimestamp = Number.isFinite(timestamp) ? Math.round(timestamp) : Date.now();
+  target.updatedAt = nextTimestamp;
+  return nextTimestamp;
+}
+
 export function save(state) {
+  if (!state || typeof state !== 'object') return;
+  if (!Number.isFinite(state.updatedAt)) {
+    touchState(state);
+  }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
@@ -419,6 +433,7 @@ export function seed() {
     updatedAt: now,
     meta: {
       remoteUpdatedAt: null,
+      remoteId: null,
     },
   };
   save(data);

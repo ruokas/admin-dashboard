@@ -5,8 +5,9 @@ import {
   getSession,
   onAuthStateChange,
   fetchSettings,
+  upsertSettings,
 } from './supabase-client.js';
-import { load, save, seed } from './storage.js';
+import { load, save, seed, touchState } from './storage.js';
 import { render, updateEditingUI, toSheetEmbed } from './render.js';
 import { SIZE_MAP, sizeFromWidth, sizeFromHeight } from './sizes.js';
 import {
@@ -50,6 +51,8 @@ const MAX_ICON_IMAGE_BYTES = 200 * 1024; // 200 KB
 const MAX_ICON_IMAGE_LENGTH = Math.ceil((MAX_ICON_IMAGE_BYTES / 3) * 4) + 512;
 const ICON_IMAGE_ACCEPT_PREFIX = 'data:image/';
 const AUTH_EMAIL_STORAGE_KEY = 'ed_dash_last_email';
+const REMOTE_SAVE_DEBOUNCE_MS = 2000;
+const REMOTE_SAVE_ERROR_MESSAGE = 'Nepavyko išsaugoti – bandykite rankiniu būdu';
 
 let supabaseReady = false;
 
@@ -113,7 +116,21 @@ function ensureStateMeta(targetState) {
   if (!source.meta || typeof source.meta !== 'object') {
     source.meta = {};
   }
+  if (!('remoteUpdatedAt' in source.meta)) {
+    source.meta.remoteUpdatedAt = null;
+  }
+  if (!('remoteId' in source.meta)) {
+    source.meta.remoteId = null;
+  }
   return source.meta;
+}
+
+function resolveAuthUserId() {
+  const userId = authSession?.user?.id;
+  if (typeof userId === 'string' && userId) {
+    return userId;
+  }
+  return null;
 }
 
 function formatDateTimeLocal(ts) {
@@ -268,6 +285,9 @@ if (state.iconImage) state.icon = '';
 let editing = false;
 let reminders;
 let debouncedSearchRender = null;
+let remoteSaveTimer = null;
+let remoteSaveInFlight = false;
+let remoteSavePendingSnapshot = null;
 
 normaliseReminderState();
 
@@ -513,12 +533,24 @@ async function bootstrapSession() {
   try {
     const remote = await fetchSettings();
     const meta = ensureStateMeta();
+    const hadRemoteId = typeof meta.remoteId === 'string' && meta.remoteId;
+    const localHasContent = Array.isArray(state.groups) && state.groups.length > 0;
     if (!remote) {
       if (meta.remoteUpdatedAt) {
         meta.remoteUpdatedAt = null;
         shouldPersist = true;
       }
+      if (meta.remoteId) {
+        meta.remoteId = null;
+        shouldPersist = true;
+      }
       return { appliedRemote: false };
+    }
+    const remoteId = typeof remote.id === 'string' && remote.id ? remote.id : null;
+    const remoteIdChanged = Boolean(hadRemoteId && remoteId && hadRemoteId !== remoteId);
+    if (meta.remoteId !== remoteId) {
+      meta.remoteId = remoteId;
+      shouldPersist = true;
     }
     const remoteState =
       remote.state_json && typeof remote.state_json === 'object' ? remote.state_json : null;
@@ -526,15 +558,17 @@ async function bootstrapSession() {
       typeof remote.updated_at === 'string' && remote.updated_at ? remote.updated_at : null;
     const remoteUpdatedAtValue = remoteUpdatedAtIso ? Date.parse(remoteUpdatedAtIso) : null;
     const localUpdatedAt = Number.isFinite(state.updatedAt) ? state.updatedAt : 0;
+    const isFreshLocalState = !hadRemoteId && !localHasContent;
+    const shouldApplyRemote =
+      remoteState &&
+      (remoteIdChanged ||
+        isFreshLocalState ||
+        (Number.isFinite(remoteUpdatedAtValue) && remoteUpdatedAtValue > localUpdatedAt));
     if (meta.remoteUpdatedAt !== remoteUpdatedAtIso) {
       meta.remoteUpdatedAt = remoteUpdatedAtIso;
       shouldPersist = true;
     }
-    if (
-      remoteState &&
-      Number.isFinite(remoteUpdatedAtValue) &&
-      remoteUpdatedAtValue > localUpdatedAt
-    ) {
+    if (shouldApplyRemote) {
       Object.assign(state, remoteState);
       if (!Number.isFinite(state.updatedAt) || state.updatedAt < remoteUpdatedAtValue) {
         state.updatedAt = remoteUpdatedAtValue;
@@ -749,6 +783,9 @@ function updateAuthSession(session) {
     if (wasAuthenticated) {
       scheduleAuthModalAutoOpen();
     }
+  }
+  if (!authSession) {
+    clearRemoteSaveTimer();
   }
   updateAuthButtonState();
 }
@@ -1563,12 +1600,136 @@ function syncReminders() {
   updateReminderBadge(entries.length);
 }
 
+function canSyncRemoteState() {
+  return supabaseReady && Boolean(authSession?.user);
+}
+
+async function ensureRemoteRowId() {
+  const userId = resolveAuthUserId();
+  if (!userId) {
+    return { userId: null, rowId: null };
+  }
+  const meta = ensureStateMeta();
+  if (typeof meta.remoteId === 'string' && meta.remoteId) {
+    return { userId, rowId: meta.remoteId };
+  }
+  try {
+    const remote = await fetchSettings();
+    const remoteId = typeof remote?.id === 'string' && remote.id ? remote.id : null;
+    if (remoteId) {
+      meta.remoteId = remoteId;
+      const remoteUpdatedAt =
+        typeof remote?.updated_at === 'string' && remote.updated_at ? remote.updated_at : null;
+      if (remoteUpdatedAt) {
+        meta.remoteUpdatedAt = remoteUpdatedAt;
+      }
+      return { userId, rowId: remoteId };
+    }
+  } catch (error) {
+    console.warn('Nepavyko nustatyti Supabase įrašo ID:', error);
+  }
+  return { userId, rowId: userId };
+}
+
+function clearRemoteSaveTimer() {
+  if (remoteSaveTimer) {
+    clearTimeout(remoteSaveTimer);
+    remoteSaveTimer = null;
+  }
+}
+
+function cloneStateSnapshot(input) {
+  if (!input || typeof input !== 'object') return null;
+  if (typeof structuredClone === 'function') {
+    try {
+      return structuredClone(input);
+    } catch (error) {
+      console.warn('Nepavyko sukurti būsenos kopijos structuredClone metodu:', error);
+    }
+  }
+  try {
+    return JSON.parse(JSON.stringify(input));
+  } catch (error) {
+    console.error('Nuotolinio išsaugojimo būsenos kopijavimo klaida:', error);
+    return null;
+  }
+}
+
+function debounceRemoteSave(nextState) {
+  if (!canSyncRemoteState()) return;
+  const snapshot = cloneStateSnapshot(nextState);
+  if (!snapshot) return;
+  clearRemoteSaveTimer();
+  remoteSaveTimer = setTimeout(() => {
+    remoteSaveTimer = null;
+    remoteSave(snapshot);
+  }, REMOTE_SAVE_DEBOUNCE_MS);
+}
+
+async function remoteSave(snapshot) {
+  if (!canSyncRemoteState()) return;
+  const targetState = snapshot || cloneStateSnapshot(state);
+  if (!targetState) return;
+  remoteSavePendingSnapshot = targetState;
+  if (remoteSaveInFlight) return;
+  remoteSaveInFlight = true;
+  try {
+    while (remoteSavePendingSnapshot && canSyncRemoteState()) {
+      const nextSnapshot = remoteSavePendingSnapshot;
+      remoteSavePendingSnapshot = null;
+      await performRemoteSaveRequest(nextSnapshot);
+    }
+  } finally {
+    remoteSaveInFlight = false;
+    if (remoteSavePendingSnapshot && canSyncRemoteState()) {
+      await remoteSave(remoteSavePendingSnapshot);
+    }
+  }
+}
+
+async function performRemoteSaveRequest(snapshot) {
+  if (!canSyncRemoteState()) return;
+  const targetState = snapshot || cloneStateSnapshot(state);
+  if (!targetState) return;
+  const { userId, rowId } = await ensureRemoteRowId();
+  if (!userId) {
+    console.warn('Nuotolinio išsaugojimo vartotojo ID nerastas – sinchronizacija nutraukta.');
+    return;
+  }
+  const issuedAtIso = new Date().toISOString();
+  try {
+    setSyncStatus(T.authStatusSyncing || 'Sinchronizuojama…');
+    const result = await upsertSettings({
+      id: rowId,
+      user_id: userId,
+      state_json: targetState,
+      updated_at: issuedAtIso,
+    });
+    const remoteUpdatedAt = result?.updated_at || issuedAtIso;
+    const meta = ensureStateMeta();
+    meta.remoteUpdatedAt = remoteUpdatedAt;
+    const savedRemoteId = typeof result?.id === 'string' && result.id ? result.id : rowId;
+    meta.remoteId = savedRemoteId;
+    save(state);
+    const email = authSession?.user?.email || '';
+    if (email) {
+      setSyncStatus(formatSignedInStatus(email), { variant: 'success' });
+    } else {
+      setSyncStatus(T.authStatusSignedIn || 'Prisijungęs', { variant: 'success' });
+    }
+  } catch (error) {
+    console.error('Nuotolinio išsaugojimo klaida:', error);
+    setSyncStatus(REMOTE_SAVE_ERROR_MESSAGE, { variant: 'error' });
+  }
+}
+
 function persistState() {
   normaliseReminderState();
-  state.updatedAt = Date.now();
+  touchState(state);
   ensureStateMeta();
   save(state);
   syncReminders();
+  debounceRemoteSave(state);
 }
 
 function renderAll() {
