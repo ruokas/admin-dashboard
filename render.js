@@ -370,14 +370,18 @@ function cleanupIntrinsicState(cardEl) {
     state.observers.forEach((disconnect) => {
       try {
         disconnect();
-      } catch {}
+      } catch (error) {
+        console.warn('Nepavyko atjungti kortelės stebėtojo', error);
+      }
     });
     state.observers = [];
   }
   if (state.removalCleanup) {
     try {
       state.removalCleanup();
-    } catch {}
+    } catch (error) {
+      console.warn('Nepavyko išvalyti kortelės šalinimo funkcijos', error);
+    }
     state.removalCleanup = null;
   }
   intrinsicPendingCards.delete(cardEl);
@@ -410,7 +414,9 @@ function ensureIntrinsicState(cardEl, innerEl = findCardInnerElement(cardEl)) {
       state.observers.forEach((disconnect) => {
         try {
           disconnect();
-        } catch {}
+        } catch (error) {
+          console.warn('Nepavyko atnaujinti kortelės stebėtojo', error);
+        }
       });
     }
     state.observers = [];
@@ -724,7 +730,9 @@ function initResizeHandles(cardEl) {
     if (activeResize && activeResize.el === cardEl && cardEl.releasePointerCapture) {
       try {
         cardEl.releasePointerCapture(activeResize.pointerId);
-      } catch {}
+      } catch (error) {
+        console.warn('Nepavyko atleisti pointer capture', error);
+      }
     }
     cardEl.removeEventListener('pointermove', handlePointerMove);
     cardEl.removeEventListener('pointerup', handlePointerUp);
@@ -742,7 +750,9 @@ function initResizeHandles(cardEl) {
     if (cardEl.setPointerCapture && Number.isFinite(event.pointerId)) {
       try {
         cardEl.setPointerCapture(event.pointerId);
-      } catch {}
+      } catch (error) {
+        console.warn('Nepavyko priskirti pointer capture', error);
+      }
     }
     cardEl.addEventListener('pointermove', handlePointerMove);
     cardEl.addEventListener('pointerup', handlePointerUp);
@@ -785,7 +795,9 @@ function setupMinSizeWatcher(cardEl, innerEl) {
   if (state.removalCleanup) {
     try {
       state.removalCleanup();
-    } catch {}
+    } catch (error) {
+      console.warn('Nepavyko išvalyti ankstesnio stebėjimo', error);
+    }
     state.removalCleanup = null;
   }
 
@@ -794,7 +806,9 @@ function setupMinSizeWatcher(cardEl, innerEl) {
     if (state.removalCleanup) {
       try {
         state.removalCleanup();
-      } catch {}
+      } catch (error) {
+        console.warn('Nepavyko perkurti stebėtojo (parent)', error);
+      }
       state.removalCleanup = null;
     }
     const removalObserver = new MutationObserver(() => {

@@ -1,3 +1,4 @@
+import { initSupabase } from './supabase-client.js';
 import { load, save, seed } from './storage.js';
 import { render, updateEditingUI, toSheetEmbed } from './render.js';
 import { SIZE_MAP, sizeFromWidth, sizeFromHeight } from './sizes.js';
@@ -20,7 +21,6 @@ import {
   updateReminderFormState,
 } from './reminder-form-state.js';
 import {
-  REMINDER_MODE_NONE,
   REMINDER_MODE_DATETIME,
   REMINDER_MODE_MINUTES,
   parseReminderInput,
@@ -42,6 +42,36 @@ const NOTE_DEFAULT_PADDING = 20;
 const MAX_ICON_IMAGE_BYTES = 200 * 1024; // 200 KB
 const MAX_ICON_IMAGE_LENGTH = Math.ceil((MAX_ICON_IMAGE_BYTES / 3) * 4) + 512;
 const ICON_IMAGE_ACCEPT_PREFIX = 'data:image/';
+
+const supabaseConfigPromise = import('./supabase-config.js')
+  .then((module) => {
+    const url = module?.SUPABASE_URL;
+    const anonKey = module?.SUPABASE_ANON_KEY;
+    if (!url || !anonKey) {
+      console.warn(
+        'Supabase konfigūracija nepilna – naudokite vietinį režimą arba užpildykite supabase-config.js.'
+      );
+      return null;
+    }
+    return { url, anonKey };
+  })
+  .catch((error) => {
+    console.warn(
+      'Supabase konfigūracijos failas nerastas. Naudojamas tik vietinis režimas.',
+      error
+    );
+    return null;
+  });
+
+supabaseConfigPromise.then((config) => {
+  if (config) {
+    try {
+      initSupabase({ url: config.url, anonKey: config.anonKey });
+    } catch (error) {
+      console.error('Nepavyko inicijuoti Supabase kliento:', error);
+    }
+  }
+});
 
 function sanitizeIconImage(value) {
   if (typeof value !== 'string') return '';
