@@ -247,7 +247,18 @@ if (dataMenuBtn) {
 }
 
 let state = load() || seed();
-await bootstrapSession();
+bootstrapSession()
+  .then((result) => {
+    if (result?.appliedRemote) {
+      normaliseReminderState();
+      refreshPageHeaderFromState();
+      renderAll();
+      syncReminders();
+    }
+  })
+  .catch((error) => {
+    console.error('Nepavyko užbaigti Supabase paleidimo:', error);
+  });
 if (!Array.isArray(state.groups)) state.groups = [];
 if (!state.title) state.title = DEFAULT_TITLE;
 if (typeof state.icon !== 'string') state.icon = '';
@@ -268,9 +279,7 @@ if (authPasswordInput) {
   authPasswordInput.value = '';
 }
 
-pageTitleEl.textContent = state.title;
-updatePageIconPresentation();
-document.title = state.title || DEFAULT_TITLE;
+refreshPageHeaderFromState();
 
 pageTitleEl.addEventListener('input', () => {
   if (!editing) return;
@@ -493,13 +502,14 @@ function maybeAutoOpenAuthModal() {
 
 async function bootstrapSession() {
   const initReady = await supabaseInitPromise.catch(() => false);
-  if (!initReady || !supabaseReady) return;
+  if (!initReady || !supabaseReady) return { appliedRemote: false };
   const session = await refreshAuthSession();
   if (!session) {
     maybeAutoOpenAuthModal();
-    return;
+    return { appliedRemote: false };
   }
   let shouldPersist = false;
+  let remoteApplied = false;
   try {
     const remote = await fetchSettings();
     const meta = ensureStateMeta();
@@ -508,7 +518,7 @@ async function bootstrapSession() {
         meta.remoteUpdatedAt = null;
         shouldPersist = true;
       }
-      return;
+      return { appliedRemote: false };
     }
     const remoteState =
       remote.state_json && typeof remote.state_json === 'object' ? remote.state_json : null;
@@ -533,6 +543,7 @@ async function bootstrapSession() {
         remoteUpdatedAtIso ||
         (remoteUpdatedAtValue ? new Date(remoteUpdatedAtValue).toISOString() : null);
       shouldPersist = true;
+      remoteApplied = true;
     }
   } catch (error) {
     console.error('Nepavyko įkelti nuotolinės būsenos iš Supabase:', error);
@@ -542,6 +553,7 @@ async function bootstrapSession() {
     }
     maybeAutoOpenAuthModal();
   }
+  return { appliedRemote: remoteApplied };
 }
 
 function resolveAuthErrorMessage(error) {
@@ -849,6 +861,15 @@ function updatePageIconPresentation(options = {}) {
     pageIconClearBtn.title = T.pageIconClear || '';
     pageIconClearBtn.setAttribute('aria-disabled', editing ? 'false' : 'true');
   }
+}
+
+function refreshPageHeaderFromState(options = {}) {
+  const { preserveIconSelection = false } = options;
+  if (pageTitleEl) {
+    pageTitleEl.textContent = state?.title || '';
+  }
+  document.title = (state?.title && state.title.trim()) || DEFAULT_TITLE;
+  updatePageIconPresentation({ preserveTextSelection: preserveIconSelection });
 }
 
 function handlePageIconFileSelection(event) {
