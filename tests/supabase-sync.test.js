@@ -1,0 +1,159 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+const supabaseCalls = { upsert: 0 };
+
+const supabaseMock = {
+  initSupabase: async () => ({}),
+  signInWithPassword: async () => ({}),
+  signOut: async () => true,
+  getSession: async () => ({ data: { session: null } }),
+  onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+  fetchSettings: async () => ({
+    id: 'row-1',
+    user_id: 'user-1',
+    state_json: null,
+    updated_at: new Date().toISOString(),
+  }),
+  upsertSettings: async (payload) => {
+    supabaseCalls.upsert += 1;
+    return {
+      id: payload.id || 'row-1',
+      updated_at: payload.updated_at || new Date().toISOString(),
+    };
+  },
+};
+
+function createStubElement() {
+  const noop = () => {};
+  const base = {
+    addEventListener: noop,
+    removeEventListener: noop,
+    setAttribute: noop,
+    getAttribute: () => null,
+    querySelector: () => null,
+    querySelectorAll: () => [],
+    appendChild: noop,
+    remove: noop,
+    classList: { add: noop, remove: noop, toggle: noop, contains: () => false },
+    style: {},
+    focus: noop,
+    blur: noop,
+    click: noop,
+    value: '',
+    innerHTML: '',
+    textContent: '',
+  };
+  return new Proxy(base, {
+    get(target, prop) {
+      if (prop in target) return target[prop];
+      return noop;
+    },
+  });
+}
+
+function setupDomStubs() {
+  const element = createStubElement();
+  const doc = {
+    documentElement: { classList: element.classList },
+    body: element,
+    createElement: () => createStubElement(),
+    createDocumentFragment: () => createStubElement(),
+    getElementById: () => createStubElement(),
+    querySelector: () => createStubElement(),
+    querySelectorAll: () => [],
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  };
+  globalThis.document = doc;
+  globalThis.window = {
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    getSelection: () => ({ removeAllRanges: () => {} }),
+    matchMedia: () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }),
+    navigator: { language: 'lt-LT' },
+  };
+  globalThis.DOMParser = class {
+    parseFromString() {
+      return { querySelector: () => null };
+    }
+  };
+  globalThis.localStorage = {
+    getItem: () => null,
+    setItem: () => {},
+    removeItem: () => {},
+  };
+  globalThis.alert = () => {};
+  globalThis.confirm = () => true;
+  globalThis.HTMLElement = class {};
+  globalThis.requestAnimationFrame = (cb) => {
+    if (typeof cb === 'function') cb();
+    return 0;
+  };
+}
+
+function createMinimalState() {
+  return {
+    groups: [],
+    customReminders: [],
+    remindersCard: {
+      enabled: false,
+      title: '',
+      wSize: 'md',
+      hSize: 'md',
+      showQuick: false,
+      width: 360,
+      height: 360,
+    },
+    meta: {},
+  };
+}
+
+async function loadAppModule() {
+  if (!globalThis.__appModule) {
+    setupDomStubs();
+    globalThis.__supabaseClientMock = supabaseMock;
+    globalThis.__appModule = await import('../app.js');
+  }
+  return globalThis.__appModule;
+}
+
+test('persistState nesiunčia į Supabase neprisijungus', async (t) => {
+  supabaseCalls.upsert = 0;
+  try {
+    const app = await loadAppModule();
+    const hooks = app.__testHooks;
+
+    hooks.resetRemoteSaveForTest();
+    hooks.setSupabaseReadyForTest(true);
+    hooks.setAuthSessionForTest(null);
+    hooks.setStateForTest(createMinimalState());
+
+    hooks.persistStateForTest();
+    assert.equal(hooks.getRemoteSaveTimerForTest(), null);
+    await hooks.flushRemoteSaveForTest();
+    assert.equal(supabaseCalls.upsert, 0);
+  } finally {
+    supabaseCalls.upsert = 0;
+  }
+});
+
+test('persistState kviečia nuotolinį išsaugojimą, kai vartotojas prisijungęs', async (t) => {
+  supabaseCalls.upsert = 0;
+  try {
+    const app = await loadAppModule();
+    const hooks = app.__testHooks;
+
+    hooks.resetRemoteSaveForTest();
+    hooks.setSupabaseReadyForTest(true);
+    hooks.setAuthSessionForTest({ user: { id: 'user-99', email: 'test@example.com' } });
+    hooks.setStateForTest(createMinimalState());
+
+    hooks.persistStateForTest();
+    assert.ok(hooks.getRemoteSaveTimerForTest());
+    await hooks.flushRemoteSaveForTest();
+    assert.equal(supabaseCalls.upsert, 1);
+  } finally {
+    supabaseCalls.upsert = 0;
+  }
+});

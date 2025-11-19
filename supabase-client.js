@@ -1,3 +1,11 @@
+function resolveTestMock(methodName) {
+  const mock = globalThis.__supabaseClientMock;
+  if (mock && typeof mock[methodName] === 'function') {
+    return mock[methodName];
+  }
+  return null;
+}
+
 let supabase = null;
 let supabaseModulePromise = null;
 
@@ -40,6 +48,8 @@ function ensureClient() {
 }
 
 export async function initSupabase(config = {}) {
+  const mockFn = resolveTestMock('initSupabase');
+  if (mockFn) return mockFn(config);
   const { url, anonKey } = resolveConfig(config);
   if (!url || !anonKey) {
     console.warn(
@@ -54,6 +64,8 @@ export async function initSupabase(config = {}) {
 }
 
 export async function signInWithPassword(email, password) {
+  const mockFn = resolveTestMock('signInWithPassword');
+  if (mockFn) return mockFn(email, password);
   const client = ensureClient();
   const normalizedEmail = typeof email === 'string' ? email.trim() : '';
   const normalizedPassword = typeof password === 'string' ? password : '';
@@ -69,6 +81,8 @@ export async function signInWithPassword(email, password) {
 }
 
 export async function signOut() {
+  const mockFn = resolveTestMock('signOut');
+  if (mockFn) return mockFn();
   const client = ensureClient();
   const { error } = await client.auth.signOut();
   if (error) throw error;
@@ -76,11 +90,15 @@ export async function signOut() {
 }
 
 export function getSession() {
+  const mockFn = resolveTestMock('getSession');
+  if (mockFn) return mockFn();
   const client = ensureClient();
   return client.auth.getSession();
 }
 
 export function onAuthStateChange(callback) {
+  const mockFn = resolveTestMock('onAuthStateChange');
+  if (mockFn) return mockFn(callback);
   const client = ensureClient();
   if (typeof callback !== 'function') {
     throw new Error('Auth būsenos stebėjimui būtina nurodyti funkciją.');
@@ -89,6 +107,8 @@ export function onAuthStateChange(callback) {
 }
 
 export async function fetchSettings() {
+  const mockFn = resolveTestMock('fetchSettings');
+  if (mockFn) return mockFn();
   const client = ensureClient();
   const { data, error } = await client
     .from('ed_dash_settings')
@@ -104,6 +124,8 @@ export async function fetchSettings() {
 }
 
 export async function upsertSettings(payload = {}) {
+  const mockFn = resolveTestMock('upsertSettings');
+  if (mockFn) return mockFn(payload);
   if (!payload || typeof payload !== 'object') {
     throw new Error('Supabase išsaugojimui būtinas objekto tipo payload.');
   }

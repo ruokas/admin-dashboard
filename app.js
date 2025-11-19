@@ -1905,6 +1905,32 @@ function persistState() {
   debounceRemoteSave(state);
 }
 
+export const __testHooks = {
+  setStateForTest(nextState) {
+    state = nextState;
+  },
+  setAuthSessionForTest(session) {
+    authSession = session;
+  },
+  setSupabaseReadyForTest(nextReady) {
+    supabaseReady = Boolean(nextReady);
+  },
+  resetRemoteSaveForTest() {
+    clearRemoteSaveTimer();
+    remoteSavePendingSnapshot = null;
+    remoteSaveInFlight = false;
+  },
+  getRemoteSaveTimerForTest() {
+    return remoteSaveTimer;
+  },
+  persistStateForTest() {
+    persistState();
+  },
+  async flushRemoteSaveForTest(snapshot) {
+    await remoteSave(snapshot);
+  },
+};
+
 function renderAll() {
   if (typeof debouncedSearchRender?.cancel === 'function') {
     debouncedSearchRender.cancel();
