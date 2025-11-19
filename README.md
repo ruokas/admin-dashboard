@@ -5,7 +5,7 @@ Statinis HTML + ES moduliais paremtas prietaisų skydas, skirtas greitam informa
 ## Trumpai
 - Kortelės nuorodoms, grafiko įterpiniams, pastaboms ir priminimams su drag-and-drop bei rankenomis dydžiui keisti.
 - Klaviatūros trumpiniai (`/`, `Ctrl+K`, `?`) ir pagalbos modalas greitam darbui.
-- JSON eksportas/importas atsarginėms kopijoms; pasirenkamas Google Sheets sinchronizavimas.
+- Automatinė Supabase sinchronizacija prisijungus (be rankinių mygtukų), pasirenkamas Google Sheets sinchronizavimas.
 - Lengvai keičiamas puslapio pavadinimas, emoji ar paveikslėlio ikona, šviesi/tamsi tema ir CSS akcentų spalvos.
 
 ## Naudojimas
@@ -59,18 +59,16 @@ Statinis HTML + ES moduliais paremtas prietaisų skydas, skirtas greitam informa
 - Visi spalvų tokenai ir semantiniai kintamieji aprašyti `styles/base.css`.
 
 ## Duomenų saugojimas ir atsarginės kopijos
-- Būsena saugoma `localStorage` po raktu `ed_dashboard_lt_v1` (grupės, įrašai, priminimai, pavadinimas, ikonos, temos nustatymai).
-- **Duomenų meniu**: mygtukas „Duomenys“ redagavimo režime išskleidžia importo ir eksporto parinktis.
-- **Eksportas**: parinktis „Eksportuoti“ išsaugo JSON failą (`<pavadinimas>-<timestamp>.json`).
-- **Importas**: parinktis „Importuoti“ leidžia pasirinkti anksčiau eksportuotą JSON; importuojant atnaujinamas pavadinimas, ikona, kortelės, priminimai.
+- Būsena saugoma `localStorage` po raktu `ed_dashboard_lt_v1` (grupės, įrašai, priminimai, pavadinimas, ikonos, temos nustatymai) ir automatiškai sinchronizuojama su Supabase, kai tik prisijungiate.
+- Prisijungus puslapis visada parsisiunčia naujausią Supabase būseną ir toliau siunčia pakeitimus foniniu režimu.
 - **Google Sheets** (pasirenkama):
   1. `storage.js` faile atnaujinkite `SCRIPT_URL` į savo Apps Script „web app“ adresą.
-  2. `app.js` faile atkomentuokite `const sheets = sheetsSync(...)` ir prijunkite `sheets.export()`/`sheets.import()` prie reikiamų mygtukų.
+  2. Jei reikia papildomos atsarginės kopijos, `app.js` faile atkomentuokite `const sheets = sheetsSync(...)` ir iškvieskite `sheets.export()`/`sheets.import()` savo logikoje.
   3. Apps Script turėtų palaikyti `action: "export" | "import"` ir grąžinti JSON struktūrą, atitinkančią `storage.js` tipą.
 
 ## Privatumas ir leidimai
 - Primenimų pranešimai gali būti matomi užrakintame įrenginyje – prieš įjungdami įsitikinkite, kad tai leidžia skyriuje galiojančios taisyklės.
-- Visa informacija išlieka vartotojo naršyklėje; jokių duomenų automatiškai nesiunčiama į serverius.
+- Visa informacija išlieka vartotojo naršyklėje; jei Supabase konfigūruotas ir esate prisijungę, duomenys automatiškai siunčiami į Supabase kaip atsarginė kopija.
 - „Clear data“ atlikite iš naršyklės „Application → Local Storage“ ar paspaudę `localStorage.removeItem('ed_dashboard_lt_v1')` konsolėje.
 
 ## Klaviatūros trumpiniai
@@ -103,7 +101,7 @@ Statinis HTML + ES moduliais paremtas prietaisų skydas, skirtas greitam informa
 6. Priskirkite priminimą konkrečiam įrašui ir patikrinkite, ar kortelė gauna žymeklį ⏰.
 7. Perjunkite šviesią/tamsią temą, įkelkite antraštės paveikslėlį ir išvalykite ikoną.
 8. Naudodami paiešką suraskite įrašą, išvalykite lauką per „Išvalyti“ mygtuką.
-9. Atlikite JSON eksportą, išvalykite `localStorage`, importuokite failą ir patikrinkite, ar visos kortelės bei priminimai atsistatė.
+9. Prisijunkite prie Supabase, atnaujinkite puslapį ir patikrinkite, ar automatiškai užkraunami bei išsaugomi naujausi duomenys.
 
 ## Našumo profilis (Chrome Performance)
 1. Atidarykite aplikaciją Chrome naršyklėje ir įjunkite **DevTools** (`Ctrl+Shift+I`).
