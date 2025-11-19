@@ -4,3 +4,6 @@ Thumbs.db
 
 # Node/NPM
 node_modules/
+
+# Supabase konfigūracija
+supabase-config.js
