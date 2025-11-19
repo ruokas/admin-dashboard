@@ -64,6 +64,14 @@ export function getSession() {
   return client.auth.getSession();
 }
 
+export function onAuthStateChange(callback) {
+  const client = ensureClient();
+  if (typeof callback !== 'function') {
+    throw new Error('Auth būsenos stebėjimui būtina nurodyti funkciją.');
+  }
+  return client.auth.onAuthStateChange(callback);
+}
+
 export async function fetchSettings() {
   const client = ensureClient();
   const { data, error } = await client
@@ -98,6 +106,7 @@ const publicApi = {
   signInWithOtp,
   signOut,
   getSession,
+  onAuthStateChange,
   fetchSettings,
   upsertSettings,
 };
