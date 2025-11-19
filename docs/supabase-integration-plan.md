@@ -21,7 +21,7 @@
 
   create index if not exists idx_ed_dash_settings_user_id on ed_dash_settings(user_id);
   ```
-- **Diegimo pastabos:** įjunkite „Email OTP“ autentifikaciją Supabase `Authentication → Providers` ir sukonfigūruokite SMTP.
+- **Diegimo pastabos:** įjunkite `Email` autentifikaciją Supabase `Authentication → Providers`, sukurkite naudotojus su slaptažodžiais ir (jei reikia) sukonfigūruokite SMTP, kad veiktų slaptažodžio atkūrimas.
 - **Smoke test:** Sukurkite vartotoją per Supabase Auth UI, įrašykite vieną eilutę `state_json` rankiniu būdu ir patikrinkite, ar matoma tik prisijungus tuo vartotoju.
 
 ## 2. Konfigūracija ir aplinkos kintamieji
@@ -36,10 +36,10 @@
 ## 3. Supabase kliento modulis
 - **Tikslas:** Centralizuoti auth/duomenų kvietimus.
 - **Failai:**
-  - `supabase-client.js` (naujas) – importuoja `createClient` iš `https://esm.sh/@supabase/supabase-js@2`; eksportuoja funkcijas `initSupabase(config)`, `signInWithOtp(email)`, `signOut()`, `getSession()`, `fetchSettings()`, `upsertSettings(payload)`.
+  - `supabase-client.js` (naujas) – importuoja `createClient` iš `https://esm.sh/@supabase/supabase-js@2`; eksportuoja funkcijas `initSupabase(config)`, `signInWithPassword(email, password)`, `signOut()`, `getSession()`, `fetchSettings()`, `upsertSettings(payload)`.
   - `app.js` – importuoja `initSupabase` ir inicijuoja klientą perduodant reikšmes iš `supabase-config.js`.
 - **Logika:** naudokite `let supabase = null;` ir sukurkite „guard“ klaidoms be konfigūracijos; `fetchSettings`/`upsertSettings` turi naudoti `supabase.from('ed_dash_settings')`.
-- **Smoke test:** Console teste paleiskite `window.supabaseClient.signInWithOtp('test@...')` ir patikrinkite, ar gaunate OTP el. paštu.
+- **Smoke test:** Console teste paleiskite `window.supabaseClient.signInWithPassword('test@...', 'slaptazodis')` ir patikrinkite, ar grąžinama aktyvi sesija.
 
 ## 4. Prisijungimo UI ir būsenos indikacija
 - **Tikslas:** Leisti vartotojui prisijungti/atsijungti iš UI, aiškiai rodyti būseną.

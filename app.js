@@ -1,6 +1,6 @@
 import {
   initSupabase,
-  signInWithOtp,
+  signInWithPassword,
   signOut as supabaseSignOut,
   getSession,
   onAuthStateChange,
@@ -79,6 +79,7 @@ supabaseConfigPromise.then(async (config) => {
       supabaseReady = true;
       updateAuthButtonState();
       await refreshAuthSession();
+      maybeAutoOpenAuthModal();
       subscribeToAuthChanges();
     } catch (error) {
       supabaseReady = false;
@@ -160,13 +161,16 @@ const authModalDialog = authModalEl?.querySelector('[data-modal-dialog]') ?? nul
 const authCloseBtn = document.getElementById('authClose');
 const authFormEl = document.getElementById('authForm');
 const authEmailInput = document.getElementById('authEmail');
+const authPasswordInput = document.getElementById('authPassword');
 const authEmailHint = document.getElementById('authEmailHint');
+const authPasswordHint = document.getElementById('authPasswordHint');
 const authModalDescription = document.getElementById('authModalDescription');
 const authModalTitle = document.getElementById('authModalTitle');
 const authMessageEl = document.getElementById('authMessage');
 const authSubmitBtn = document.getElementById('authSubmit');
 const authClearBtn = document.getElementById('authClear');
 const authEmailLabel = authFormEl?.querySelector("label[for='authEmail']") ?? null;
+const authPasswordLabel = authFormEl?.querySelector("label[for='authPassword']") ?? null;
 if (authModalDialog && !authModalDialog.hasAttribute('tabindex')) {
   authModalDialog.setAttribute('tabindex', '-1');
 }
@@ -236,12 +240,16 @@ let authSubscription = null;
 let authModalOpen = false;
 let authSubmitting = false;
 let lastFocusedBeforeAuthModal = null;
+let autoAuthModalRequested = true;
 
 normaliseReminderState();
 
 const storedEmail = loadStoredEmail();
 if (authEmailInput && storedEmail) {
   authEmailInput.value = storedEmail;
+}
+if (authPasswordInput) {
+  authPasswordInput.value = '';
 }
 
 pageTitleEl.textContent = state.title;
@@ -365,7 +373,7 @@ function applyAuthLabels() {
   }
   if (authModalDescription) {
     authModalDescription.textContent =
-      T.authModalDescription || 'Įveskite savo el. paštą, kad gautumėte nuorodą.';
+      T.authModalDescription || 'Įveskite savo el. paštą ir slaptažodį.';
   }
   if (authEmailLabel) {
     authEmailLabel.textContent = T.authEmailLabel || 'El. pašto adresas';
@@ -377,8 +385,17 @@ function applyAuthLabels() {
     const stored = T.authStoredEmail || 'Išsaugotas el. paštas';
     authEmailHint.textContent = `${stored}. ${T.authClearHint || ''}`.trim();
   }
+  if (authPasswordLabel) {
+    authPasswordLabel.textContent = T.authPasswordLabel || 'Slaptažodis';
+  }
+  if (authPasswordInput) {
+    authPasswordInput.placeholder = T.authPasswordPlaceholder || '••••••••';
+  }
+  if (authPasswordHint) {
+    authPasswordHint.textContent = T.authPasswordHint || 'Slaptažodžiai nesaugomi naršyklėje.';
+  }
   if (authSubmitBtn) {
-    authSubmitBtn.textContent = T.authSubmit || 'Siųsti prisijungimo nuorodą';
+    authSubmitBtn.textContent = T.authSubmit || 'Prisijungti';
   }
   if (authClearBtn) {
     authClearBtn.textContent = T.authClear || 'Išvalyti';
@@ -417,8 +434,9 @@ function loadStoredEmail() {
 
 function persistStoredEmail(value) {
   try {
-    if (value) {
-      localStorage.setItem(AUTH_EMAIL_STORAGE_KEY, value);
+    const normalized = typeof value === 'string' ? value.trim() : '';
+    if (normalized) {
+      localStorage.setItem(AUTH_EMAIL_STORAGE_KEY, normalized);
     } else {
       localStorage.removeItem(AUTH_EMAIL_STORAGE_KEY);
     }
@@ -437,11 +455,53 @@ function setAuthMessage(message, variant = 'neutral') {
   }
 }
 
+function scheduleAuthModalAutoOpen() {
+  autoAuthModalRequested = true;
+  maybeAutoOpenAuthModal();
+}
+
+function maybeAutoOpenAuthModal() {
+  if (!autoAuthModalRequested) return;
+  if (!supabaseReady) return;
+  if (authSession) {
+    autoAuthModalRequested = false;
+    return;
+  }
+  if (authModalOpen) {
+    autoAuthModalRequested = false;
+    return;
+  }
+  openAuthModal();
+  autoAuthModalRequested = false;
+}
+
+function resolveAuthErrorMessage(error) {
+  const defaultMessage = T.authStatusError || 'Nepavyko prisijungti. Bandykite dar kartą.';
+  if (!error) return defaultMessage;
+  const rawMessage = typeof error.message === 'string' ? error.message.trim() : '';
+  const normalized = rawMessage.toLowerCase();
+  if (
+    normalized.includes('invalid login') ||
+    normalized.includes('invalid credentials') ||
+    error?.status === 400 ||
+    error?.status === 422
+  ) {
+    return T.authInvalidCredentials || defaultMessage;
+  }
+  return rawMessage || defaultMessage;
+}
+
 function setAuthSubmitting(pending) {
   authSubmitting = Boolean(pending);
   if (authSubmitBtn) {
     authSubmitBtn.disabled = pending;
     authSubmitBtn.setAttribute('aria-busy', pending ? 'true' : 'false');
+  }
+  if (authEmailInput) {
+    authEmailInput.disabled = pending;
+  }
+  if (authPasswordInput) {
+    authPasswordInput.disabled = pending;
   }
 }
 
@@ -470,12 +530,16 @@ function openAuthModal() {
     alert(T.authNoConfig || 'Supabase konfigūracija nerasta.');
     return;
   }
+  autoAuthModalRequested = false;
   authModalOpen = true;
   lastFocusedBeforeAuthModal =
     document.activeElement instanceof HTMLElement ? document.activeElement : null;
   authModalEl.hidden = false;
   document.body.dataset.modalOpen = '1';
   setAuthMessage('', 'neutral');
+  if (authPasswordInput) {
+    authPasswordInput.value = '';
+  }
   const focusTarget = authEmailInput || authModalDialog;
   if (focusTarget && typeof focusTarget.focus === 'function') {
     requestAnimationFrame(() => focusTarget.focus());
@@ -525,21 +589,35 @@ async function onAuthSubmit(event) {
   event.preventDefault();
   if (!supabaseReady || authSubmitting) return;
   const email = (authEmailInput?.value || '').trim();
-  if (!email) {
+  const password = authPasswordInput?.value || '';
+  if (!email || !password) {
     setAuthMessage(T.required || 'Užpildykite visus laukus.', 'error');
-    authEmailInput?.focus();
+    if (!email) {
+      authEmailInput?.focus();
+    } else {
+      authPasswordInput?.focus();
+    }
     return;
   }
   try {
     setAuthSubmitting(true);
     setSyncStatus(T.authStatusSyncing || 'Sinchronizuojama…');
-    await signInWithOtp(email);
+    setAuthMessage('', 'neutral');
+    const { session } = await signInWithPassword(email, password);
     persistStoredEmail(email);
-    setAuthMessage(T.authOtpSent || 'Prisijungimo nuoroda išsiųsta.', 'success');
-    setSyncStatus(T.authStatusSignedOut || 'Neprisijungęs');
+    if (authPasswordInput) {
+      authPasswordInput.value = '';
+    }
+    if (session) {
+      updateAuthSession(session);
+    } else {
+      await refreshAuthSession();
+    }
+    setAuthMessage(T.authPasswordSuccess || 'Prisijungimas sėkmingas.', 'success');
+    closeAuthModal({ restoreFocus: false });
   } catch (error) {
-    console.error('Nepavyko išsiųsti OTP nuorodos:', error);
-    setAuthMessage(T.authStatusError || 'Nepavyko prisijungti. Bandykite dar kartą.', 'error');
+    console.error('Nepavyko prisijungti:', error);
+    setAuthMessage(resolveAuthErrorMessage(error), 'error');
     setSyncStatus(T.authStatusError || 'Nepavyko prisijungti. Bandykite dar kartą.', {
       variant: 'error',
     });
@@ -553,6 +631,9 @@ function handleAuthClear() {
   if (authEmailInput) {
     authEmailInput.value = '';
     authEmailInput.focus();
+  }
+  if (authPasswordInput) {
+    authPasswordInput.value = '';
   }
   setAuthMessage(T.authClearSuccess || 'El. paštas išvalytas.', 'success');
 }
@@ -572,11 +653,19 @@ async function refreshAuthSession() {
 }
 
 function updateAuthSession(session) {
+  const wasAuthenticated = Boolean(authSession);
   authSession = session && session.user ? session : null;
   if (authSession?.user?.email) {
     setSyncStatus(formatSignedInStatus(authSession.user.email), { variant: 'success' });
+    autoAuthModalRequested = false;
+    if (authModalOpen) {
+      closeAuthModal({ restoreFocus: false });
+    }
   } else if (supabaseReady) {
     setSyncStatus(T.authStatusSignedOut || 'Neprisijungęs');
+    if (wasAuthenticated) {
+      scheduleAuthModalAutoOpen();
+    }
   }
   updateAuthButtonState();
 }

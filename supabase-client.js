@@ -41,13 +41,17 @@ export function initSupabase(config = {}) {
   return supabase;
 }
 
-export async function signInWithOtp(email) {
+export async function signInWithPassword(email, password) {
   const client = ensureClient();
   const normalizedEmail = typeof email === 'string' ? email.trim() : '';
-  if (!normalizedEmail) {
-    throw new Error('El. pašto adresas privalomas OTP prisijungimui.');
+  const normalizedPassword = typeof password === 'string' ? password : '';
+  if (!normalizedEmail || !normalizedPassword) {
+    throw new Error('El. paštas ir slaptažodis yra privalomi.');
   }
-  const { data, error } = await client.auth.signInWithOtp({ email: normalizedEmail });
+  const { data, error } = await client.auth.signInWithPassword({
+    email: normalizedEmail,
+    password: normalizedPassword,
+  });
   if (error) throw error;
   return data;
 }
@@ -103,7 +107,7 @@ export async function upsertSettings(payload = {}) {
 
 const publicApi = {
   initSupabase,
-  signInWithOtp,
+  signInWithPassword,
   signOut,
   getSession,
   onAuthStateChange,
