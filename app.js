@@ -286,6 +286,8 @@ let editing = false;
 let reminders;
 let debouncedSearchRender = null;
 let remoteSaveTimer = null;
+let remoteSaveInFlight = false;
+let remoteSavePendingSnapshot = null;
 
 normaliseReminderState();
 
@@ -1660,6 +1662,27 @@ function debounceRemoteSave(nextState) {
 }
 
 async function remoteSave(snapshot) {
+  if (!canSyncRemoteState()) return;
+  const targetState = snapshot || cloneStateSnapshot(state);
+  if (!targetState) return;
+  remoteSavePendingSnapshot = targetState;
+  if (remoteSaveInFlight) return;
+  remoteSaveInFlight = true;
+  try {
+    while (remoteSavePendingSnapshot && canSyncRemoteState()) {
+      const nextSnapshot = remoteSavePendingSnapshot;
+      remoteSavePendingSnapshot = null;
+      await performRemoteSaveRequest(nextSnapshot);
+    }
+  } finally {
+    remoteSaveInFlight = false;
+    if (remoteSavePendingSnapshot && canSyncRemoteState()) {
+      await remoteSave(remoteSavePendingSnapshot);
+    }
+  }
+}
+
+async function performRemoteSaveRequest(snapshot) {
   if (!canSyncRemoteState()) return;
   const targetState = snapshot || cloneStateSnapshot(state);
   if (!targetState) return;
