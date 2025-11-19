@@ -376,7 +376,18 @@ export function load() {
   }
 }
 
+export function touchState(target, timestamp = Date.now()) {
+  if (!target || typeof target !== 'object') return null;
+  const nextTimestamp = Number.isFinite(timestamp) ? Math.round(timestamp) : Date.now();
+  target.updatedAt = nextTimestamp;
+  return nextTimestamp;
+}
+
 export function save(state) {
+  if (!state || typeof state !== 'object') return;
+  if (!Number.isFinite(state.updatedAt)) {
+    touchState(state);
+  }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 

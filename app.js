@@ -5,8 +5,9 @@ import {
   getSession,
   onAuthStateChange,
   fetchSettings,
+  upsertSettings,
 } from './supabase-client.js';
-import { load, save, seed } from './storage.js';
+import { load, save, seed, touchState } from './storage.js';
 import { render, updateEditingUI, toSheetEmbed } from './render.js';
 import { SIZE_MAP, sizeFromWidth, sizeFromHeight } from './sizes.js';
 import {
@@ -50,6 +51,8 @@ const MAX_ICON_IMAGE_BYTES = 200 * 1024; // 200 KB
 const MAX_ICON_IMAGE_LENGTH = Math.ceil((MAX_ICON_IMAGE_BYTES / 3) * 4) + 512;
 const ICON_IMAGE_ACCEPT_PREFIX = 'data:image/';
 const AUTH_EMAIL_STORAGE_KEY = 'ed_dash_last_email';
+const REMOTE_SAVE_DEBOUNCE_MS = 2000;
+const REMOTE_SAVE_ERROR_MESSAGE = 'Nepavyko išsaugoti – bandykite rankiniu būdu';
 
 let supabaseReady = false;
 
@@ -268,6 +271,7 @@ if (state.iconImage) state.icon = '';
 let editing = false;
 let reminders;
 let debouncedSearchRender = null;
+let remoteSaveTimer = null;
 
 normaliseReminderState();
 
@@ -749,6 +753,9 @@ function updateAuthSession(session) {
     if (wasAuthenticated) {
       scheduleAuthModalAutoOpen();
     }
+  }
+  if (!authSession) {
+    clearRemoteSaveTimer();
   }
   updateAuthButtonState();
 }
@@ -1563,12 +1570,78 @@ function syncReminders() {
   updateReminderBadge(entries.length);
 }
 
+function canSyncRemoteState() {
+  return supabaseReady && Boolean(authSession?.user);
+}
+
+function clearRemoteSaveTimer() {
+  if (remoteSaveTimer) {
+    clearTimeout(remoteSaveTimer);
+    remoteSaveTimer = null;
+  }
+}
+
+function cloneStateSnapshot(input) {
+  if (!input || typeof input !== 'object') return null;
+  if (typeof structuredClone === 'function') {
+    try {
+      return structuredClone(input);
+    } catch (error) {
+      console.warn('Nepavyko sukurti būsenos kopijos structuredClone metodu:', error);
+    }
+  }
+  try {
+    return JSON.parse(JSON.stringify(input));
+  } catch (error) {
+    console.error('Nuotolinio išsaugojimo būsenos kopijavimo klaida:', error);
+    return null;
+  }
+}
+
+function debounceRemoteSave(nextState) {
+  if (!canSyncRemoteState()) return;
+  const snapshot = cloneStateSnapshot(nextState);
+  if (!snapshot) return;
+  clearRemoteSaveTimer();
+  remoteSaveTimer = setTimeout(() => {
+    remoteSaveTimer = null;
+    remoteSave(snapshot);
+  }, REMOTE_SAVE_DEBOUNCE_MS);
+}
+
+async function remoteSave(snapshot) {
+  if (!canSyncRemoteState()) return;
+  const targetState = snapshot || cloneStateSnapshot(state);
+  if (!targetState) return;
+  const issuedAtIso = new Date().toISOString();
+  try {
+    setSyncStatus(T.authStatusSyncing || 'Sinchronizuojama…');
+    const result = await upsertSettings({
+      state_json: targetState,
+      updated_at: issuedAtIso,
+    });
+    const remoteUpdatedAt = result?.updated_at || issuedAtIso;
+    ensureStateMeta().remoteUpdatedAt = remoteUpdatedAt;
+    save(state);
+    const email = authSession?.user?.email || '';
+    if (email) {
+      setSyncStatus(formatSignedInStatus(email), { variant: 'success' });
+    } else {
+      setSyncStatus(T.authStatusSignedIn || 'Prisijungęs', { variant: 'success' });
+    }
+  } catch (error) {
+    console.error('Nuotolinio išsaugojimo klaida:', error);
+    setSyncStatus(REMOTE_SAVE_ERROR_MESSAGE, { variant: 'error' });
+  }
+}
+
 function persistState() {
   normaliseReminderState();
-  state.updatedAt = Date.now();
+  touchState(state);
   ensureStateMeta();
   save(state);
   syncReminders();
+  debounceRemoteSave(state);
 }
 
 function renderAll() {
