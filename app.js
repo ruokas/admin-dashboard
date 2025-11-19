@@ -23,11 +23,9 @@ import {
   confirmDialog as confirmDlg,
   notesDialog,
   helpDialog,
-  remoteSyncDialog,
 } from './forms.js';
 import { I } from './icons.js';
 import { Tlt } from './i18n.js';
-import { exportJson } from './exporter.js';
 import { createReminderManager } from './reminders.js';
 import {
   getReminderFormState,
@@ -227,11 +225,6 @@ const searchClearBtn = document.getElementById('searchClear');
 const pageIconImageBtn = document.getElementById('pageIconImageBtn');
 const pageIconClearBtn = document.getElementById('pageIconClearBtn');
 const pageIconFileInput = document.getElementById('pageIconFile');
-const dataMenu = document.getElementById('dataMenu');
-const dataMenuBtn = document.getElementById('dataMenuBtn');
-const dataMenuList = document.getElementById('dataMenuList');
-const remoteFetchBtn = document.getElementById('remoteFetchBtn');
-const remotePushBtn = document.getElementById('remotePushBtn');
 let pageIconImageEl = null;
 
 let authSession = null;
@@ -240,12 +233,11 @@ let authModalOpen = false;
 let authSubmitting = false;
 let lastFocusedBeforeAuthModal = null;
 let autoAuthModalRequested = true;
+let bootstrapCompleted = false;
 
 applyPageIconActionLabels();
-applyDataMenuLabels();
 applyAuthLabels();
 updateAuthButtonState();
-updateRemoteSyncButtons();
 
 if (addMenu && !addMenu.dataset.open) {
   addMenu.dataset.open = '0';
@@ -259,19 +251,6 @@ if (addBtn) {
   }
   addBtn.setAttribute('aria-expanded', addMenu?.dataset.open === '1' ? 'true' : 'false');
 }
-if (dataMenu && !dataMenu.dataset.open) {
-  dataMenu.dataset.open = '0';
-}
-if (dataMenuBtn) {
-  if (!dataMenuBtn.hasAttribute('aria-controls')) {
-    dataMenuBtn.setAttribute('aria-controls', 'dataMenuList');
-  }
-  if (!dataMenuBtn.hasAttribute('aria-haspopup')) {
-    dataMenuBtn.setAttribute('aria-haspopup', 'true');
-  }
-  dataMenuBtn.setAttribute('aria-expanded', dataMenu?.dataset.open === '1' ? 'true' : 'false');
-}
-
 let state = load() || seed();
 bootstrapSession()
   .then((result) => {
@@ -284,6 +263,9 @@ bootstrapSession()
   })
   .catch((error) => {
     console.error('Nepavyko užbaigti Supabase paleidimo:', error);
+  })
+  .finally(() => {
+    bootstrapCompleted = true;
   });
 if (!Array.isArray(state.groups)) state.groups = [];
 if (!state.title) state.title = DEFAULT_TITLE;
@@ -400,30 +382,6 @@ function applyPageIconActionLabels() {
   }
 }
 
-function applyDataMenuLabels() {
-  if (!dataMenu) return;
-  const menuLabel = dataMenuBtn?.querySelector('[data-menu-label]');
-  if (menuLabel) {
-    menuLabel.textContent = T.dataMenu || 'Duomenys';
-  }
-  const importLabel = dataMenu.querySelector('[data-menu-import] span');
-  if (importLabel) {
-    importLabel.textContent = T.import || 'Importuoti';
-  }
-  const exportLabel = dataMenu.querySelector('[data-menu-export] span');
-  if (exportLabel) {
-    exportLabel.textContent = T.export || 'Eksportuoti';
-  }
-  const remoteFetchLabel = dataMenu.querySelector('[data-menu-remote-fetch] span');
-  if (remoteFetchLabel) {
-    remoteFetchLabel.textContent = T.remoteFetch || 'Atsiųsti iš Supabase';
-  }
-  const remotePushLabel = dataMenu.querySelector('[data-menu-remote-push] span');
-  if (remotePushLabel) {
-    remotePushLabel.textContent = T.remotePush || 'Išsiųsti į Supabase';
-  }
-}
-
 function applyAuthLabels() {
   if (authToggleBtn) {
     const label = T.authToggleSignIn || 'Prisijungti';
@@ -488,23 +446,6 @@ function setSyncStatus(message, options = {}) {
   } else {
     delete syncStatusEl.dataset.variant;
   }
-}
-
-function updateRemoteSyncButtons() {
-  const canSync = canSyncRemoteState();
-  const disabledTitle = !supabaseReady
-    ? T.authNoConfig || ''
-    : T.remoteSyncAuthRequired || T.authToggleSignIn || '';
-  [remoteFetchBtn, remotePushBtn].forEach((btn) => {
-    if (!btn) return;
-    btn.disabled = !canSync;
-    if (btn.hasAttribute('aria-disabled')) {
-      btn.setAttribute('aria-disabled', canSync ? 'false' : 'true');
-    } else if (!canSync) {
-      btn.setAttribute('aria-disabled', 'true');
-    }
-    btn.title = canSync ? '' : disabledTitle;
-  });
 }
 
 function updateIdleSyncStatus() {
@@ -594,66 +535,9 @@ async function bootstrapSession() {
     maybeAutoOpenAuthModal();
     return { appliedRemote: false };
   }
-  let shouldPersist = false;
-  let remoteApplied = false;
-  try {
-    const remote = await fetchSettings();
-    const meta = ensureStateMeta();
-    const hadRemoteId = typeof meta.remoteId === 'string' && meta.remoteId;
-    const localHasContent = Array.isArray(state.groups) && state.groups.length > 0;
-    if (!remote) {
-      if (meta.remoteUpdatedAt) {
-        meta.remoteUpdatedAt = null;
-        shouldPersist = true;
-      }
-      if (meta.remoteId) {
-        meta.remoteId = null;
-        shouldPersist = true;
-      }
-      return { appliedRemote: false };
-    }
-    const remoteId = typeof remote.id === 'string' && remote.id ? remote.id : null;
-    const remoteIdChanged = Boolean(hadRemoteId && remoteId && hadRemoteId !== remoteId);
-    if (meta.remoteId !== remoteId) {
-      meta.remoteId = remoteId;
-      shouldPersist = true;
-    }
-    const remoteState =
-      remote.state_json && typeof remote.state_json === 'object' ? remote.state_json : null;
-    const remoteUpdatedAtIso =
-      typeof remote.updated_at === 'string' && remote.updated_at ? remote.updated_at : null;
-    const remoteUpdatedAtValue = remoteUpdatedAtIso ? Date.parse(remoteUpdatedAtIso) : null;
-    const localUpdatedAt = Number.isFinite(state.updatedAt) ? state.updatedAt : 0;
-    const isFreshLocalState = !hadRemoteId && !localHasContent;
-    const shouldApplyRemote =
-      remoteState &&
-      (remoteIdChanged ||
-        isFreshLocalState ||
-        (Number.isFinite(remoteUpdatedAtValue) && remoteUpdatedAtValue > localUpdatedAt));
-    if (meta.remoteUpdatedAt !== remoteUpdatedAtIso) {
-      meta.remoteUpdatedAt = remoteUpdatedAtIso;
-      shouldPersist = true;
-    }
-    if (shouldApplyRemote) {
-      Object.assign(state, remoteState);
-      if (!Number.isFinite(state.updatedAt) || state.updatedAt < remoteUpdatedAtValue) {
-        state.updatedAt = remoteUpdatedAtValue;
-      }
-      ensureStateMeta().remoteUpdatedAt =
-        remoteUpdatedAtIso ||
-        (remoteUpdatedAtValue ? new Date(remoteUpdatedAtValue).toISOString() : null);
-      shouldPersist = true;
-      remoteApplied = true;
-    }
-  } catch (error) {
-    console.error('Nepavyko įkelti nuotolinės būsenos iš Supabase:', error);
-  } finally {
-    if (shouldPersist) {
-      save(state);
-    }
-    maybeAutoOpenAuthModal();
-  }
-  return { appliedRemote: remoteApplied };
+  const remoteResult = await syncLatestRemoteState({ preferRemote: true });
+  maybeAutoOpenAuthModal();
+  return { appliedRemote: Boolean(remoteResult?.applied) };
 }
 
 function resolveAuthErrorMessage(error) {
@@ -851,7 +735,9 @@ function updateAuthSession(session) {
     clearRemoteSaveTimer();
   }
   updateAuthButtonState();
-  updateRemoteSyncButtons();
+  if (authSession && !wasAuthenticated && bootstrapCompleted) {
+    syncLatestRemoteState({ preferRemote: true });
+  }
 }
 
 async function onAuthSignOut() {
@@ -1668,78 +1554,56 @@ function canSyncRemoteState() {
   return supabaseReady && Boolean(authSession?.user);
 }
 
-function ensureRemoteSyncAvailable() {
-  if (!supabaseReady) {
-    alert(T.authNoConfig || 'Supabase konfigūracija nerasta.');
-    return false;
-  }
+async function syncLatestRemoteState(options = {}) {
+  const { preferRemote = false } = options;
   if (!canSyncRemoteState()) {
-    alert(T.remoteSyncAuthRequired || 'Prisijunkite, kad naudotumėte Supabase sinchronizavimą.');
-    return false;
+    return { applied: false };
   }
-  return true;
-}
-
-async function remoteFetchLatest() {
-  if (!ensureRemoteSyncAvailable()) return;
   try {
     setSyncStatus(T.authStatusSyncing || 'Sinchronizuojama…');
     const remote = await fetchSettings();
+    if (!remote) {
+      updateIdleSyncStatus();
+      return { applied: false };
+    }
     const remoteState =
       remote && remote.state_json && typeof remote.state_json === 'object'
         ? remote.state_json
         : null;
-    if (!remoteState) {
-      setSyncStatus(T.remoteSyncNoData || 'Supabase duomenų nerasta.', {
-        variant: 'warning',
-      });
-      return;
-    }
+    const remoteId = typeof remote.id === 'string' && remote.id ? remote.id : null;
     const remoteUpdatedAtIso =
       typeof remote.updated_at === 'string' && remote.updated_at ? remote.updated_at : null;
     const remoteUpdatedAtValue = remoteUpdatedAtIso ? Date.parse(remoteUpdatedAtIso) : null;
     const localUpdatedAt = Number.isFinite(state.updatedAt) ? state.updatedAt : null;
-    const confirmOverwrite = await remoteSyncDialog(T, {
-      remoteUpdatedAt: remoteUpdatedAtValue,
-      localUpdatedAt,
-      isRemoteNewer:
-        Number.isFinite(remoteUpdatedAtValue) &&
-        (!Number.isFinite(localUpdatedAt) || remoteUpdatedAtValue >= localUpdatedAt),
-    });
-    if (!confirmOverwrite) {
-      updateIdleSyncStatus();
-      return;
-    }
-    clearPendingRemoteSave();
-    const remoteId = typeof remote.id === 'string' && remote.id ? remote.id : null;
-    const applied = applyRemoteState(remoteState, {
-      remoteId,
-      remoteUpdatedAtIso,
-      remoteUpdatedAtValue,
-    });
-    if (!applied) {
-      setSyncStatus(T.remoteSyncNoData || 'Supabase duomenų nerasta.', {
-        variant: 'warning',
+    const shouldApply = preferRemote
+      ? Boolean(remoteState)
+      : Number.isFinite(remoteUpdatedAtValue) &&
+        (!Number.isFinite(localUpdatedAt) || remoteUpdatedAtValue >= localUpdatedAt);
+    if (shouldApply && remoteState) {
+      applyRemoteState(remoteState, {
+        remoteId,
+        remoteUpdatedAtIso,
+        remoteUpdatedAtValue,
       });
-      return;
+      setSyncStatus(T.remoteSyncSuccess || 'Duomenys atnaujinti iš Supabase.', {
+        variant: 'success',
+        includeRemoteMeta: true,
+      });
+      return { applied: true };
     }
-    setSyncStatus(T.remoteSyncSuccess || 'Duomenys atnaujinti iš Supabase.', {
-      variant: 'success',
-      includeRemoteMeta: true,
-    });
+    const meta = ensureStateMeta();
+    if (remoteId) meta.remoteId = remoteId;
+    if (remoteUpdatedAtIso) meta.remoteUpdatedAt = remoteUpdatedAtIso;
+    save(state);
+    updateIdleSyncStatus();
+    return { applied: false };
   } catch (error) {
     console.error('Nuotolinio atsisiuntimo klaida iš Supabase:', error);
     setSyncStatus(T.remoteSyncError || 'Nepavyko atsiųsti duomenų iš Supabase.', {
       variant: 'error',
     });
+    return { applied: false, error: true };
   }
-}
-
-async function remotePushLatest() {
-  if (!ensureRemoteSyncAvailable()) return;
-  const snapshot = cloneStateSnapshot(state);
-  if (!snapshot) return;
-  await remoteSave(snapshot);
 }
 
 function applyRemoteState(remoteState, options = {}) {
@@ -2451,113 +2315,6 @@ document.addEventListener('click', (event) => {
     setMenuOpen(false);
   }
 });
-
-let isDataMenuOpen = false;
-let lastFocusedBeforeDataMenu = null;
-
-function focusFirstDataMenuItem() {
-  if (!dataMenuList) return;
-  const focusTarget = dataMenuList.querySelector('button:not([disabled])');
-  if (!(focusTarget instanceof HTMLElement)) return;
-  const focusFn = () => focusTarget.focus();
-  if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
-    window.requestAnimationFrame(focusFn);
-  } else {
-    focusFn();
-  }
-}
-
-function setDataMenuOpenState(open, options = {}) {
-  if (!dataMenu || !dataMenuBtn) return;
-  const { restoreFocus = false } = options;
-  isDataMenuOpen = Boolean(open);
-  dataMenu.dataset.open = open ? '1' : '0';
-  dataMenuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
-  if (!open && restoreFocus) {
-    const focusTarget =
-      lastFocusedBeforeDataMenu instanceof HTMLElement ? lastFocusedBeforeDataMenu : dataMenuBtn;
-    if (focusTarget && typeof focusTarget.focus === 'function') {
-      focusTarget.focus();
-    }
-  }
-  if (!open) {
-    lastFocusedBeforeDataMenu = null;
-  }
-}
-
-function openDataMenu(options = {}) {
-  if (!dataMenu || !dataMenuBtn) return;
-  if (isDataMenuOpen) {
-    if (options.focusFirst) {
-      focusFirstDataMenuItem();
-    }
-    return;
-  }
-  lastFocusedBeforeDataMenu =
-    document.activeElement instanceof HTMLElement ? document.activeElement : dataMenuBtn;
-  setDataMenuOpenState(true);
-  if (options.focusFirst) {
-    focusFirstDataMenuItem();
-  }
-  document.addEventListener('pointerdown', handleDataMenuPointerDown, true);
-  document.addEventListener('focusin', handleDataMenuFocusIn, true);
-  document.addEventListener('keydown', handleDataMenuKeydown, true);
-}
-
-function closeDataMenu(options = {}) {
-  if (!isDataMenuOpen) return;
-  const { restoreFocus = false } = options;
-  setDataMenuOpenState(false, { restoreFocus });
-  document.removeEventListener('pointerdown', handleDataMenuPointerDown, true);
-  document.removeEventListener('focusin', handleDataMenuFocusIn, true);
-  document.removeEventListener('keydown', handleDataMenuKeydown, true);
-}
-
-function toggleDataMenu(options = {}) {
-  if (isDataMenuOpen) {
-    closeDataMenu();
-  } else {
-    openDataMenu(options);
-  }
-}
-
-function handleDataMenuPointerDown(event) {
-  if (!isDataMenuOpen || !dataMenu) return;
-  if (!dataMenu.contains(event.target)) {
-    closeDataMenu();
-  }
-}
-
-function handleDataMenuFocusIn(event) {
-  if (!isDataMenuOpen || !dataMenu) return;
-  if (!dataMenu.contains(event.target)) {
-    closeDataMenu();
-  }
-}
-
-function handleDataMenuKeydown(event) {
-  if (!isDataMenuOpen) return;
-  if (event.key === 'Escape' || event.key === 'Esc') {
-    event.preventDefault();
-    closeDataMenu({ restoreFocus: true });
-  }
-}
-
-if (dataMenu && dataMenuBtn && dataMenuList) {
-  dataMenuBtn.addEventListener('click', () => {
-    toggleDataMenu();
-  });
-  dataMenuBtn.addEventListener('keydown', (event) => {
-    if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      openDataMenu({ focusFirst: true });
-    } else if (event.key === 'Escape' || event.key === 'Esc') {
-      event.preventDefault();
-      closeDataMenu({ restoreFocus: true });
-    }
-  });
-}
-
 // Išplėtimui: jei reikia kitų laukų ignoravimo, papildykite žemiau esantį sąrašą.
 function isEditableTarget(target) {
   if (!(target instanceof HTMLElement)) return false;
@@ -2664,37 +2421,6 @@ if (addRemindersBtn) {
     addRemindersCard();
   });
 }
-const exportBtnEl = document.getElementById('exportBtn');
-if (exportBtnEl) {
-  exportBtnEl.addEventListener('click', () => {
-    closeDataMenu();
-    exportJson(state);
-  });
-}
-const importBtnEl = document.getElementById('importBtn');
-if (importBtnEl) {
-  importBtnEl.addEventListener('click', () => {
-    closeDataMenu();
-    document.getElementById('fileInput')?.click();
-  });
-}
-if (remoteFetchBtn) {
-  remoteFetchBtn.addEventListener('click', () => {
-    closeDataMenu();
-    remoteFetchLatest();
-  });
-}
-if (remotePushBtn) {
-  remotePushBtn.addEventListener('click', () => {
-    closeDataMenu();
-    remotePushLatest();
-  });
-}
-document.getElementById('fileInput').addEventListener('change', (e) => {
-  const f = e.target.files[0];
-  if (f) importJson(f);
-  e.target.value = '';
-});
 
 window.addEventListener('beforeunload', () => {
   if (authSubscription && typeof authSubscription.unsubscribe === 'function') {
