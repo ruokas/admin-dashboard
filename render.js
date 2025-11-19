@@ -1,6 +1,32 @@
 import { SIZE_MAP, sizeFromWidth, sizeFromHeight } from './sizes.js';
 import { getActiveTheme, resolveChartThemeUrl } from './theme-utils.js';
 
+export function formatRemoteSyncStatus(meta, T = {}) {
+  const remoteIso =
+    meta && typeof meta.remoteUpdatedAt === 'string' && meta.remoteUpdatedAt
+      ? meta.remoteUpdatedAt
+      : null;
+  if (!remoteIso) return '';
+  const parsed = Date.parse(remoteIso);
+  if (!Number.isFinite(parsed)) return '';
+  const date = new Date(parsed);
+  let timeLabel = '';
+  try {
+    timeLabel = date.toLocaleTimeString('lt-LT', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch (error) {
+    console.warn('Nepavyko suformatuoti nuotolinės sinchronizacijos laiko:', error);
+    timeLabel = `${date.getHours().toString().padStart(2, '0')}:${date
+      .getMinutes()
+      .toString()
+      .padStart(2, '0')}`;
+  }
+  const template = T.remoteSyncLast || 'Paskutinė nuotolinė sinchronizacija: {time}';
+  return template.replace('{time}', timeLabel);
+}
+
 let currentState;
 let persist;
 let floatingMenu;
