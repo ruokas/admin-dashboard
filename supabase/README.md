@@ -5,7 +5,7 @@
 ## 1. Projekto kūrimas
 1. Supabase valdymo pulte sukurkite naują projektą arba pasirinkite esamą organizaciją.
 2. Pasirinkite regioną, kuriame laikysite ED skyriaus nustatymus.
-3. Įgalinkite **Email OTP** autentifikaciją skiltyje `Authentication → Providers` ir sukonfigūruokite SMTP, kad OTP laiškai būtų pristatomi.
+3. Įgalinkite **Email** autentifikaciją skiltyje `Authentication → Providers`, nustatykite slaptažodžio politiką ir (jei reikia) SMTP, kad veiktų slaptažodžio atkūrimas.
 
 ## 2. Schema ir RLS
 1. Atsisiųskite `schema.sql` iš šio katalogo.

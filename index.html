@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="styles/components/card.css" />
     <link rel="stylesheet" href="styles/components/layout.css" />
     <link rel="stylesheet" href="styles/components/reminders.css" />
+    <link rel="stylesheet" href="styles/components/modal.css" />
   </head>
   <body>
     <header class="page-header">
@@ -198,6 +199,9 @@
           <span aria-hidden="true">?</span>
           <span class="sr-only">Pagalba</span>
         </button>
+        <button id="auth-toggle" class="btn-outline auth-toggle" type="button">
+          Prisijungti
+        </button>
         <span id="syncStatus" role="status" aria-live="polite"></span>
       </div>
     </header>
@@ -213,6 +217,66 @@
       accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
       hidden
     />
+
+    <div
+      id="authModal"
+      class="auth-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="authModalTitle"
+      aria-describedby="authModalDescription"
+      hidden
+    >
+      <div class="auth-modal__panel" data-modal-dialog>
+        <div class="auth-modal__header">
+          <h2 id="authModalTitle">Prisijungimas</h2>
+          <button
+            id="authClose"
+            class="auth-modal__close"
+            type="button"
+            aria-label="Uždaryti"
+          >
+            ✕
+          </button>
+        </div>
+          <p id="authModalDescription" class="auth-modal__description">
+            Įveskite savo el. paštą ir slaptažodį.
+          </p>
+        <form id="authForm" class="auth-modal__form">
+          <label for="authEmail">El. pašto adresas</label>
+          <input
+            id="authEmail"
+            name="email"
+            type="email"
+            required
+            autocomplete="email"
+            placeholder="vardas@gmail.com"
+          />
+          <p id="authEmailHint" class="auth-modal__hint">
+            Išsaugotas el. paštas įrašomas automatiškai. „Išvalyti“ pašalina duomenis iš naršyklės.
+          </p>
+          <label for="authPassword">Slaptažodis</label>
+          <input
+            id="authPassword"
+            name="password"
+            type="password"
+            required
+            autocomplete="current-password"
+            placeholder="••••••••"
+          />
+          <p id="authPasswordHint" class="auth-modal__hint">
+            Slaptažodžiai nesaugomi naršyklėje. Įveskite juos tik saugiame įrenginyje.
+          </p>
+          <div class="auth-modal__actions">
+            <button id="authSubmit" class="btn" type="submit">
+              Prisijungti
+            </button>
+            <button id="authClear" class="btn-outline" type="button">Išvalyti</button>
+          </div>
+          <p id="authMessage" class="auth-modal__message" role="status" aria-live="polite"></p>
+        </form>
+      </div>
+    </div>
 
     <script>
       window.addEventListener(

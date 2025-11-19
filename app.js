@@ -1,4 +1,10 @@
-import { initSupabase } from './supabase-client.js';
+import {
+  initSupabase,
+  signInWithPassword,
+  signOut as supabaseSignOut,
+  getSession,
+  onAuthStateChange,
+} from './supabase-client.js';
 import { load, save, seed } from './storage.js';
 import { render, updateEditingUI, toSheetEmbed } from './render.js';
 import { SIZE_MAP, sizeFromWidth, sizeFromHeight } from './sizes.js';
@@ -42,6 +48,9 @@ const NOTE_DEFAULT_PADDING = 20;
 const MAX_ICON_IMAGE_BYTES = 200 * 1024; // 200 KB
 const MAX_ICON_IMAGE_LENGTH = Math.ceil((MAX_ICON_IMAGE_BYTES / 3) * 4) + 512;
 const ICON_IMAGE_ACCEPT_PREFIX = 'data:image/';
+const AUTH_EMAIL_STORAGE_KEY = 'ed_dash_last_email';
+
+let supabaseReady = false;
 
 const supabaseConfigPromise = import('./supabase-config.js')
   .then((module) => {
@@ -63,13 +72,25 @@ const supabaseConfigPromise = import('./supabase-config.js')
     return null;
   });
 
-supabaseConfigPromise.then((config) => {
+supabaseConfigPromise.then(async (config) => {
   if (config) {
     try {
       initSupabase({ url: config.url, anonKey: config.anonKey });
+      supabaseReady = true;
+      updateAuthButtonState();
+      await refreshAuthSession();
+      maybeAutoOpenAuthModal();
+      subscribeToAuthChanges();
     } catch (error) {
+      supabaseReady = false;
+      updateAuthButtonState();
       console.error('Nepavyko inicijuoti Supabase kliento:', error);
+      setSyncStatus(T.authStatusError || 'Nepavyko prisijungti. Bandykite dar kartą.', {
+        variant: 'error',
+      });
     }
+  } else {
+    updateAuthButtonState();
   }
 });
 
@@ -133,7 +154,26 @@ function applySizeMetadata(target, width, height) {
 }
 
 const editBtn = document.getElementById('editBtn');
-// const syncStatus = document.getElementById('syncStatus'); // Sheets sync indikatorius (išjungta)
+const syncStatusEl = document.getElementById('syncStatus');
+const authToggleBtn = document.getElementById('auth-toggle');
+const authModalEl = document.getElementById('authModal');
+const authModalDialog = authModalEl?.querySelector('[data-modal-dialog]') ?? null;
+const authCloseBtn = document.getElementById('authClose');
+const authFormEl = document.getElementById('authForm');
+const authEmailInput = document.getElementById('authEmail');
+const authPasswordInput = document.getElementById('authPassword');
+const authEmailHint = document.getElementById('authEmailHint');
+const authPasswordHint = document.getElementById('authPasswordHint');
+const authModalDescription = document.getElementById('authModalDescription');
+const authModalTitle = document.getElementById('authModalTitle');
+const authMessageEl = document.getElementById('authMessage');
+const authSubmitBtn = document.getElementById('authSubmit');
+const authClearBtn = document.getElementById('authClear');
+const authEmailLabel = authFormEl?.querySelector("label[for='authEmail']") ?? null;
+const authPasswordLabel = authFormEl?.querySelector("label[for='authPassword']") ?? null;
+if (authModalDialog && !authModalDialog.hasAttribute('tabindex')) {
+  authModalDialog.setAttribute('tabindex', '-1');
+}
 const searchEl = document.getElementById('q');
 const searchLabelEl = document.getElementById('searchLabel');
 const themeBtn = document.getElementById('themeBtn');
@@ -157,6 +197,8 @@ let pageIconImageEl = null;
 
 applyPageIconActionLabels();
 applyDataMenuLabels();
+applyAuthLabels();
+updateAuthButtonState();
 
 if (addMenu && !addMenu.dataset.open) {
   addMenu.dataset.open = '0';
@@ -193,8 +235,22 @@ if (state.iconImage) state.icon = '';
 let editing = false;
 let reminders;
 let debouncedSearchRender = null;
+let authSession = null;
+let authSubscription = null;
+let authModalOpen = false;
+let authSubmitting = false;
+let lastFocusedBeforeAuthModal = null;
+let autoAuthModalRequested = true;
 
 normaliseReminderState();
+
+const storedEmail = loadStoredEmail();
+if (authEmailInput && storedEmail) {
+  authEmailInput.value = storedEmail;
+}
+if (authPasswordInput) {
+  authPasswordInput.value = '';
+}
 
 pageTitleEl.textContent = state.title;
 updatePageIconPresentation();
@@ -250,6 +306,23 @@ if (pageIconFileInput) {
   pageIconFileInput.addEventListener('change', (event) => handlePageIconFileSelection(event));
 }
 
+if (authToggleBtn) {
+  authToggleBtn.addEventListener('click', () => onAuthToggle());
+}
+if (authCloseBtn) {
+  authCloseBtn.addEventListener('click', () => closeAuthModal());
+}
+if (authModalEl) {
+  authModalEl.addEventListener('click', (event) => handleAuthBackdropClick(event));
+}
+if (authFormEl) {
+  authFormEl.addEventListener('submit', (event) => onAuthSubmit(event));
+}
+if (authClearBtn) {
+  authClearBtn.addEventListener('click', () => handleAuthClear());
+}
+document.addEventListener('keydown', handleAuthModalKeydown, true);
+
 const uid = () => crypto.randomUUID().slice(0, 8);
 
 const openHelp = () => helpDialog(T);
@@ -286,6 +359,346 @@ function applyDataMenuLabels() {
   const exportLabel = dataMenu.querySelector('[data-menu-export] span');
   if (exportLabel) {
     exportLabel.textContent = T.export || 'Eksportuoti';
+  }
+}
+
+function applyAuthLabels() {
+  if (authToggleBtn) {
+    const label = T.authToggleSignIn || 'Prisijungti';
+    authToggleBtn.textContent = label;
+    authToggleBtn.setAttribute('aria-label', label);
+  }
+  if (authModalTitle) {
+    authModalTitle.textContent = T.authModalTitle || 'Prisijungimas';
+  }
+  if (authModalDescription) {
+    authModalDescription.textContent =
+      T.authModalDescription || 'Įveskite savo el. paštą ir slaptažodį.';
+  }
+  if (authEmailLabel) {
+    authEmailLabel.textContent = T.authEmailLabel || 'El. pašto adresas';
+  }
+  if (authEmailInput) {
+    authEmailInput.placeholder = T.authEmailPlaceholder || 'vardas@gmail.com';
+  }
+  if (authEmailHint) {
+    const stored = T.authStoredEmail || 'Išsaugotas el. paštas';
+    authEmailHint.textContent = `${stored}. ${T.authClearHint || ''}`.trim();
+  }
+  if (authPasswordLabel) {
+    authPasswordLabel.textContent = T.authPasswordLabel || 'Slaptažodis';
+  }
+  if (authPasswordInput) {
+    authPasswordInput.placeholder = T.authPasswordPlaceholder || '••••••••';
+  }
+  if (authPasswordHint) {
+    authPasswordHint.textContent = T.authPasswordHint || 'Slaptažodžiai nesaugomi naršyklėje.';
+  }
+  if (authSubmitBtn) {
+    authSubmitBtn.textContent = T.authSubmit || 'Prisijungti';
+  }
+  if (authClearBtn) {
+    authClearBtn.textContent = T.authClear || 'Išvalyti';
+    authClearBtn.setAttribute('aria-label', T.authClearHint || T.authClear || 'Išvalyti');
+  }
+  if (authMessageEl) {
+    authMessageEl.textContent = '';
+  }
+  setSyncStatus(T.authStatusSignedOut || 'Neprisijungęs');
+}
+
+function setSyncStatus(message, options = {}) {
+  if (!syncStatusEl) return;
+  const { variant = 'neutral' } = options;
+  syncStatusEl.textContent = message || '';
+  if (variant && variant !== 'neutral') {
+    syncStatusEl.dataset.variant = variant;
+  } else {
+    delete syncStatusEl.dataset.variant;
+  }
+}
+
+function formatSignedInStatus(email) {
+  const template = T.authStatusSignedIn || 'Prisijungta kaip {email}';
+  return template.replace('{email}', email || 'vartotojas');
+}
+
+function loadStoredEmail() {
+  try {
+    return localStorage.getItem(AUTH_EMAIL_STORAGE_KEY) || '';
+  } catch (error) {
+    console.warn('Nepavyko nuskaityti išsaugoto el. pašto:', error);
+    return '';
+  }
+}
+
+function persistStoredEmail(value) {
+  try {
+    const normalized = typeof value === 'string' ? value.trim() : '';
+    if (normalized) {
+      localStorage.setItem(AUTH_EMAIL_STORAGE_KEY, normalized);
+    } else {
+      localStorage.removeItem(AUTH_EMAIL_STORAGE_KEY);
+    }
+  } catch (error) {
+    console.warn('Nepavyko išsaugoti el. pašto:', error);
+  }
+}
+
+function setAuthMessage(message, variant = 'neutral') {
+  if (!authMessageEl) return;
+  authMessageEl.textContent = message || '';
+  if (variant && variant !== 'neutral') {
+    authMessageEl.dataset.variant = variant;
+  } else {
+    delete authMessageEl.dataset.variant;
+  }
+}
+
+function scheduleAuthModalAutoOpen() {
+  autoAuthModalRequested = true;
+  maybeAutoOpenAuthModal();
+}
+
+function maybeAutoOpenAuthModal() {
+  if (!autoAuthModalRequested) return;
+  if (!supabaseReady) return;
+  if (authSession) {
+    autoAuthModalRequested = false;
+    return;
+  }
+  if (authModalOpen) {
+    autoAuthModalRequested = false;
+    return;
+  }
+  openAuthModal();
+  autoAuthModalRequested = false;
+}
+
+function resolveAuthErrorMessage(error) {
+  const defaultMessage = T.authStatusError || 'Nepavyko prisijungti. Bandykite dar kartą.';
+  if (!error) return defaultMessage;
+  const rawMessage = typeof error.message === 'string' ? error.message.trim() : '';
+  const normalized = rawMessage.toLowerCase();
+  if (
+    normalized.includes('invalid login') ||
+    normalized.includes('invalid credentials') ||
+    error?.status === 400 ||
+    error?.status === 422
+  ) {
+    return T.authInvalidCredentials || defaultMessage;
+  }
+  return rawMessage || defaultMessage;
+}
+
+function setAuthSubmitting(pending) {
+  authSubmitting = Boolean(pending);
+  if (authSubmitBtn) {
+    authSubmitBtn.disabled = pending;
+    authSubmitBtn.setAttribute('aria-busy', pending ? 'true' : 'false');
+  }
+  if (authEmailInput) {
+    authEmailInput.disabled = pending;
+  }
+  if (authPasswordInput) {
+    authPasswordInput.disabled = pending;
+  }
+}
+
+function updateAuthButtonState() {
+  if (!authToggleBtn) return;
+  const signInLabel = T.authToggleSignIn || 'Prisijungti';
+  const signOutLabel = T.authToggleSignOut || 'Atsijungti';
+  let nextLabel = signInLabel;
+  if (!supabaseReady) {
+    authToggleBtn.disabled = true;
+    authToggleBtn.setAttribute('aria-disabled', 'true');
+    authToggleBtn.title = T.authNoConfig || '';
+  } else {
+    authToggleBtn.disabled = false;
+    authToggleBtn.removeAttribute('aria-disabled');
+    authToggleBtn.title = '';
+    nextLabel = authSession ? signOutLabel : signInLabel;
+  }
+  authToggleBtn.textContent = nextLabel;
+  authToggleBtn.setAttribute('aria-label', nextLabel);
+}
+
+function openAuthModal() {
+  if (!authModalEl) return;
+  if (!supabaseReady) {
+    alert(T.authNoConfig || 'Supabase konfigūracija nerasta.');
+    return;
+  }
+  autoAuthModalRequested = false;
+  authModalOpen = true;
+  lastFocusedBeforeAuthModal =
+    document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  authModalEl.hidden = false;
+  document.body.dataset.modalOpen = '1';
+  setAuthMessage('', 'neutral');
+  if (authPasswordInput) {
+    authPasswordInput.value = '';
+  }
+  const focusTarget = authEmailInput || authModalDialog;
+  if (focusTarget && typeof focusTarget.focus === 'function') {
+    requestAnimationFrame(() => focusTarget.focus());
+  }
+}
+
+function closeAuthModal(options = {}) {
+  if (!authModalEl) return;
+  const { restoreFocus = true } = options;
+  authModalOpen = false;
+  authModalEl.hidden = true;
+  delete document.body.dataset.modalOpen;
+  if (restoreFocus && lastFocusedBeforeAuthModal instanceof HTMLElement) {
+    lastFocusedBeforeAuthModal.focus();
+  }
+  lastFocusedBeforeAuthModal = null;
+}
+
+function handleAuthModalKeydown(event) {
+  if (!authModalOpen) return;
+  if (event.key === 'Escape' || event.key === 'Esc') {
+    event.preventDefault();
+    closeAuthModal();
+  }
+}
+
+function handleAuthBackdropClick(event) {
+  if (!authModalOpen || !authModalEl) return;
+  if (event.target === authModalEl) {
+    closeAuthModal();
+  }
+}
+
+function onAuthToggle() {
+  if (!supabaseReady) {
+    alert(T.authNoConfig || 'Supabase konfigūracija nerasta.');
+    return;
+  }
+  if (authSession) {
+    onAuthSignOut();
+  } else {
+    openAuthModal();
+  }
+}
+
+async function onAuthSubmit(event) {
+  event.preventDefault();
+  if (!supabaseReady || authSubmitting) return;
+  const email = (authEmailInput?.value || '').trim();
+  const password = authPasswordInput?.value || '';
+  if (!email || !password) {
+    setAuthMessage(T.required || 'Užpildykite visus laukus.', 'error');
+    if (!email) {
+      authEmailInput?.focus();
+    } else {
+      authPasswordInput?.focus();
+    }
+    return;
+  }
+  try {
+    setAuthSubmitting(true);
+    setSyncStatus(T.authStatusSyncing || 'Sinchronizuojama…');
+    setAuthMessage('', 'neutral');
+    const { session } = await signInWithPassword(email, password);
+    persistStoredEmail(email);
+    if (authPasswordInput) {
+      authPasswordInput.value = '';
+    }
+    if (session) {
+      updateAuthSession(session);
+    } else {
+      await refreshAuthSession();
+    }
+    setAuthMessage(T.authPasswordSuccess || 'Prisijungimas sėkmingas.', 'success');
+    closeAuthModal({ restoreFocus: false });
+  } catch (error) {
+    console.error('Nepavyko prisijungti:', error);
+    setAuthMessage(resolveAuthErrorMessage(error), 'error');
+    setSyncStatus(T.authStatusError || 'Nepavyko prisijungti. Bandykite dar kartą.', {
+      variant: 'error',
+    });
+  } finally {
+    setAuthSubmitting(false);
+  }
+}
+
+function handleAuthClear() {
+  persistStoredEmail('');
+  if (authEmailInput) {
+    authEmailInput.value = '';
+    authEmailInput.focus();
+  }
+  if (authPasswordInput) {
+    authPasswordInput.value = '';
+  }
+  setAuthMessage(T.authClearSuccess || 'El. paštas išvalytas.', 'success');
+}
+
+async function refreshAuthSession() {
+  if (!supabaseReady) return;
+  try {
+    setSyncStatus(T.authStatusSyncing || 'Sinchronizuojama…');
+    const { data } = await getSession();
+    const session = data?.session ?? null;
+    updateAuthSession(session);
+  } catch (error) {
+    console.error('Nepavyko gauti Supabase sesijos:', error);
+    updateAuthSession(null);
+    setSyncStatus(T.authStatusSignedOut || 'Neprisijungęs', { variant: 'error' });
+  }
+}
+
+function updateAuthSession(session) {
+  const wasAuthenticated = Boolean(authSession);
+  authSession = session && session.user ? session : null;
+  if (authSession?.user?.email) {
+    setSyncStatus(formatSignedInStatus(authSession.user.email), { variant: 'success' });
+    autoAuthModalRequested = false;
+    if (authModalOpen) {
+      closeAuthModal({ restoreFocus: false });
+    }
+  } else if (supabaseReady) {
+    setSyncStatus(T.authStatusSignedOut || 'Neprisijungęs');
+    if (wasAuthenticated) {
+      scheduleAuthModalAutoOpen();
+    }
+  }
+  updateAuthButtonState();
+}
+
+async function onAuthSignOut() {
+  if (!supabaseReady) return;
+  try {
+    setSyncStatus(T.authStatusSyncing || 'Sinchronizuojama…');
+    await supabaseSignOut();
+    updateAuthSession(null);
+  } catch (error) {
+    console.error('Nepavyko atsijungti nuo Supabase:', error);
+    setSyncStatus(T.authStatusError || 'Nepavyko prisijungti. Bandykite dar kartą.', {
+      variant: 'error',
+    });
+  }
+}
+
+function subscribeToAuthChanges() {
+  if (!supabaseReady) return;
+  try {
+    const result = onAuthStateChange((_event, session) => {
+      updateAuthSession(session);
+    });
+    const subscription = result?.data?.subscription || result?.subscription;
+    if (subscription) {
+      if (authSubscription && typeof authSubscription.unsubscribe === 'function') {
+        authSubscription.unsubscribe();
+      }
+      authSubscription = subscription;
+    }
+  } catch (error) {
+    console.error('Nepavyko užsiprenumeruoti Supabase auth įvykių:', error);
   }
 }
 
@@ -1810,6 +2223,12 @@ document.getElementById('fileInput').addEventListener('change', (e) => {
   const f = e.target.files[0];
   if (f) importJson(f);
   e.target.value = '';
+});
+
+window.addEventListener('beforeunload', () => {
+  if (authSubscription && typeof authSubscription.unsubscribe === 'function') {
+    authSubscription.unsubscribe();
+  }
 });
 
 if (helpBtn) {
