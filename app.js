@@ -1592,6 +1592,18 @@ function canSyncRemoteState() {
   return supabaseReady && Boolean(authSession?.user);
 }
 
+function hasLocalContent() {
+  const hasGroups = Array.isArray(state?.groups) && state.groups.length > 0;
+  const hasCustomReminders =
+    Array.isArray(state?.customReminders) && state.customReminders.length > 0;
+  const hasTitle = typeof state?.title === 'string' && state.title.trim().length > 0;
+  const hasIcon =
+    (typeof state?.icon === 'string' && state.icon.trim()) ||
+    (typeof state?.iconImage === 'string' && state.iconImage.trim());
+  const remindersEnabled = Boolean(state?.remindersCard?.enabled);
+  return hasGroups || hasCustomReminders || hasTitle || hasIcon || remindersEnabled;
+}
+
 async function syncLatestRemoteState(options = {}) {
   const { preferRemote = false } = options;
   if (!canSyncRemoteState()) {
@@ -1616,9 +1628,10 @@ async function syncLatestRemoteState(options = {}) {
     const remoteHasTimestamp = Number.isFinite(remoteUpdatedAtValue);
     const remoteIsNewerOrEqual =
       remoteHasTimestamp && (!Number.isFinite(localUpdatedAt) || remoteUpdatedAtValue >= localUpdatedAt);
+    const localHasContent = hasLocalContent();
     const shouldApply = Boolean(remoteState) &&
       (preferRemote
-        ? remoteIsNewerOrEqual || !remoteHasTimestamp
+        ? remoteIsNewerOrEqual || !remoteHasTimestamp || !localHasContent
         : remoteIsNewerOrEqual);
     if (shouldApply && remoteState) {
       applyRemoteState(remoteState, {
