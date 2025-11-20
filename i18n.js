@@ -24,7 +24,7 @@ export const Tlt = {
   remoteSyncError: 'Nepavyko atsiųsti duomenų iš Supabase.',
   remoteSyncSuccess: 'Duomenys atnaujinti iš Supabase.',
   remoteSyncAuthRequired: 'Prisijunkite, kad naudotumėte Supabase sinchronizavimą.',
-  remoteSyncLast: 'Paskutinė nuotolinė sinchronizacija: {time}',
+  remoteSyncLast: 'Atnaujinta: {time}',
   theme: 'Tema',
   color: 'Spalva',
   customize: 'Tinkinti',
