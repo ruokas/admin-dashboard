@@ -205,7 +205,7 @@ export const Tlt = {
   authToggleSignIn: 'Prisijungti',
   authToggleSignOut: 'Atsijungti',
   authModalTitle: 'Prisijungimas',
-  authModalDescription: 'Prisijunkite su savo el. pašto adresu ir slaptažodžiu.',
+  authModalDescription: 'Įveskite prisijungimo duomenis.',
   authEmailLabel: 'El. pašto adresas',
   authEmailPlaceholder: 'vardas@gmail.com',
   authPasswordLabel: 'Slaptažodis',
