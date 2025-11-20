@@ -66,6 +66,10 @@ Statinis HTML + ES moduliais paremtas prietaisų skydas, skirtas greitam informa
   2. Jei reikia papildomos atsarginės kopijos, `app.js` faile atkomentuokite `const sheets = sheetsSync(...)` ir iškvieskite `sheets.export()`/`sheets.import()` savo logikoje.
   3. Apps Script turėtų palaikyti `action: "export" | "import"` ir grąžinti JSON struktūrą, atitinkančią `storage.js` tipą.
 
+### Rankinis duomenų atkūrimas / eksportas
+- Viršutinėje juostoje yra meniu **„Duomenys“**: importuoti JSON, eksportuoti, atsisiųsti iš Supabase arba išsiųsti į Supabase.
+- Jei Supabase įrašas buvo tuščias, importuokite atsarginį `.json` failą ir spauskite „Išsiųsti į Supabase“ (reikalingas prisijungimas), kad atstatytumėte nuotolinę kopiją.
+
 ## Privatumas ir leidimai
 - Primenimų pranešimai gali būti matomi užrakintame įrenginyje – prieš įjungdami įsitikinkite, kad tai leidžia skyriuje galiojančios taisyklės.
 - Visa informacija išlieka vartotojo naršyklėje; jei Supabase konfigūruotas ir esate prisijungę, duomenys automatiškai siunčiami į Supabase kaip atsarginė kopija.

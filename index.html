@@ -115,6 +115,34 @@
         </div>
       </div>
       <div class="secondary-actions" data-zone="secondary-actions">
+        <div id="dataMenu" data-open="0">
+          <button
+            id="dataBtn"
+            class="btn-outline"
+            type="button"
+            aria-haspopup="true"
+            aria-expanded="false"
+            aria-controls="dataMenuList"
+          >
+            Duomenys
+          </button>
+          <div class="menu-backdrop" data-menu-backdrop aria-hidden="true"></div>
+          <div
+            id="dataMenuList"
+            class="menu-panel"
+            role="menu"
+            aria-labelledby="dataBtn"
+          >
+            <button id="dataImport" type="button" role="menuitem">📥 Importuoti</button>
+            <button id="dataExport" type="button" role="menuitem">📤 Eksportuoti</button>
+            <button id="dataRemoteFetch" type="button" role="menuitem">
+              ⇣ Atsiųsti iš Supabase
+            </button>
+            <button id="dataRemotePush" type="button" role="menuitem">
+              ⇡ Išsiųsti į Supabase
+            </button>
+          </div>
+        </div>
         <!-- Fallback labels so buttons are visible before JS initializes -->
         <button id="editBtn" class="btn-outline" type="button">
           Redaguoti
@@ -158,6 +186,8 @@
       accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
       hidden
     />
+
+    <input type="file" id="dataFileInput" accept="application/json" hidden />
 
     <div
       id="authModal"

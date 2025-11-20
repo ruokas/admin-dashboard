@@ -40,6 +40,7 @@ function createStubElement() {
     focus: noop,
     blur: noop,
     click: noop,
+    dataset: {},
     value: '',
     innerHTML: '',
     textContent: '',
@@ -264,6 +265,38 @@ test('syncLatestRemoteState išskleidžia trigubai užkoduotą state_json', asyn
     assert.equal(nextState.title, remoteSnapshot.title);
     assert.deepEqual(nextState.groups, remoteSnapshot.groups);
     assert.equal(nextState.meta.remoteId, 'row-10');
+  } finally {
+    supabaseMock.fetchSettings = originalFetch;
+  }
+});
+
+test('syncLatestRemoteState nepritaiko tuščio remote snapshot preferRemote režimu', async () => {
+  const originalFetch = supabaseMock.fetchSettings;
+  supabaseMock.fetchSettings = async () => ({
+    id: 'row-empty',
+    user_id: 'user-empty',
+    state_json: '{}',
+    updated_at: new Date().toISOString(),
+  });
+
+  try {
+    const app = await loadAppModule();
+    const hooks = app.__testHooks;
+    hooks.setSupabaseReadyForTest(true);
+    hooks.setAuthSessionForTest({ user: { id: 'user-empty', email: 'empty@example.com' } });
+    hooks.setStateForTest({
+      ...createMinimalState(),
+      title: 'Lokalus',
+      groups: [{ id: 'g-local', title: 'Lokalus', items: [] }],
+      updatedAt: Date.now(),
+      meta: {},
+    });
+
+    const result = await hooks.syncLatestRemoteStateForTest({ preferRemote: true });
+    assert.equal(result.applied, false);
+    const nextState = hooks.getStateForTest();
+    assert.equal(nextState.title, 'Lokalus');
+    assert.deepEqual(nextState.groups, [{ id: 'g-local', title: 'Lokalus', items: [] }]);
   } finally {
     supabaseMock.fetchSettings = originalFetch;
   }

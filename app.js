@@ -39,6 +39,7 @@ import {
   hasReminderPayload,
 } from './reminder-input.js';
 import { getActiveTheme, resolveChartThemeUrl } from './theme-utils.js';
+import { exportJson } from './exporter.js';
 
 const T = Tlt;
 // Hook future English localisation: fill T.en when translations are ready.
@@ -223,6 +224,15 @@ const addMenu = document.getElementById('addMenu');
 const addMenuList = document.getElementById('addMenuList');
 const addBtn = document.getElementById('addBtn');
 const addMenuBackdrop = addMenu?.querySelector('[data-menu-backdrop]') ?? null;
+const dataMenu = document.getElementById('dataMenu');
+const dataMenuList = document.getElementById('dataMenuList');
+const dataBtn = document.getElementById('dataBtn');
+const dataMenuBackdrop = dataMenu?.querySelector('[data-menu-backdrop]') ?? null;
+const dataImportBtn = document.getElementById('dataImport');
+const dataExportBtn = document.getElementById('dataExport');
+const dataRemoteFetchBtn = document.getElementById('dataRemoteFetch');
+const dataRemotePushBtn = document.getElementById('dataRemotePush');
+const dataFileInput = document.getElementById('dataFileInput');
 const helpBtn = document.getElementById('helpBtn');
 const searchClearBtn = document.getElementById('searchClear');
 const pageIconImageBtn = document.getElementById('pageIconImageBtn');
@@ -242,6 +252,7 @@ let loginGateDelayTimer = null;
 let loginGateDelayUsed = false;
 
 applyPageIconActionLabels();
+applyDataMenuLabels();
 applyAuthLabels();
 updateAuthButtonState();
 
@@ -256,6 +267,18 @@ if (addBtn) {
     addBtn.setAttribute('aria-haspopup', 'true');
   }
   addBtn.setAttribute('aria-expanded', addMenu?.dataset.open === '1' ? 'true' : 'false');
+}
+if (dataMenu && !dataMenu.dataset.open) {
+  dataMenu.dataset.open = '0';
+}
+if (dataBtn) {
+  if (!dataBtn.hasAttribute('aria-controls')) {
+    dataBtn.setAttribute('aria-controls', 'dataMenuList');
+  }
+  if (!dataBtn.hasAttribute('aria-haspopup')) {
+    dataBtn.setAttribute('aria-haspopup', 'true');
+  }
+  dataBtn.setAttribute('aria-expanded', dataMenu?.dataset.open === '1' ? 'true' : 'false');
 }
 let state = load() || seed();
 bootstrapSession()
@@ -374,6 +397,25 @@ const updateSearchClearVisibility = () => {
   const hasValue = Boolean(searchEl?.value?.trim());
   searchClearBtn.hidden = !hasValue;
 };
+
+function applyDataMenuLabels() {
+  if (dataBtn) {
+    dataBtn.textContent = T.dataMenu || 'Duomenys';
+    dataBtn.setAttribute('aria-label', T.dataMenu || 'Duomenys');
+  }
+  if (dataImportBtn) {
+    dataImportBtn.textContent = T.import || 'Importuoti';
+  }
+  if (dataExportBtn) {
+    dataExportBtn.textContent = T.export || 'Eksportuoti';
+  }
+  if (dataRemoteFetchBtn) {
+    dataRemoteFetchBtn.textContent = T.remoteFetch || 'Atsiųsti iš Supabase';
+  }
+  if (dataRemotePushBtn) {
+    dataRemotePushBtn.textContent = T.remotePush || 'Išsiųsti į Supabase';
+  }
+}
 
 function applyPageIconActionLabels() {
   if (pageIconImageBtn) {
@@ -1612,15 +1654,16 @@ function parseRemoteState(input) {
   return current && typeof current === 'object' ? current : null;
 }
 
-function hasLocalContent() {
-  const hasGroups = Array.isArray(state?.groups) && state.groups.length > 0;
+function hasContentSnapshot(target = state) {
+  if (!target || typeof target !== 'object') return false;
+  const hasGroups = Array.isArray(target?.groups) && target.groups.length > 0;
   const hasCustomReminders =
-    Array.isArray(state?.customReminders) && state.customReminders.length > 0;
-  const hasTitle = typeof state?.title === 'string' && state.title.trim().length > 0;
+    Array.isArray(target?.customReminders) && target.customReminders.length > 0;
+  const hasTitle = typeof target?.title === 'string' && target.title.trim().length > 0;
   const hasIcon =
-    (typeof state?.icon === 'string' && state.icon.trim()) ||
-    (typeof state?.iconImage === 'string' && state.iconImage.trim());
-  const remindersEnabled = Boolean(state?.remindersCard?.enabled);
+    (typeof target?.icon === 'string' && target.icon.trim()) ||
+    (typeof target?.iconImage === 'string' && target.iconImage.trim());
+  const remindersEnabled = Boolean(target?.remindersCard?.enabled);
   return hasGroups || hasCustomReminders || hasTitle || hasIcon || remindersEnabled;
 }
 
@@ -1641,13 +1684,15 @@ async function syncLatestRemoteState(options = {}) {
     const remoteUpdatedAtIso =
       typeof remote.updated_at === 'string' && remote.updated_at ? remote.updated_at : null;
     const remoteUpdatedAtValue = remoteUpdatedAtIso ? Date.parse(remoteUpdatedAtIso) : null;
-    const localHasContent = hasLocalContent();
+    const remoteHasContent = hasContentSnapshot(remoteState);
+    const localHasContent = hasContentSnapshot(state);
     const localUpdatedAt =
       localHasContent && Number.isFinite(state.updatedAt) ? state.updatedAt : null;
     const remoteHasTimestamp = Number.isFinite(remoteUpdatedAtValue);
     const remoteIsNewerOrEqual =
       remoteHasTimestamp && (!Number.isFinite(localUpdatedAt) || remoteUpdatedAtValue >= localUpdatedAt);
     const shouldApply = Boolean(remoteState) &&
+      remoteHasContent &&
       (preferRemote
         ? remoteIsNewerOrEqual || !remoteHasTimestamp || !localHasContent
         : remoteIsNewerOrEqual);
@@ -1666,12 +1711,16 @@ async function syncLatestRemoteState(options = {}) {
     console.info('Supabase sync praleistas', {
       preferRemote,
       remoteStatePresent: Boolean(remoteState),
+      remoteHasContent,
       remoteUpdatedAtIso,
       remoteHasTimestamp,
       localHasContent,
       localUpdatedAt,
       remoteIsNewerOrEqual,
     });
+    if (remoteState && !remoteHasContent) {
+      setSyncStatus(T.remoteSyncNoData || 'Supabase duomenų nerasta.', { variant: 'warning' });
+    }
     const meta = ensureStateMeta();
     if (remoteId) meta.remoteId = remoteId;
     if (remoteUpdatedAtIso) meta.remoteUpdatedAt = remoteUpdatedAtIso;
@@ -1685,6 +1734,40 @@ async function syncLatestRemoteState(options = {}) {
     });
     return { applied: false, error: true };
   }
+}
+
+async function manualRemoteFetch() {
+  setDataMenuOpen(false);
+  if (!canSyncRemoteState()) {
+    alert(T.remoteSyncAuthRequired || 'Prisijunkite, kad naudotumėte Supabase sinchronizavimą.');
+    return;
+  }
+  const hasLocal = hasContentSnapshot(state);
+  if (hasLocal) {
+    const confirmed = window.confirm(
+      T.remoteSyncDialogDescription || 'Nuotoliniai duomenys gali perrašyti vietinius įrašus. Patvirtinkite veiksmą.',
+    );
+    if (!confirmed) return;
+  }
+  const result = await syncLatestRemoteState({ preferRemote: true });
+  if (!result.applied) {
+    setSyncStatus(T.remoteSyncNoData || 'Supabase duomenų nerasta.', { variant: 'warning' });
+  }
+}
+
+async function manualRemotePush() {
+  setDataMenuOpen(false);
+  if (!canSyncRemoteState()) {
+    alert(T.remoteSyncAuthRequired || 'Prisijunkite, kad naudotumėte Supabase sinchronizavimą.');
+    return;
+  }
+  if (!hasContentSnapshot(state)) {
+    alert(T.remotePushEmpty || 'Nėra ką siųsti – skydelis tuščias.');
+    return;
+  }
+  setSyncStatus(T.remotePushProgress || 'Siunčiama į Supabase…');
+  await remoteSave(cloneStateSnapshot(state));
+  setSyncStatus(T.remotePushSuccess || 'Duomenys įkelti į Supabase.', { variant: 'success' });
 }
 
 function applyRemoteState(remoteState, options = {}) {
@@ -2334,6 +2417,10 @@ function isMenuOpen() {
   return addMenu?.dataset.open === '1';
 }
 
+function isDataMenuOpen() {
+  return dataMenu?.dataset.open === '1';
+}
+
 function setMenuOpen(open, options = {}) {
   if (!addMenu) return;
   const { restoreFocus = true } = options;
@@ -2378,11 +2465,39 @@ function setMenuOpen(open, options = {}) {
   }
 }
 
+function setDataMenuOpen(open) {
+  if (!dataMenu) return;
+  const currentlyOpen = isDataMenuOpen();
+  if (open === currentlyOpen) return;
+  dataMenu.dataset.open = open ? '1' : '0';
+  if (dataBtn) {
+    dataBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+
+  if (open) {
+    const focusTarget = dataMenuList?.querySelector('button:not([disabled])');
+    if (focusTarget instanceof HTMLElement && typeof focusTarget.focus === 'function') {
+      focusTarget.focus();
+    }
+    document.addEventListener('keydown', handleDataMenuKeydown);
+  } else {
+    document.removeEventListener('keydown', handleDataMenuKeydown);
+  }
+}
+
 function handleMenuKeydown(event) {
   if (!isMenuOpen()) return;
   if (event.key === 'Escape' || event.key === 'Esc') {
     event.preventDefault();
     setMenuOpen(false);
+  }
+}
+
+function handleDataMenuKeydown(event) {
+  if (!isDataMenuOpen()) return;
+  if (event.key === 'Escape' || event.key === 'Esc') {
+    event.preventDefault();
+    setDataMenuOpen(false);
   }
 }
 
@@ -2402,6 +2517,62 @@ document.addEventListener('click', (event) => {
     setMenuOpen(false);
   }
 });
+
+if (dataBtn && dataMenu) {
+  dataBtn.addEventListener('click', () => {
+    setDataMenuOpen(!isDataMenuOpen());
+  });
+}
+
+if (dataMenuBackdrop) {
+  dataMenuBackdrop.addEventListener('click', () => setDataMenuOpen(false));
+}
+
+document.addEventListener('click', (event) => {
+  if (!dataMenu || !isDataMenuOpen()) return;
+  if (!dataMenu.contains(event.target)) {
+    setDataMenuOpen(false);
+  }
+});
+
+if (dataImportBtn && dataFileInput) {
+  dataImportBtn.addEventListener('click', () => {
+    dataFileInput.value = '';
+    dataFileInput.click();
+  });
+}
+
+if (dataFileInput) {
+  dataFileInput.addEventListener('change', (event) => {
+    const target = event.target;
+    const file = target?.files?.[0];
+    if (file) {
+      importJson(file);
+      setSyncStatus(T.remoteImportSuccess || 'Failas importuotas.');
+    }
+    if (target) target.value = '';
+    setDataMenuOpen(false);
+  });
+}
+
+if (dataExportBtn) {
+  dataExportBtn.addEventListener('click', () => {
+    exportJson(state);
+    setDataMenuOpen(false);
+  });
+}
+
+if (dataRemoteFetchBtn) {
+  dataRemoteFetchBtn.addEventListener('click', () => {
+    manualRemoteFetch();
+  });
+}
+
+if (dataRemotePushBtn) {
+  dataRemotePushBtn.addEventListener('click', () => {
+    manualRemotePush();
+  });
+}
 // Išplėtimui: jei reikia kitų laukų ignoravimo, papildykite žemiau esantį sąrašą.
 function isEditableTarget(target) {
   if (!(target instanceof HTMLElement)) return false;

@@ -11,6 +11,10 @@ export const Tlt = {
   dataMenu: 'Duomenys',
   remoteFetch: 'Atsiųsti iš Supabase',
   remotePush: 'Išsiųsti į Supabase',
+  remotePushProgress: 'Siunčiama į Supabase…',
+  remotePushSuccess: 'Duomenys įkelti į Supabase.',
+  remotePushEmpty: 'Nėra ką siųsti – skydelis tuščias.',
+  remoteImportSuccess: 'Failas importuotas.',
   remoteSyncDialogTitle: 'Atsiųsti iš Supabase',
   remoteSyncDialogDescription:
     'Nuotoliniai duomenys gali perrašyti vietinius įrašus. Patvirtinkite veiksmą.',
