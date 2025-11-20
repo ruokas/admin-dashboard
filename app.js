@@ -57,6 +57,7 @@ const ICON_IMAGE_ACCEPT_PREFIX = 'data:image/';
 const AUTH_EMAIL_STORAGE_KEY = 'ed_dash_last_email';
 const REMOTE_SAVE_DEBOUNCE_MS = 2000;
 const REMOTE_SAVE_ERROR_MESSAGE = 'Nepavyko išsaugoti – bandykite rankiniu būdu';
+const LOGIN_GATE_DELAY_MS = 700;
 
 let supabaseReady = false;
 
@@ -83,17 +84,20 @@ const supabaseInitPromise = supabaseConfigPromise
   .then(async (config) => {
     if (!config) {
       updateAuthButtonState();
+      setLoginGateActive(false);
       return false;
     }
     try {
       await initSupabase({ url: config.url, anonKey: config.anonKey });
       supabaseReady = true;
+      setLoginGateActive(true);
       updateAuthButtonState();
       subscribeToAuthChanges();
       return true;
     } catch (error) {
       supabaseReady = false;
       updateAuthButtonState();
+      setLoginGateActive(false);
       console.error('Nepavyko inicijuoti Supabase kliento:', error);
       setSyncStatus(T.authStatusError || 'Nepavyko prisijungti. Bandykite dar kartą.', {
         variant: 'error',
@@ -103,6 +107,7 @@ const supabaseInitPromise = supabaseConfigPromise
   })
   .catch((error) => {
     console.error('Supabase inicijavimo klaida:', error);
+    setLoginGateActive(false);
     return false;
   });
 
@@ -197,8 +202,6 @@ const authCloseBtn = document.getElementById('authClose');
 const authFormEl = document.getElementById('authForm');
 const authEmailInput = document.getElementById('authEmail');
 const authPasswordInput = document.getElementById('authPassword');
-const authEmailHint = document.getElementById('authEmailHint');
-const authPasswordHint = document.getElementById('authPasswordHint');
 const authModalDescription = document.getElementById('authModalDescription');
 const authModalTitle = document.getElementById('authModalTitle');
 const authMessageEl = document.getElementById('authMessage');
@@ -234,6 +237,9 @@ let authSubmitting = false;
 let lastFocusedBeforeAuthModal = null;
 let autoAuthModalRequested = true;
 let bootstrapCompleted = false;
+let loginGateActive = false;
+let loginGateDelayTimer = null;
+let loginGateDelayUsed = false;
 
 applyPageIconActionLabels();
 applyAuthLabels();
@@ -392,8 +398,7 @@ function applyAuthLabels() {
     authModalTitle.textContent = T.authModalTitle || 'Prisijungimas';
   }
   if (authModalDescription) {
-    authModalDescription.textContent =
-      T.authModalDescription || 'Įveskite savo el. paštą ir slaptažodį.';
+    authModalDescription.textContent = T.authModalDescription || 'Įveskite prisijungimo duomenis.';
   }
   if (authEmailLabel) {
     authEmailLabel.textContent = T.authEmailLabel || 'El. pašto adresas';
@@ -401,18 +406,11 @@ function applyAuthLabels() {
   if (authEmailInput) {
     authEmailInput.placeholder = T.authEmailPlaceholder || 'vardas@gmail.com';
   }
-  if (authEmailHint) {
-    const stored = T.authStoredEmail || 'Išsaugotas el. paštas';
-    authEmailHint.textContent = `${stored}. ${T.authClearHint || ''}`.trim();
-  }
   if (authPasswordLabel) {
     authPasswordLabel.textContent = T.authPasswordLabel || 'Slaptažodis';
   }
   if (authPasswordInput) {
     authPasswordInput.placeholder = T.authPasswordPlaceholder || '••••••••';
-  }
-  if (authPasswordHint) {
-    authPasswordHint.textContent = T.authPasswordHint || 'Slaptažodžiai nesaugomi naršyklėje.';
   }
   if (authSubmitBtn) {
     authSubmitBtn.textContent = T.authSubmit || 'Prisijungti';
@@ -507,6 +505,37 @@ function setAuthMessage(message, variant = 'neutral') {
   }
 }
 
+function setLoginGateActive(active) {
+  const wasActive = loginGateActive;
+  loginGateActive = Boolean(active);
+  if (loginGateDelayTimer) {
+    clearTimeout(loginGateDelayTimer);
+    loginGateDelayTimer = null;
+  }
+  if (loginGateActive) {
+    document.body.dataset.loginGate = '1';
+    const open = () => {
+      if (!authModalOpen) {
+        openAuthModal({ force: true });
+      }
+    };
+    if (!wasActive && !loginGateDelayUsed) {
+      loginGateDelayTimer = setTimeout(() => {
+        loginGateDelayTimer = null;
+        open();
+      }, LOGIN_GATE_DELAY_MS);
+      loginGateDelayUsed = true;
+    } else {
+      open();
+    }
+  } else {
+    delete document.body.dataset.loginGate;
+    if (authModalOpen) {
+      closeAuthModal({ restoreFocus: false });
+    }
+  }
+}
+
 function scheduleAuthModalAutoOpen() {
   autoAuthModalRequested = true;
   maybeAutoOpenAuthModal();
@@ -589,9 +618,10 @@ function updateAuthButtonState() {
   authToggleBtn.setAttribute('aria-label', nextLabel);
 }
 
-function openAuthModal() {
+function openAuthModal(options = {}) {
   if (!authModalEl) return;
-  if (!supabaseReady) {
+  const { force = false } = options;
+  if (!force && !supabaseReady) {
     alert(T.authNoConfig || 'Supabase konfigūracija nerasta.');
     return;
   }
@@ -600,7 +630,11 @@ function openAuthModal() {
   lastFocusedBeforeAuthModal =
     document.activeElement instanceof HTMLElement ? document.activeElement : null;
   authModalEl.hidden = false;
+  authModalEl.classList.toggle('auth-modal--gate', loginGateActive);
   document.body.dataset.modalOpen = '1';
+  if (loginGateActive) {
+    document.body.dataset.loginGate = '1';
+  }
   setAuthMessage('', 'neutral');
   if (authPasswordInput) {
     authPasswordInput.value = '';
@@ -613,6 +647,9 @@ function openAuthModal() {
 
 function closeAuthModal(options = {}) {
   if (!authModalEl) return;
+  if (loginGateActive && !authSession) {
+    return;
+  }
   const { restoreFocus = true } = options;
   authModalOpen = false;
   authModalEl.hidden = true;
@@ -722,6 +759,7 @@ async function refreshAuthSession() {
 function updateAuthSession(session) {
   const wasAuthenticated = Boolean(authSession);
   authSession = session && session.user ? session : null;
+  setLoginGateActive(!authSession);
   updateIdleSyncStatus();
   if (authSession?.user?.email) {
     autoAuthModalRequested = false;

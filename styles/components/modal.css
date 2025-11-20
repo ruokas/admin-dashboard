@@ -9,8 +9,9 @@ body[data-modal-open='1'] {
   align-items: center;
   justify-content: center;
   padding: var(--space-4);
-  background: rgba(5, 11, 18, 0.78);
+  background: rgba(5, 11, 18, 0.72);
   z-index: 20;
+  backdrop-filter: blur(4px);
 }
 
 .auth-modal[hidden] {
@@ -18,13 +19,14 @@ body[data-modal-open='1'] {
 }
 
 .auth-modal__panel {
-  width: min(420px, 100%);
+  width: min(460px, 100%);
   background: var(--surface);
   color: var(--text);
   border-radius: var(--space-3);
-  box-shadow: var(--shadow);
-  padding: var(--space-5) var(--space-4);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
+  padding: var(--space-6) var(--space-5);
   position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .auth-modal__header {
@@ -87,12 +89,6 @@ body[data-modal-open='1'] {
   background: rgba(12, 17, 22, 0.04);
 }
 
-.auth-modal__hint {
-  font-size: var(--font-sm);
-  color: var(--subtext);
-  margin: 0;
-}
-
 .auth-modal__actions {
   display: flex;
   flex-wrap: wrap;
@@ -132,6 +128,17 @@ body[data-modal-open='1'] {
 
 #syncStatus[data-variant='error'] {
   color: var(--danger);
+}
+
+body[data-login-gate='1'] header,
+body[data-login-gate='1'] main {
+  filter: blur(2px);
+  pointer-events: none;
+  user-select: none;
+}
+
+body[data-login-gate='1'] .page-header {
+  opacity: 0.4;
 }
 
 @media (max-width: 720px) {
