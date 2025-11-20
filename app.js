@@ -1624,11 +1624,12 @@ async function syncLatestRemoteState(options = {}) {
     const remoteUpdatedAtIso =
       typeof remote.updated_at === 'string' && remote.updated_at ? remote.updated_at : null;
     const remoteUpdatedAtValue = remoteUpdatedAtIso ? Date.parse(remoteUpdatedAtIso) : null;
-    const localUpdatedAt = Number.isFinite(state.updatedAt) ? state.updatedAt : null;
+    const localHasContent = hasLocalContent();
+    const localUpdatedAt =
+      localHasContent && Number.isFinite(state.updatedAt) ? state.updatedAt : null;
     const remoteHasTimestamp = Number.isFinite(remoteUpdatedAtValue);
     const remoteIsNewerOrEqual =
       remoteHasTimestamp && (!Number.isFinite(localUpdatedAt) || remoteUpdatedAtValue >= localUpdatedAt);
-    const localHasContent = hasLocalContent();
     const shouldApply = Boolean(remoteState) &&
       (preferRemote
         ? remoteIsNewerOrEqual || !remoteHasTimestamp || !localHasContent
