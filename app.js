@@ -1613,10 +1613,13 @@ async function syncLatestRemoteState(options = {}) {
       typeof remote.updated_at === 'string' && remote.updated_at ? remote.updated_at : null;
     const remoteUpdatedAtValue = remoteUpdatedAtIso ? Date.parse(remoteUpdatedAtIso) : null;
     const localUpdatedAt = Number.isFinite(state.updatedAt) ? state.updatedAt : null;
-    const shouldApply = preferRemote
-      ? Boolean(remoteState)
-      : Number.isFinite(remoteUpdatedAtValue) &&
-        (!Number.isFinite(localUpdatedAt) || remoteUpdatedAtValue >= localUpdatedAt);
+    const remoteHasTimestamp = Number.isFinite(remoteUpdatedAtValue);
+    const remoteIsNewerOrEqual =
+      remoteHasTimestamp && (!Number.isFinite(localUpdatedAt) || remoteUpdatedAtValue >= localUpdatedAt);
+    const shouldApply = Boolean(remoteState) &&
+      (preferRemote
+        ? remoteIsNewerOrEqual || !remoteHasTimestamp
+        : remoteIsNewerOrEqual);
     if (shouldApply && remoteState) {
       applyRemoteState(remoteState, {
         remoteId,
