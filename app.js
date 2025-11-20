@@ -1592,6 +1592,21 @@ function canSyncRemoteState() {
   return supabaseReady && Boolean(authSession?.user);
 }
 
+function parseRemoteState(input) {
+  if (!input) return null;
+  if (typeof input === 'object') return input;
+  if (typeof input === 'string') {
+    try {
+      const parsed = JSON.parse(input);
+      return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch (error) {
+      console.warn('Nepavyko perskaityti Supabase state_json kaip JSON:', error);
+      return null;
+    }
+  }
+  return null;
+}
+
 function hasLocalContent() {
   const hasGroups = Array.isArray(state?.groups) && state.groups.length > 0;
   const hasCustomReminders =
@@ -1616,10 +1631,7 @@ async function syncLatestRemoteState(options = {}) {
       updateIdleSyncStatus();
       return { applied: false };
     }
-    const remoteState =
-      remote && remote.state_json && typeof remote.state_json === 'object'
-        ? remote.state_json
-        : null;
+    const remoteState = parseRemoteState(remote?.state_json);
     const remoteId = typeof remote.id === 'string' && remote.id ? remote.id : null;
     const remoteUpdatedAtIso =
       typeof remote.updated_at === 'string' && remote.updated_at ? remote.updated_at : null;
@@ -1834,6 +1846,9 @@ export const __testHooks = {
   setStateForTest(nextState) {
     state = nextState;
   },
+  getStateForTest() {
+    return state;
+  },
   setAuthSessionForTest(session) {
     authSession = session;
   },
@@ -1852,6 +1867,9 @@ export const __testHooks = {
   },
   async flushRemoteSaveForTest(snapshot) {
     await remoteSave(snapshot);
+  },
+  syncLatestRemoteStateForTest(options) {
+    return syncLatestRemoteState(options);
   },
 };
 
