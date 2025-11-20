@@ -1599,7 +1599,7 @@ function parseRemoteState(input) {
 
   let current = input;
   let attempts = 0;
-  while (typeof current === 'string' && attempts < 2) {
+  while (typeof current === 'string' && attempts < 5) {
     try {
       current = JSON.parse(current);
       attempts += 1;
