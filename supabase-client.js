@@ -113,7 +113,9 @@ export async function fetchSettings() {
   const { data, error } = await client
     .from('ed_dash_settings')
     .select('id, user_id, state_json, updated_at')
-    .single();
+    .order('updated_at', { ascending: false, nullsLast: true })
+    .limit(1)
+    .maybeSingle();
   if (error) {
     if (error.code === 'PGRST116') {
       return null;

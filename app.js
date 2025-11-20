@@ -1663,6 +1663,15 @@ async function syncLatestRemoteState(options = {}) {
       });
       return { applied: true };
     }
+    console.info('Supabase sync praleistas', {
+      preferRemote,
+      remoteStatePresent: Boolean(remoteState),
+      remoteUpdatedAtIso,
+      remoteHasTimestamp,
+      localHasContent,
+      localUpdatedAt,
+      remoteIsNewerOrEqual,
+    });
     const meta = ensureStateMeta();
     if (remoteId) meta.remoteId = remoteId;
     if (remoteUpdatedAtIso) meta.remoteUpdatedAt = remoteUpdatedAtIso;
