@@ -1595,16 +1595,21 @@ function canSyncRemoteState() {
 function parseRemoteState(input) {
   if (!input) return null;
   if (typeof input === 'object') return input;
-  if (typeof input === 'string') {
+  if (typeof input !== 'string') return null;
+
+  let current = input;
+  let attempts = 0;
+  while (typeof current === 'string' && attempts < 2) {
     try {
-      const parsed = JSON.parse(input);
-      return parsed && typeof parsed === 'object' ? parsed : null;
+      current = JSON.parse(current);
+      attempts += 1;
     } catch (error) {
       console.warn('Nepavyko perskaityti Supabase state_json kaip JSON:', error);
       return null;
     }
   }
-  return null;
+
+  return current && typeof current === 'object' ? current : null;
 }
 
 function hasLocalContent() {
