@@ -23,7 +23,7 @@ export function formatRemoteSyncStatus(meta, T = {}) {
       .toString()
       .padStart(2, '0')}`;
   }
-  const template = T.remoteSyncLast || 'Paskutinė nuotolinė sinchronizacija: {time}';
+  const template = T.remoteSyncLast || 'Atnaujinta: {time}';
   return template.replace('{time}', timeLabel);
 }
 

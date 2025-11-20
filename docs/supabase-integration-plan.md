@@ -75,7 +75,7 @@
 - **Tikslas:** Vartotojas turi matyti, kada paskutinį kartą sinchronizuota, ir galėti importuoti/išeksportuoti į Supabase.
 - **Failai:**
   - `app.js`/`forms.js` – `Duomenų` meniu pridėkite mygtukus „Atsiųsti iš Supabase“ (`remoteFetchButton`) ir „Išsiųsti į Supabase“ (`remotePushButton`).
-  - `render.js` – atnaujinkite `syncStatus` rodmenis: `Paskutinė nuotolinė sinchronizacija: 14:32`.
+- `render.js` – atnaujinkite `syncStatus` rodmenis: `Atnaujinta: 14:32`.
   - `app.js` – `remoteFetch()` turi parodyti modalą su pasirinkimu „Perrašyti vietinius duomenis“ arba „Atšaukti“.
 - **Logika:** konfliktus spręskite paprastai – jei nuotoliniai duomenys naujesni (`remote.updated_at > state.updatedAt`), rodykite įspėjimą su `confirm()` ir tik sutikus perrašykite.
 - **Smoke test:** keiskite būseną dviejuose naršyklės languose ir patikrinkite, kad rankinis „Atsiųsti“ atnaujintų duomenis.
